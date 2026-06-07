@@ -4,6 +4,7 @@ import { useDarkMode } from './use-dark-mode'
 import { useTheme } from './use-theme'
 import { useDateMode } from './use-date-mode'
 import { useAutoMarkRead } from './use-auto-mark-read'
+import { useAutoTranslate } from './use-auto-translate'
 import { useUnreadIndicator } from './use-unread-indicator'
 import { useInternalLinks } from './use-internal-links'
 import { useShowThumbnails } from './use-show-thumbnails'
@@ -28,6 +29,8 @@ interface Prefs {
   'appearance.color_theme': string | null
   'reading.date_mode': string | null
   'reading.auto_mark_read': string | null
+  'reading.auto_translate': string | null
+  'reading.auto_translate_concurrency': string | null
   'reading.unread_indicator': string | null
   'reading.internal_links': string | null
   'reading.show_thumbnails': string | null

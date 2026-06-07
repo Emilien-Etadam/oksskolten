@@ -3,6 +3,7 @@ import {
   getExistingArticleUrls,
   getRetryArticles,
   getRetryStats,
+  getSetting,
   insertArticle,
   updateArticleContent,
   updateFeedError,
@@ -19,7 +20,9 @@ import { type FetchProgressEvent, emitProgress, markFeedDone } from './fetcher/p
 import { fetchFullText, isBotBlockPage, convertHtmlToMarkdown, markdownToExcerpt, MIN_EXTRACTED_LENGTH } from './fetcher/content.js'
 import { type FetchRssResult, fetchAndParseRss, RateLimitError } from './fetcher/rss.js'
 import { computeInterval, computeEmpiricalInterval, sqliteFuture, DEFAULT_INTERVAL } from './fetcher/schedule.js'
+import { DEFAULT_LANGUAGE } from '../shared/lang.js'
 import { detectLanguage } from './fetcher/ai.js'
+import { enqueueAutoTranslate, isAutoTranslateEnabled } from './fetcher/translate-queue.js'
 import { logger } from './logger.js'
 
 const log = logger.child('fetcher')
@@ -136,6 +139,17 @@ interface RetryArticle {
 
 type ArticleTask = NewArticle | RetryArticle
 
+function maybeEnqueueAutoTranslate(
+  articleId: number,
+  fullText: string | null,
+  lang: string | null,
+): void {
+  if (!isAutoTranslateEnabled() || !fullText || !lang || lang === 'unknown') return
+  const targetLang = getSetting('translate.target_lang') || getSetting('general.language') || DEFAULT_LANGUAGE
+  if (lang === targetLang) return
+  enqueueAutoTranslate(articleId, fullText)
+}
+
 /** Returns true if the retry article still has an error after processing. */
 async function processArticle(task: ArticleTask): Promise<boolean> {
   const articleUrl = task.kind === 'new' ? task.url : task.article.url
@@ -164,6 +178,7 @@ async function processArticle(task: ArticleTask): Promise<boolean> {
         og_image: content.ogImage,
         last_error: content.lastError,
       })
+      maybeEnqueueAutoTranslate(articleId, content.fullText, effectiveLang)
       // Fire-and-forget: detect similar articles asynchronously
       void detectAndStoreSimilarArticles(articleId, task.title, task.feed_id, task.published_at)
     } catch (err) {
@@ -180,6 +195,7 @@ async function processArticle(task: ArticleTask): Promise<boolean> {
       og_image: content.ogImage,
       last_error: content.lastError,
     })
+    maybeEnqueueAutoTranslate(task.article.id, content.fullText, effectiveLang)
   }
   return !!content.lastError
 }

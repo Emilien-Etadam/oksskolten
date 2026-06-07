@@ -264,6 +264,13 @@ const dict = {
   },
   'settings.autoMarkReadOn': { ja: 'オン', en: 'On' },
   'settings.autoMarkReadOff': { ja: 'オフ', en: 'Off' },
+  'settings.autoTranslate': { ja: '自動翻訳', en: 'Auto-Translation', fr: 'Auto-traduction' },
+  'settings.autoTranslateDesc': {
+    ja: '外国語の記事を取得時に自動的に翻訳します（vLLMローカルサーバーが必要）',
+    en: 'Automatically translate non-target-language articles on fetch (requires local vLLM server)',
+  },
+  'settings.autoTranslateOn': { ja: 'オン', en: 'On' },
+  'settings.autoTranslateOff': { ja: 'オフ', en: 'Off' },
   'settings.unreadIndicator': { ja: '未読インジケーター', en: 'Unread Indicator' },
   'settings.unreadIndicatorDescDot': {
     ja: '記事リストに未読マーク（ドット）を表示しますか？',

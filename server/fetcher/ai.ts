@@ -1,9 +1,24 @@
+import { franc } from 'franc-min'
 import { getSetting } from '../db.js'
 import { getProvider } from '../providers/llm/index.js'
 import { googleTranslate } from '../providers/translate/google-translate.js'
 import { deeplTranslate } from '../providers/translate/deepl.js'
 import { TASK_DEFAULTS } from '../../shared/models.js'
 import { DEFAULT_LANGUAGE, languageName } from '../../shared/lang.js'
+
+const MIN_DETECT_LENGTH = 10
+const DETECT_SAMPLE_LENGTH = 1000
+
+/** ISO 639-3 (franc) → ISO 639-1 */
+const ISO639_3_TO_1: Record<string, string> = {
+  ara: 'ar', bul: 'bg', ces: 'cs', dan: 'da', deu: 'de', ell: 'el', eng: 'en',
+  spa: 'es', est: 'et', fin: 'fi', fra: 'fr', heb: 'he', hin: 'hi', hrv: 'hr',
+  hun: 'hu', ind: 'id', ita: 'it', jpn: 'ja', kor: 'ko', lit: 'lt', lav: 'lv',
+  nld: 'nl', nor: 'no', pol: 'pl', por: 'pt', ron: 'ro', rus: 'ru', slk: 'sk',
+  slv: 'sl', swe: 'sv', tur: 'tr', ukr: 'uk', vie: 'vi', zho: 'zh', cmn: 'zh',
+}
+
+const detectCache = new Map<string, string>()
 
 export type AiBillingMode = 'anthropic' | 'gemini' | 'openai' | 'claude-code' | 'ollama' | 'vllm' | 'google-translate' | 'deepl'
 
@@ -15,10 +30,27 @@ export interface AiTextResult {
   monthlyChars?: number
 }
 
+function mapIso639_3(code: string): string {
+  return ISO639_3_TO_1[code] ?? code
+}
+
 export function detectLanguage(fullText: string): string {
-  const sample = fullText.slice(0, 1000)
-  const jaCount = (sample.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/g) || []).length
-  return jaCount / sample.length > 0.1 ? 'ja' : 'en'
+  const trimmed = fullText.trim()
+  if (!trimmed || trimmed.length < MIN_DETECT_LENGTH) return 'unknown'
+
+  const sample = trimmed.slice(0, DETECT_SAMPLE_LENGTH)
+  const cached = detectCache.get(sample)
+  if (cached) return cached
+
+  const iso3 = franc(sample)
+  const lang = iso3 === 'und' ? 'unknown' : mapIso639_3(iso3)
+  detectCache.set(sample, lang)
+  return lang
+}
+
+/** @internal test helper */
+export function _clearDetectLanguageCache(): void {
+  detectCache.clear()
 }
 
 
@@ -66,8 +98,9 @@ async function runAiTask(
   config: AiTaskConfig,
   fullText: string,
   onText?: (delta: string) => void,
+  providerOverride?: string,
 ): Promise<{ text: string } & AiTextResult> {
-  const providerName = getSetting(config.providerKey) || TASK_DEFAULTS.summarize.provider
+  const providerName = providerOverride || getSetting(config.providerKey) || TASK_DEFAULTS.summarize.provider
   const model = getSetting(config.modelKey) || config.defaultModel
   const provider = getProvider(providerName)
   provider.requireKey()
@@ -123,15 +156,20 @@ export async function streamSummarizeArticle(
   return { summary: r.text, inputTokens: r.inputTokens, outputTokens: r.outputTokens, billingMode: r.billingMode, model: r.model }
 }
 
-export async function translateArticle(fullText: string): Promise<{ fullTextTranslated: string } & AiTextResult> {
-  const provider = getSetting('translate.provider') || TASK_DEFAULTS.translate.provider
-  if (provider === 'google-translate') {
-    return runGoogleTranslate(fullText)
+export async function translateArticle(
+  fullText: string,
+  options?: { provider?: string },
+): Promise<{ fullTextTranslated: string } & AiTextResult> {
+  const provider = options?.provider || getSetting('translate.provider') || TASK_DEFAULTS.translate.provider
+  if (!options?.provider) {
+    if (provider === 'google-translate') {
+      return runGoogleTranslate(fullText)
+    }
+    if (provider === 'deepl') {
+      return runDeepl(fullText)
+    }
   }
-  if (provider === 'deepl') {
-    return runDeepl(fullText)
-  }
-  const r = await runAiTask(translateConfig, fullText)
+  const r = await runAiTask(translateConfig, fullText, undefined, options?.provider)
   return { fullTextTranslated: r.text, inputTokens: r.inputTokens, outputTokens: r.outputTokens, billingMode: r.billingMode, model: r.model }
 }
 

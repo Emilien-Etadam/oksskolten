@@ -9,6 +9,7 @@ export function ReadingSection() {
   const { settings } = useAppLayout()
   const {
     autoMarkRead, setAutoMarkRead,
+    autoTranslate, setAutoTranslate,
     keyboardNavigation, setKeyboardNavigation,
     keybindings, setKeybindings,
     showUnreadIndicator, setShowUnreadIndicator,
@@ -350,6 +351,20 @@ export function ReadingSection() {
           ]}
           value={autoMarkRead}
           onChange={setAutoMarkRead}
+        />
+      </div>
+
+      <div className="mt-6">
+        <p className="text-sm text-text mb-1">{t('settings.autoTranslate')}</p>
+        <p className="text-xs text-muted mb-3">{t('settings.autoTranslateDesc')}</p>
+        <RadioGroup
+          name="autoTranslate"
+          options={[
+            { value: 'on' as const, label: t('settings.autoTranslateOn') },
+            { value: 'off' as const, label: t('settings.autoTranslateOff') },
+          ]}
+          value={autoTranslate}
+          onChange={setAutoTranslate}
         />
       </div>
 

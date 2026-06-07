@@ -29,6 +29,8 @@ const PREF_KEYS = [
   'appearance.color_theme',
   'reading.date_mode',
   'reading.auto_mark_read',
+  'reading.auto_translate',
+  'reading.auto_translate_concurrency',
   'reading.unread_indicator',
   'reading.internal_links',
   'reading.show_thumbnails',
@@ -63,6 +65,8 @@ const PREF_ALLOWED: Record<PrefKey, string[] | null> = {
   'appearance.color_theme': null,
   'reading.date_mode': ['relative', 'absolute'],
   'reading.auto_mark_read': ['on', 'off'],
+  'reading.auto_translate': ['on', 'off'],
+  'reading.auto_translate_concurrency': null,
   'reading.unread_indicator': ['on', 'off'],
   'reading.internal_links': ['on', 'off'],
   'reading.show_thumbnails': ['on', 'off'],
@@ -82,7 +86,7 @@ const PREF_ALLOWED: Record<PrefKey, string[] | null> = {
   'summary.model': getAllModelValues(),
   'translate.provider': ['anthropic', 'gemini', 'openai', 'claude-code', 'ollama', 'vllm', 'google-translate', 'deepl'],
   'translate.model': getAllModelValues(),
-  'translate.target_lang': ['ja', 'en'],
+  'translate.target_lang': ['ja', 'en', 'fr'],
   'ollama.base_url': null,
   'ollama.custom_headers': null,
   'vllm.base_url': null,
@@ -239,6 +243,13 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
         const parsed = z.coerce.number().int().min(1).max(9999).safeParse(value)
         if (!parsed.success) {
           reply.status(400).send({ error: `${key} must be a positive integer (1-9999)` })
+          return
+        }
+      }
+      if (key === 'reading.auto_translate_concurrency') {
+        const parsed = z.coerce.number().int().min(1).max(5).safeParse(value)
+        if (!parsed.success) {
+          reply.status(400).send({ error: `${key} must be an integer between 1 and 5` })
           return
         }
       }
