@@ -46,6 +46,10 @@ the list's existing instant-update + batched-server mechanism via an `onMarkRead
 prop threaded through `article-list.tsx` → `swipeable-article-card.tsx` →
 `article-card.tsx`, plus one i18n key (`article.markAsRead`).
 
+On touch devices, swiping an unread card to the right also marks it read (left swipe
+still opens the article). The handled gesture stops propagation so it doesn't open
+the sidebar drawer.
+
 ## Upstream fixes
 
 - **CSP inline scripts**: the strict `script-src 'self'` blocked the two inline
