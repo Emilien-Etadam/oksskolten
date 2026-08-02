@@ -23,11 +23,19 @@ of the last visited list. Reuses the existing keyboard-navigation context that p
 j/k zap navigation. Mounted from `src/components/article/article-detail.tsx`
 (2-line insertion).
 
+## Bottom tab bar
+
+`src/components/layout/bottom-nav.tsx` — newspaper-app-style bottom bar with the main
+destinations (Inbox, Search, Read Later, Chat) plus a Menu tab that opens the sidebar.
+Shown when the sidebar is closed; hidden on the chat page. Mounted from
+`src/components/layout/page-layout.tsx` (2-line insertion).
+
 ## Upstream files touched
 
 | File | Change |
 |---|---|
 | `src/app.tsx` | +2 lines (import + `<CategoryTabs />`) |
 | `src/components/article/article-detail.tsx` | +2 lines (import + `<ArticleSwipeNavigation />`) |
+| `src/components/layout/page-layout.tsx` | +2 lines (import + `<BottomNav />`) |
 
 Everything else is new files, so merges from upstream should stay conflict-free.
