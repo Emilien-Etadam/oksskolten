@@ -30,6 +30,14 @@ destinations (Inbox, Search, Read Later, Chat) plus a Menu tab that opens the si
 Shown when the sidebar is closed; hidden on the chat page. Mounted from
 `src/components/layout/page-layout.tsx` (2-line insertion).
 
+## Hide-sidebar setting
+
+`src/hooks/use-hide-sidebar.ts` + `src/pages/settings/sidebar-visibility-section.tsx` —
+Settings → Appearance → Sidebar toggle. When hidden, the sidebar no longer opens
+automatically on desktop and navigation happens through the bottom tab bar; the Menu
+tab still opens the sidebar on demand. Wired via small insertions in `src/app.tsx`,
+`src/pages/settings/appearance-tab.tsx`, and four new keys in `src/lib/i18n.ts`.
+
 ## Upstream files touched
 
 | File | Change |
@@ -37,5 +45,10 @@ Shown when the sidebar is closed; hidden on the chat page. Mounted from
 | `src/app.tsx` | +2 lines (import + `<CategoryTabs />`) |
 | `src/components/article/article-detail.tsx` | +2 lines (import + `<ArticleSwipeNavigation />`) |
 | `src/components/layout/page-layout.tsx` | +2 lines (import + `<BottomNav />`) |
+| `src/pages/settings/appearance-tab.tsx` | +4 lines (import + `<SidebarVisibilitySection />`) |
+| `src/lib/i18n.ts` | +4 keys (`settings.hideSidebar*`) |
+
+`src/app.tsx` additionally has 2 lines adjusted (sidebar auto-open respects the
+hide-sidebar setting).
 
 Everything else is new files, so merges from upstream should stay conflict-free.
