@@ -113,6 +113,15 @@ describe('translate-queue', () => {
     expect(mockTranslateArticle).toHaveBeenCalledTimes(1)
   })
 
+  it('does not store an empty translation result', async () => {
+    mockTranslateArticle.mockResolvedValue({ fullTextTranslated: '' })
+    enqueueAutoTranslate(1, 'Full english text')
+    await flushQueue()
+    expect(mockTranslateArticle).toHaveBeenCalled()
+    expect(mockUpdateArticleContent).not.toHaveBeenCalled()
+    expect(mockUpdateScore).not.toHaveBeenCalled()
+  })
+
   it('survives translation failures without throwing', async () => {
     mockTranslateArticle.mockRejectedValue(new Error('vLLM unreachable'))
     enqueueAutoTranslate(1, 'Full english text')

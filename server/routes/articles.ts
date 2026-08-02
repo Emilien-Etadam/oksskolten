@@ -177,12 +177,16 @@ function createAiHandler(config: AiHandlerConfig) {
           article.full_text,
           (delta) => { sse.send({ type: 'delta', text: delta }) },
         )
+        // An empty result is a provider failure (e.g. wrong vLLM model name,
+        // reasoning-only output) — surface it instead of storing nothing
+        if (!result.text.trim()) throw new Error(config.errorCode)
         config.applyResult(article.id, result.text)
         const usage = formatUsage(result)
         sse.send({ type: 'done', usage })
         sse.end()
       } else {
         const result = await config.nonStreamFn(article.full_text)
+        if (!result.text.trim()) throw new Error(config.errorCode)
         config.applyResult(article.id, result.text)
         reply.send({ text: result.text, usage: formatUsage(result) })
       }

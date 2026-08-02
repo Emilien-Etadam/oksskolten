@@ -142,6 +142,31 @@ describe('POST /api/articles/:id/summarize?stream=1', () => {
     expect(errorEvent).toBeDefined()
     expect(errorEvent.error).toBe('SUMMARIZATION_FAILED')
   })
+
+  it('treats an empty streamed result as a failure', async () => {
+    const feed = seedFeed()
+    const artId = seedArticle(feed.id, { full_text: 'Long content' })
+
+    // Provider "succeeds" but produces no text (e.g. wrong vLLM model name)
+    mockStreamSummarize.mockResolvedValue({ summary: '', inputTokens: 0, outputTokens: 0, billingMode: 'standard', model: 'haiku' })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/articles/${artId}/summarize?stream=1`,
+      headers: json,
+      payload: {},
+    })
+
+    expect(res.statusCode).toBe(200)
+    const events = res.body
+      .split('\n')
+      .filter((l: string) => l.startsWith('data: '))
+      .map((l: string) => JSON.parse(l.slice(6)))
+    const errorEvent = events.find((e: any) => e.type === 'error')
+    expect(errorEvent).toBeDefined()
+    expect(errorEvent.error).toBe('SUMMARIZATION_FAILED')
+    expect(events.find((e: any) => e.type === 'done')).toBeUndefined()
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -149,6 +174,29 @@ describe('POST /api/articles/:id/summarize?stream=1', () => {
 // ---------------------------------------------------------------------------
 
 describe('POST /api/articles/:id/translate', () => {
+  it('treats an empty streamed translation as a failure', async () => {
+    const feed = seedFeed()
+    const artId = seedArticle(feed.id, { full_text: 'French text', lang: 'fr' })
+
+    mockStreamTranslate.mockResolvedValue({ fullTextTranslated: '', inputTokens: 0, outputTokens: 0, billingMode: 'standard', model: 'sonnet' })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/articles/${artId}/translate?stream=1`,
+      headers: json,
+      payload: {},
+    })
+
+    expect(res.statusCode).toBe(200)
+    const events = res.body
+      .split('\n')
+      .filter((l: string) => l.startsWith('data: '))
+      .map((l: string) => JSON.parse(l.slice(6)))
+    const errorEvent = events.find((e: any) => e.type === 'error')
+    expect(errorEvent).toBeDefined()
+    expect(errorEvent.error).toBe('TRANSLATION_FAILED')
+  })
+
   it('returns cached translation', async () => {
     const feed = seedFeed()
     const artId = seedArticle(feed.id, { full_text: 'English text', full_text_translated: '日本語テキスト', translated_lang: 'en' })

@@ -46,6 +46,10 @@ async function processItem(item: TranslateQueueItem): Promise<void> {
     if (article.lang === item.targetLang) return
 
     const result = await translateArticle(article.full_text, { provider: 'vllm' })
+    if (!result.fullTextTranslated.trim()) {
+      log.warn(`auto-translate returned empty text for article ${item.articleId}, skipping`)
+      return
+    }
     updateArticleContent(item.articleId, {
       full_text_translated: result.fullTextTranslated,
       translated_lang: item.targetLang,
