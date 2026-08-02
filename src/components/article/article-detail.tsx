@@ -22,6 +22,7 @@ import { useAppLayout } from '../../app'
 import { Skeleton } from '../ui/skeleton'
 import { Callout } from '../ui/callout'
 import { ArticleZapNavigation } from './article-zap-navigation'
+import { ArticleSwipeNavigation } from './article-swipe-navigation'
 import { ArticleToolbar } from './article-toolbar'
 import { ArticleSummarySection } from './article-summary-section'
 import { ArticleTranslationBanner } from './article-translation-banner'
@@ -182,6 +183,7 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
 
   return (
     <>
+      {enableZapNavigation && <ArticleSwipeNavigation currentArticleId={String(article.id)} />}
       {enableZapNavigation && (
         <ArticleZapNavigation
           currentArticleId={String(article.id)}
