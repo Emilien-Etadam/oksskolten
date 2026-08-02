@@ -17,7 +17,8 @@
     "lint": "eslint src/ server/ shared/",
     "typecheck": "tsc --noEmit",
     "test": "mise exec node@22 -- vitest run",
-    "test:watch": "mise exec node@22 -- vitest"
+    "test:watch": "mise exec node@22 -- vitest",
+    "test:e2e": "npm run build && playwright test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
@@ -71,6 +72,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",

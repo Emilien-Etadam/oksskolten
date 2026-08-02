@@ -79,6 +79,25 @@ Key files: `server/fetcher/translate-queue.ts` (queue), `server/fetcher/ai.ts`
 (franc detection + provider override), `migrations/0009_auto_translate.sql`,
 `src/hooks/use-auto-translate.ts`.
 
+## Front page (La Une)
+
+`/` is a newspaper-style front page (`src/pages/front-page.tsx`,
+`server/routes/frontpage.ts` + `server/db/frontpage.ts`): a hero article (highest
+score, image preferred) followed by the top unread articles of each category,
+reusing the magazine card variants. The chat-first home screen it replaces remains
+available as the chat page (`/chat`). Note: `/` is not wired into demo mode.
+
+## Tooling
+
+- **E2E smoke tests**: `npm run test:e2e` (Playwright) builds the app, boots the
+  real server against a scratch DB (`.e2e-data/`), and checks the front page,
+  the inbox → reader flow, and the mobile bottom bar. Set `PW_CHROMIUM_PATH` to
+  reuse a preinstalled Chromium.
+- **DB backup**: `scripts/backup-db.sh` snapshots the SQLite database with the
+  online backup API (WAL-safe), gzip + rotation. See the header for a cron line.
+- **CI**: the upstream `test.yaml` workflow uses no secrets and runs on push to
+  main — enable GitHub Actions on the fork to validate every upstream sync.
+
 ## Upstream fixes
 
 - **CSP inline scripts**: the strict `script-src 'self'` blocked the two inline

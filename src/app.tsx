@@ -19,7 +19,7 @@ import { CategoryTabs } from './components/feed/category-tabs'
 import { isSidebarCollapsed, persistSidebarCollapsed } from './lib/sidebar-collapsed'
 const SettingsPage = lazy(() => import('./pages/settings-page').then(m => ({ default: m.SettingsPage })))
 const ChatPage = lazy(() => import('./pages/chat-page').then(m => ({ default: m.ChatPage })))
-const HomePage = lazy(() => import('./pages/home-page').then(m => ({ default: m.HomePage })))
+const FrontPage = lazy(() => import('./pages/front-page').then(m => ({ default: m.FrontPage })))
 import { AuthShell } from './lib/auth-shell'
 import { ErrorBoundary } from './components/auth/error-boundary'
 import { HintBanner } from './components/ui/hint-banner'
@@ -214,11 +214,13 @@ function ChatPageWrapper() {
   )
 }
 
-function HomePageWrapper() {
+function FrontPageWrapper() {
+  const { t } = useI18n()
   return (
-    <PageLayout>
+    <PageLayout feedName={t('frontpage.title')}>
+      <CategoryTabs />
       <Suspense>
-        <HomePage />
+        <FrontPage />
       </Suspense>
     </PageLayout>
   )
@@ -324,7 +326,7 @@ function AnimatedRoutes() {
         <ScrollRestore pathname={location.pathname} pageType={pageType} />
         <Routes location={location}>
           <Route element={<AppLayout />}>
-            <Route path="/" element={<HomePageWrapper />} />
+            <Route path="/" element={<FrontPageWrapper />} />
             <Route path="/inbox" element={<ArticleListPage />} />
             <Route path="/bookmarks" element={<ArticleListPage />} />
             <Route path="/likes" element={<ArticleListPage />} />

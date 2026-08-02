@@ -126,6 +126,7 @@ const dict = {
   'hint.history': { ja: '記事を開いて読んだ履歴。「スクロールで自動既読」で流れたものは含まず、実際に開いた記事だけが残ります。', en: 'Articles you actually opened and read. Items swept away by "Auto-Mark As Read On Scroll" aren\'t included — only articles you tapped into.', zh: '您实际打开并阅读的文章。「滚动时自动标为已读」跳过的不包括在内 — 只有您点进去看的文章。' },
   'articles.showOlder': { ja: 'もっと読む（${count}件）', en: 'Show older articles (${count})', zh: '显示更早的文章（${count}）'},
   'articles.allCaughtUp': { ja: '全部読んだよ！', en: "You're all caught up!", zh: "全部读完了！"},
+  'frontpage.title': { ja: 'トップ', en: 'Front Page', zh: '头版'},
 
   // ArticleDetail
   'article.markAsRead': { ja: '既読にする', en: 'Mark as read', zh: '标为已读'},
