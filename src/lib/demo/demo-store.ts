@@ -183,6 +183,7 @@ function toArticleListItem(a: SeedArticle): ArticleListItem {
     feed_id: a.feed_id,
     feed_name: feedName(a.feed_id),
     title: a.title,
+    title_translated: null,
     url: a.url,
     published_at: a.published_at,
     lang: a.lang,

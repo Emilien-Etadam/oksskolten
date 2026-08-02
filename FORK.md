@@ -49,6 +49,23 @@ On touch devices, swiping an unread card to the right also marks it read (left s
 still opens the article). The handled gesture stops propagation so it doesn't open
 the sidebar drawer.
 
+## Background AI pipeline (vLLM)
+
+The auto-translate queue evolved into a persistent AI queue
+(`server/fetcher/ai-queue.ts`, migration `0010_ai_pipeline.sql`):
+
+- **Persistent**: queued work is marked in DB (`translate_pending_at`,
+  `summarize_pending_at`) and resumed after restarts or failures, with a 10-minute
+  backoff and bounded batches, at the start of every fetch cycle.
+- **Translated titles**: the queue also translates article titles
+  (`title_translated`), shown in every list card and in the reader's translated
+  view. Manual translation triggers a best-effort title translation too.
+- **Auto-summarize**: Settings → Reading → Auto-Summarize generates summaries on
+  fetch via vLLM (`reading.auto_summarize`).
+
+Category tabs show per-category unread counts, and the article card variants share
+a common `CardMeta` row.
+
 ## Auto-translation on fetch (vLLM)
 
 Settings → Reading → Auto-Translation. When enabled, every fetched article whose

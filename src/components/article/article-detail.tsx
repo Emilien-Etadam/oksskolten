@@ -192,9 +192,9 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
         />
       )}
       <article ref={articleRef} className="article-card max-w-2xl mx-auto px-6 md:px-10 py-8">
-      {/* Title */}
+      {/* Title — translated when reading the translated view */}
       <h1 className="mb-1.5 text-[28px] font-bold leading-[1.3] break-words [overflow-wrap:anywhere]">
-        {article.title}
+        {viewMode === 'translated' && !isUserLang && article.title_translated ? article.title_translated : article.title}
       </h1>
 
       {/* Date */}

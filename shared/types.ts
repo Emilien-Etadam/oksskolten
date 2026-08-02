@@ -65,6 +65,7 @@ export interface ArticleListItem {
   feed_id: number
   feed_name: string
   title: string
+  title_translated: string | null
   url: string
   published_at: string | null
   lang: string | null

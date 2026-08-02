@@ -10,6 +10,7 @@ export function ReadingSection() {
   const {
     autoMarkRead, setAutoMarkRead,
     autoTranslate, setAutoTranslate,
+    autoSummarize, setAutoSummarize,
     keyboardNavigation, setKeyboardNavigation,
     keybindings, setKeybindings,
     showUnreadIndicator, setShowUnreadIndicator,
@@ -365,6 +366,20 @@ export function ReadingSection() {
           ]}
           value={autoTranslate}
           onChange={setAutoTranslate}
+        />
+      </div>
+
+      <div className="mt-6">
+        <p className="text-sm text-text mb-1">{t('settings.autoSummarize')}</p>
+        <p className="text-xs text-muted mb-3">{t('settings.autoSummarizeDesc')}</p>
+        <RadioGroup
+          name="autoSummarize"
+          options={[
+            { value: 'on' as const, label: t('settings.autoSummarizeOn') },
+            { value: 'off' as const, label: t('settings.autoSummarizeOff') },
+          ]}
+          value={autoSummarize}
+          onChange={setAutoSummarize}
         />
       </div>
 

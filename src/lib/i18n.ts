@@ -286,6 +286,14 @@ const dict = {
   },
   'settings.autoTranslateOn': { ja: 'オン', en: 'On', zh: '开'},
   'settings.autoTranslateOff': { ja: 'オフ', en: 'Off', zh: '关'},
+  'settings.autoSummarize': { ja: '自動要約', en: 'Auto-Summarize', zh: '自动摘要'},
+  'settings.autoSummarizeDesc': {
+    ja: '記事を取得時に自動的に要約します（vLLMローカルサーバーが必要）',
+    en: 'Automatically summarize articles on fetch (requires local vLLM server)',
+    zh: '获取文章时自动生成摘要（需要本地 vLLM 服务器）'
+  },
+  'settings.autoSummarizeOn': { ja: 'オン', en: 'On', zh: '开'},
+  'settings.autoSummarizeOff': { ja: 'オフ', en: 'Off', zh: '关'},
   'settings.unreadIndicator': { ja: '未読インジケーター', en: 'Unread Indicator', zh: '未读指示器'},
   'settings.unreadIndicatorDescDot': {
     ja: '記事リストに未読マーク（ドット）を表示しますか？',

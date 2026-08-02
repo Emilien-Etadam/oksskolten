@@ -113,6 +113,8 @@ function useCardBase(article: ArticleListItem, dateMode: 'relative' | 'absolute'
     ? formatRelativeDate(article.published_at, locale, { justNow: t('date.justNow') })
     : formatDate(article.published_at, locale)
   const href = articleUrlToPath(article.url)
+  // Prefer the auto/manually translated title when available
+  const title = article.title_translated || article.title
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (onClick) { onClick(e); return }
@@ -121,12 +123,47 @@ function useCardBase(article: ArticleListItem, dateMode: 'relative' | 'absolute'
     void navigate(href)
   }
 
-  return { isUnread, domain, dateText, href, handleClick, originalUrl: article.url }
+  return { isUnread, domain, dateText, href, handleClick, originalUrl: article.url, title }
+}
+
+interface CardMetaProps {
+  domain: string | null
+  dateText: string
+  article: ArticleListItem
+  isUnread: boolean
+  onMarkRead?: (articleId: number) => void
+  /** md = 12px text / 14px favicon, sm = 11px text / 12px favicon */
+  size?: 'md' | 'sm'
+  className?: string
+}
+
+/** Shared meta row: favicon + domain + date, with an optional mark-read button. */
+function CardMeta({ domain, dateText, article, isUnread, onMarkRead, size = 'md', className = '' }: CardMetaProps) {
+  const iconSize = size === 'md' ? 14 : 12
+  return (
+    <div className={`flex items-center gap-1 ${size === 'md' ? 'text-[12px]' : 'text-[11px]'} text-muted whitespace-nowrap min-w-0 ${className}`}>
+      {domain && (
+        <>
+          <img
+            src={`https://www.google.com/s2/favicons?sz=16&domain=${domain}`}
+            alt=""
+            width={iconSize}
+            height={iconSize}
+            className="shrink-0"
+          />
+          <span className="truncate">{domain}</span>
+          <span className="mx-0.5 shrink-0">·</span>
+        </>
+      )}
+      <span className="shrink-0">{dateText}</span>
+      {isUnread && onMarkRead && <MarkReadButton className="ml-auto -my-1.5" onClick={() => onMarkRead(article.id)} />}
+    </div>
+  )
 }
 
 /** List layout — classic single-column (current default) */
 function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, showThumbnails, onClick, onMarkRead }: ArticleCardProps) {
-  const { isUnread, domain, dateText, href, handleClick, originalUrl } = useCardBase(article, dateMode, onClick)
+  const { isUnread, domain, dateText, href, handleClick, originalUrl, title } = useCardBase(article, dateMode, onClick)
   const showIndicator = isUnread && showUnreadIndicator
 
   return (
@@ -152,29 +189,14 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, show
               isUnread ? 'font-semibold text-text' : 'font-normal text-muted'
             }`}
           >
-            {article.title}
+            {title}
           </span>
           {article.excerpt && (
             <p className="text-[13px] text-muted truncate mt-0.5">
               {article.excerpt}
             </p>
           )}
-          <div className="flex items-center gap-1 text-[12px] text-muted mt-1 whitespace-nowrap min-w-0">
-            {domain && (
-              <>
-                <img
-                  src={`https://www.google.com/s2/favicons?sz=16&domain=${domain}`}
-                  alt=""
-                  width={14}
-                  height={14}
-                  className="shrink-0"
-                />
-                <span className="truncate">{domain}</span>
-                <span className="mx-0.5 shrink-0">·</span>
-              </>
-            )}
-            <span className="shrink-0">{dateText}</span>
-          </div>
+          <CardMeta domain={domain} dateText={dateText} article={article} isUnread={isUnread} className="mt-1" />
         </div>
         {showThumbnails && <Thumbnail src={article.og_image} articleUrl={article.url} />}
         {isUnread && onMarkRead && <MarkReadButton onClick={() => onMarkRead(article.id)} />}
@@ -185,7 +207,7 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, show
 
 /** Card layout — image-forward grid card */
 function GridCard({ article, dateMode, showThumbnails, onClick, onMarkRead }: ArticleCardProps) {
-  const { isUnread, domain, dateText, href, handleClick, originalUrl } = useCardBase(article, dateMode, onClick)
+  const { isUnread, domain, dateText, href, handleClick, originalUrl, title } = useCardBase(article, dateMode, onClick)
 
   return (
     <a
@@ -201,30 +223,14 @@ function GridCard({ article, dateMode, showThumbnails, onClick, onMarkRead }: Ar
             isUnread ? 'font-semibold text-text' : 'font-normal text-muted'
           }`}
         >
-          {article.title}
+          {title}
         </span>
         {article.excerpt && (
           <p className="text-[12px] text-muted line-clamp-2 mt-1">
             {article.excerpt}
           </p>
         )}
-        <div className="flex items-center gap-1 text-[11px] text-muted mt-2">
-          {domain && (
-            <>
-              <img
-                src={`https://www.google.com/s2/favicons?sz=16&domain=${domain}`}
-                alt=""
-                width={12}
-                height={12}
-                className="shrink-0"
-              />
-              <span className="truncate">{domain}</span>
-              <span className="mx-0.5 shrink-0">·</span>
-            </>
-          )}
-          <span className="shrink-0">{dateText}</span>
-          {isUnread && onMarkRead && <MarkReadButton className="ml-auto -my-1.5" onClick={() => onMarkRead(article.id)} />}
-        </div>
+        <CardMeta domain={domain} dateText={dateText} article={article} isUnread={isUnread} onMarkRead={onMarkRead} size="sm" className="mt-2" />
       </div>
     </a>
   )
@@ -232,7 +238,7 @@ function GridCard({ article, dateMode, showThumbnails, onClick, onMarkRead }: Ar
 
 /** Magazine layout — hero card (large) */
 function HeroCard({ article, dateMode, showThumbnails, onClick, onMarkRead }: ArticleCardProps) {
-  const { isUnread, domain, dateText, href, handleClick, originalUrl } = useCardBase(article, dateMode, onClick)
+  const { isUnread, domain, dateText, href, handleClick, originalUrl, title } = useCardBase(article, dateMode, onClick)
 
   return (
     <a
@@ -248,30 +254,14 @@ function HeroCard({ article, dateMode, showThumbnails, onClick, onMarkRead }: Ar
             isUnread ? 'font-semibold text-text' : 'font-normal text-muted'
           }`}
         >
-          {article.title}
+          {title}
         </span>
         {article.excerpt && (
           <p className="text-[14px] text-muted line-clamp-3 mt-1.5">
             {article.excerpt}
           </p>
         )}
-        <div className="flex items-center gap-1 text-[12px] text-muted mt-2">
-          {domain && (
-            <>
-              <img
-                src={`https://www.google.com/s2/favicons?sz=16&domain=${domain}`}
-                alt=""
-                width={14}
-                height={14}
-                className="shrink-0"
-              />
-              <span>{domain}</span>
-              <span className="mx-0.5">·</span>
-            </>
-          )}
-          <span>{dateText}</span>
-          {isUnread && onMarkRead && <MarkReadButton className="ml-auto -my-1.5" onClick={() => onMarkRead(article.id)} />}
-        </div>
+        <CardMeta domain={domain} dateText={dateText} article={article} isUnread={isUnread} onMarkRead={onMarkRead} className="mt-2" />
       </div>
     </a>
   )
@@ -279,7 +269,7 @@ function HeroCard({ article, dateMode, showThumbnails, onClick, onMarkRead }: Ar
 
 /** Magazine layout — small card (below hero) */
 function SmallCard({ article, dateMode, showThumbnails, onClick, onMarkRead }: ArticleCardProps) {
-  const { isUnread, domain, dateText, href, handleClick, originalUrl } = useCardBase(article, dateMode, onClick)
+  const { isUnread, domain, dateText, href, handleClick, originalUrl, title } = useCardBase(article, dateMode, onClick)
 
   return (
     <a
@@ -295,30 +285,14 @@ function SmallCard({ article, dateMode, showThumbnails, onClick, onMarkRead }: A
             isUnread ? 'font-semibold text-text' : 'font-normal text-muted'
           }`}
         >
-          {article.title}
+          {title}
         </span>
         {article.excerpt && (
           <p className="text-[12px] text-muted truncate mt-0.5">
             {article.excerpt}
           </p>
         )}
-        <div className="flex items-center gap-1 text-[11px] text-muted mt-1 whitespace-nowrap min-w-0">
-          {domain && (
-            <>
-              <img
-                src={`https://www.google.com/s2/favicons?sz=16&domain=${domain}`}
-                alt=""
-                width={12}
-                height={12}
-                className="shrink-0"
-              />
-              <span className="truncate">{domain}</span>
-              <span className="mx-0.5 shrink-0">·</span>
-            </>
-          )}
-          <span className="shrink-0">{dateText}</span>
-          {isUnread && onMarkRead && <MarkReadButton className="ml-auto -my-1.5" onClick={() => onMarkRead(article.id)} />}
-        </div>
+        <CardMeta domain={domain} dateText={dateText} article={article} isUnread={isUnread} onMarkRead={onMarkRead} size="sm" className="mt-1" />
       </div>
     </a>
   )
@@ -326,7 +300,7 @@ function SmallCard({ article, dateMode, showThumbnails, onClick, onMarkRead }: A
 
 /** Compact layout — title and date only */
 function CompactCard({ article, dateMode, indicatorStyle, showUnreadIndicator, onClick, onMarkRead }: ArticleCardProps) {
-  const { isUnread, dateText, href, handleClick, originalUrl } = useCardBase(article, dateMode, onClick)
+  const { isUnread, dateText, href, handleClick, originalUrl, title } = useCardBase(article, dateMode, onClick)
   const showIndicator = isUnread && showUnreadIndicator
 
   return (
@@ -351,7 +325,7 @@ function CompactCard({ article, dateMode, indicatorStyle, showUnreadIndicator, o
             isUnread ? 'font-medium text-text' : 'font-normal text-muted'
           }`}
         >
-          {article.title}
+          {title}
         </span>
         <span className="text-[11px] text-muted shrink-0 ml-2">{dateText}</span>
         {isUnread && onMarkRead && <MarkReadButton className="w-6 h-6 -my-1" onClick={() => onMarkRead(article.id)} />}

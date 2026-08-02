@@ -32,6 +32,10 @@ vi.mock('../anthropic.js', () => ({
   anthropic: { messages: { stream: vi.fn(), create: vi.fn() } },
 }))
 
+vi.mock('../fetcher/ai-queue.js', () => ({
+  translateArticleTitle: vi.fn(),
+}))
+
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------

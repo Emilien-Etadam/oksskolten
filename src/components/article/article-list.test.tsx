@@ -122,6 +122,7 @@ function makeArticle(overrides: Partial<ArticleListItem> = {}): ArticleListItem 
     feed_id: 1,
     feed_name: 'Test Feed',
     title: 'Test Article',
+    title_translated: null,
     url: 'https://example.com/1',
     published_at: '2026-01-01T00:00:00Z',
     lang: 'en',

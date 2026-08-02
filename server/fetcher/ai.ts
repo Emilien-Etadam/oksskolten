@@ -162,8 +162,60 @@ const translateConfig: AiTaskConfig = {
   buildPrompt: buildTranslatePrompt,
 }
 
-export async function summarizeArticle(fullText: string): Promise<{ summary: string } & AiTextResult> {
-  const r = await runAiTask(summarizeConfig, fullText)
+const TITLE_MAX_TOKENS = 256
+
+function buildTranslateTitlePrompt(title: string): string {
+  const lang = getSetting('translate.target_lang') || getSetting('general.language') || DEFAULT_LANGUAGE
+  return `Translate the following article title into ${languageName(lang)}. Output only the translated title, nothing else.
+
+${title}`
+}
+
+const translateTitleConfig: AiTaskConfig = {
+  providerKey: 'translate.provider',
+  modelKey: 'translate.model',
+  defaultModel: TASK_DEFAULTS.translate.model,
+  maxTokensKey: 'translate.title_max_tokens',
+  defaultMaxTokens: TITLE_MAX_TOKENS,
+  buildPrompt: buildTranslateTitlePrompt,
+}
+
+/** Remove wrapping quotes a model may add around a translated title. */
+function unquoteTitle(text: string): string {
+  const trimmed = text.trim()
+  const pairs: Array<[string, string]> = [['"', '"'], ['«', '»'], ['“', '”'], ['「', '」']]
+  for (const [open, close] of pairs) {
+    if (trimmed.startsWith(open) && trimmed.endsWith(close) && trimmed.length > open.length + close.length) {
+      return trimmed.slice(open.length, -close.length).trim()
+    }
+  }
+  return trimmed
+}
+
+export async function translateTitle(
+  title: string,
+  options?: { provider?: string },
+): Promise<{ titleTranslated: string } & AiTextResult> {
+  const provider = options?.provider || getSetting('translate.provider') || TASK_DEFAULTS.translate.provider
+  if (!options?.provider) {
+    if (provider === 'google-translate') {
+      const r = await runGoogleTranslate(title)
+      return { titleTranslated: unquoteTitle(r.fullTextTranslated), inputTokens: r.inputTokens, outputTokens: r.outputTokens, billingMode: r.billingMode, model: r.model, monthlyChars: r.monthlyChars }
+    }
+    if (provider === 'deepl') {
+      const r = await runDeepl(title)
+      return { titleTranslated: unquoteTitle(r.fullTextTranslated), inputTokens: r.inputTokens, outputTokens: r.outputTokens, billingMode: r.billingMode, model: r.model, monthlyChars: r.monthlyChars }
+    }
+  }
+  const r = await runAiTask(translateTitleConfig, title, undefined, options?.provider)
+  return { titleTranslated: unquoteTitle(r.text), inputTokens: r.inputTokens, outputTokens: r.outputTokens, billingMode: r.billingMode, model: r.model }
+}
+
+export async function summarizeArticle(
+  fullText: string,
+  options?: { provider?: string },
+): Promise<{ summary: string } & AiTextResult> {
+  const r = await runAiTask(summarizeConfig, fullText, undefined, options?.provider)
   return { summary: r.text, inputTokens: r.inputTokens, outputTokens: r.outputTokens, billingMode: r.billingMode, model: r.model }
 }
 

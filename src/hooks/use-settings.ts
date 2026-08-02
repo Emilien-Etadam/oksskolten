@@ -5,6 +5,7 @@ import { useTheme } from './use-theme'
 import { useDateMode } from './use-date-mode'
 import { useAutoMarkRead } from './use-auto-mark-read'
 import { useAutoTranslate } from './use-auto-translate'
+import { useAutoSummarize } from './use-auto-summarize'
 import { useUnreadIndicator } from './use-unread-indicator'
 import { useInternalLinks } from './use-internal-links'
 import { useShowThumbnails } from './use-show-thumbnails'
@@ -31,6 +32,7 @@ interface Prefs {
   'reading.auto_mark_read': string | null
   'reading.auto_translate': string | null
   'reading.auto_translate_concurrency': string | null
+  'reading.auto_summarize': string | null
   'reading.unread_indicator': string | null
   'reading.internal_links': string | null
   'reading.show_thumbnails': string | null
@@ -68,6 +70,7 @@ export function useSettings() {
   const { dateMode, setDateMode } = useDateMode()
   const { autoMarkRead, setAutoMarkRead } = useAutoMarkRead()
   const { autoTranslate, setAutoTranslate } = useAutoTranslate()
+  const { autoSummarize, setAutoSummarize } = useAutoSummarize()
   const { showUnreadIndicator, setShowUnreadIndicator } = useUnreadIndicator()
   const { internalLinks, setInternalLinks } = useInternalLinks()
   const currentTheme = themes.find(t => t.name === themeName) ?? themes[0]
@@ -115,6 +118,8 @@ export function useSettings() {
   autoMarkReadRef.current = autoMarkRead
   const autoTranslateRef = useRef(autoTranslate)
   autoTranslateRef.current = autoTranslate
+  const autoSummarizeRef = useRef(autoSummarize)
+  autoSummarizeRef.current = autoSummarize
   const showUnreadIndicatorRef = useRef(showUnreadIndicator)
   showUnreadIndicatorRef.current = showUnreadIndicator
   const internalLinksRef = useRef(internalLinks)
@@ -154,6 +159,8 @@ export function useSettings() {
       { key: 'reading.auto_mark_read', setter: setAutoMarkRead, backfillRef: autoMarkReadRef,
         validate: v => v === 'on' || v === 'off' },
       { key: 'reading.auto_translate', setter: setAutoTranslate, backfillRef: autoTranslateRef,
+        validate: v => v === 'on' || v === 'off' },
+      { key: 'reading.auto_summarize', setter: setAutoSummarize, backfillRef: autoSummarizeRef,
         validate: v => v === 'on' || v === 'off' },
       { key: 'reading.unread_indicator', setter: setShowUnreadIndicator, backfillRef: showUnreadIndicatorRef,
         validate: v => v === 'on' || v === 'off' },
@@ -205,7 +212,7 @@ export function useSettings() {
     if (Object.keys(backfill).length > 0) {
       apiPatch('/api/settings/preferences', backfill).catch(() => {})
     }
-  }, [prefs, setTheme, setDateMode, setAutoMarkRead, setAutoTranslate, setShowUnreadIndicator, setInternalLinks, setShowThumbnails, setShowFeedActivity, setChatPosition, setArticleOpenMode, setCategoryUnreadOnly, setLayout, setMascot, setHighlightTheme, setArticleFont, setKeyboardNavigation, setKeybindings])
+  }, [prefs, setTheme, setDateMode, setAutoMarkRead, setAutoTranslate, setAutoSummarize, setShowUnreadIndicator, setInternalLinks, setShowThumbnails, setShowFeedActivity, setChatPosition, setArticleOpenMode, setCategoryUnreadOnly, setLayout, setMascot, setHighlightTheme, setArticleFont, setKeyboardNavigation, setKeybindings])
 
   // Hydrate custom themes from DB
   useEffect(() => {
@@ -312,6 +319,7 @@ export function useSettings() {
     syncedSetDateMode,
     syncedSetAutoMarkRead,
     syncedSetAutoTranslate,
+    syncedSetAutoSummarize,
     syncedSetShowUnreadIndicator,
     syncedSetInternalLinks,
     syncedSetShowThumbnails,
@@ -345,6 +353,7 @@ export function useSettings() {
       syncedSetDateMode: make<'relative' | 'absolute'>('reading.date_mode', setDateMode),
       syncedSetAutoMarkRead: make<'on' | 'off'>('reading.auto_mark_read', setAutoMarkRead),
       syncedSetAutoTranslate: make<'on' | 'off'>('reading.auto_translate', setAutoTranslate),
+      syncedSetAutoSummarize: make<'on' | 'off'>('reading.auto_summarize', setAutoSummarize),
       syncedSetShowUnreadIndicator: make<'on' | 'off'>('reading.unread_indicator', setShowUnreadIndicator),
       syncedSetInternalLinks: make<'on' | 'off'>('reading.internal_links', setInternalLinks),
       syncedSetShowThumbnails: make<'on' | 'off'>('reading.show_thumbnails', setShowThumbnails),
@@ -374,7 +383,7 @@ export function useSettings() {
     }
     // scheduleSave and dirtyKeysRef are stable refs; remaining setters are useState/useCallback-stable
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setDateMode, setAutoMarkRead, setAutoTranslate, setShowUnreadIndicator, setInternalLinks, setShowThumbnails, setShowFeedActivity, setChatPosition, setArticleOpenMode, setCategoryUnreadOnly, setLayout, setArticleFont, setMascot])
+  }, [setDateMode, setAutoMarkRead, setAutoTranslate, setAutoSummarize, setShowUnreadIndicator, setInternalLinks, setShowThumbnails, setShowFeedActivity, setChatPosition, setArticleOpenMode, setCategoryUnreadOnly, setLayout, setArticleFont, setMascot])
 
   // Special: theme setter updates 2 keys + resets highlight
   const syncedSetTheme = useCallback((name: string) => {
@@ -421,6 +430,8 @@ export function useSettings() {
     setAutoMarkRead: syncedSetAutoMarkRead,
     autoTranslate,
     setAutoTranslate: syncedSetAutoTranslate,
+    autoSummarize,
+    setAutoSummarize: syncedSetAutoSummarize,
     showUnreadIndicator,
     setShowUnreadIndicator: syncedSetShowUnreadIndicator,
     internalLinks,

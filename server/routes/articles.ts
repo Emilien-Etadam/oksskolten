@@ -31,6 +31,7 @@ import { requireJson } from '../auth.js'
 import { summarizeArticle, translateArticle, streamSummarizeArticle, streamTranslateArticle, fetchArticleContent } from '../fetcher.js'
 import type { AiTextResult } from '../fetcher.js'
 import { archiveArticleImages, isImageArchivingEnabled, deleteArticleImages } from '../fetcher/article-images.js'
+import { translateArticleTitle } from '../fetcher/ai-queue.js'
 import { getSetting } from '../db/settings.js'
 import { DEFAULT_LANGUAGE } from '../../shared/lang.js'
 import path from 'node:path'
@@ -498,6 +499,8 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
         const userLang = getTranslateTargetLang()
         updateArticleContent(articleId, { full_text_translated: text, translated_lang: userLang })
         updateScore(articleId)
+        // Best-effort: translate the title too so the list matches the reader
+        translateArticleTitle(articleId)
       },
       errorMessage: 'Translation failed',
       errorCode: 'TRANSLATION_FAILED',

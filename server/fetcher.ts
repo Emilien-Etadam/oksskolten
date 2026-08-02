@@ -26,7 +26,7 @@ import { type FetchRssResult, type RssItem, fetchAndParseRss, RateLimitError } f
 import { computeInterval, computeEmpiricalInterval, sqliteFuture, DEFAULT_INTERVAL } from './fetcher/schedule.js'
 import { DEFAULT_LANGUAGE } from '../shared/lang.js'
 import { detectLanguage } from './fetcher/ai.js'
-import { enqueueAutoTranslate, isAutoTranslateEnabled } from './fetcher/translate-queue.js'
+import { enqueueAutoTranslate, enqueueAutoSummarize, isAutoTranslateEnabled, isAutoSummarizeEnabled, resumePendingAiTasks } from './fetcher/ai-queue.js'
 import { logger } from './logger.js'
 
 const log = logger.child('fetcher')
@@ -203,6 +203,9 @@ function maybeEnqueueAutoTranslate(
   fullText: string | null,
   lang: string | null,
 ): void {
+  if (fullText && isAutoSummarizeEnabled()) {
+    enqueueAutoSummarize(articleId, fullText)
+  }
   if (!isAutoTranslateEnabled() || !fullText || !lang || lang === 'unknown') return
   const targetLang = getSetting('translate.target_lang') || getSetting('general.language') || DEFAULT_LANGUAGE
   if (lang === targetLang) return
@@ -371,6 +374,8 @@ export async function fetchSingleFeed(
 export async function fetchAllFeeds(
   onProgress?: (event: FetchProgressEvent) => void,
 ): Promise<void> {
+  // Recover queued AI work that survived a restart or a failed attempt
+  resumePendingAiTasks()
   const feeds = getEnabledFeeds()
   const semaphore = new Semaphore(CONCURRENCY)
 
