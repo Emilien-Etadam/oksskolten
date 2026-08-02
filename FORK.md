@@ -30,13 +30,12 @@ destinations (Inbox, Search, Read Later, Chat) plus a Menu tab that opens the si
 Shown when the sidebar is closed; hidden on the chat page. Mounted from
 `src/components/layout/page-layout.tsx` (2-line insertion).
 
-## Hide-sidebar setting
+## Persistent sidebar collapse
 
-`src/hooks/use-hide-sidebar.ts` + `src/pages/settings/sidebar-visibility-section.tsx` —
-Settings → Appearance → Sidebar toggle. When hidden, the sidebar no longer opens
-automatically on desktop and navigation happens through the bottom tab bar; the Menu
-tab still opens the sidebar on demand. Wired via small insertions in `src/app.tsx`,
-`src/pages/settings/appearance-tab.tsx`, and four new keys in `src/lib/i18n.ts`.
+`src/lib/sidebar-collapsed.ts` — the existing collapse button in the sidebar header
+now remembers its state across reloads (localStorage). Collapsed on desktop, the
+bottom tab bar takes over navigation; the Menu tab reopens the sidebar on demand.
+Wired via small insertions in `src/app.tsx`.
 
 ## Mark-as-read button
 
@@ -68,8 +67,7 @@ the sidebar drawer.
 | `src/app.tsx` | +2 lines (import + `<CategoryTabs />`) |
 | `src/components/article/article-detail.tsx` | +2 lines (import + `<ArticleSwipeNavigation />`) |
 | `src/components/layout/page-layout.tsx` | +2 lines (import + `<BottomNav />`) |
-| `src/pages/settings/appearance-tab.tsx` | +4 lines (import + `<SidebarVisibilitySection />`) |
-| `src/lib/i18n.ts` | +4 keys (`settings.hideSidebar*`) |
+| `src/lib/i18n.ts` | +1 key (`article.markAsRead`) |
 
 | `src/components/article/article-card.tsx` | `onMarkRead` prop + button in the 5 card variants |
 | `src/components/article/swipeable-article-card.tsx` | `onMarkRead` pass-through |
@@ -77,7 +75,7 @@ the sidebar drawer.
 | `server/index.ts` | CSP script-src hashes for inline bootstrap scripts |
 | `tailwind.config.ts` + `src/index.css` | logo font swapped to local Palatino stack |
 
-`src/app.tsx` additionally has 2 lines adjusted (sidebar auto-open respects the
-hide-sidebar setting).
+`src/app.tsx` additionally has 2 lines adjusted and a small effect added (sidebar
+auto-open respects the persisted collapse state).
 
 Everything else is new files, so merges from upstream should stay conflict-free.

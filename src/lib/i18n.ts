@@ -457,10 +457,6 @@ const dict = {
   // Article font
   'settings.articleFont': { ja: '記事フォント', en: 'Article Font', zh: '文章字体'},
   'settings.articleFontDesc': { ja: '記事一覧のタイトル・抜粋と記事本文に適用されます。Google Fontsから読み込むため初回表示が少し遅れる場合があります', en: 'Applied to article list titles, excerpts, and article body. Loaded from Google Fonts, so the first render may be slightly delayed', zh: '应用于文章列表标题、摘要和正文。从 Google Fonts 加载，首次渲染可能稍有延迟' },
-  'settings.hideSidebar': { ja: 'サイドバー', en: 'Sidebar', zh: '侧边栏'},
-  'settings.hideSidebarDesc': { ja: 'サイドバーを隠して下部のタブバーで移動します（新聞アプリ風）。メニュータブからいつでもサイドバーを開けます', en: 'Hide the sidebar and navigate with the bottom tab bar, newspaper-app style. The Menu tab still opens the sidebar anytime', zh: '隐藏侧边栏，使用底部标签栏导航（报纸应用风格）。仍可随时通过菜单标签打开侧边栏' },
-  'settings.hideSidebarOff': { ja: '表示する', en: 'Visible', zh: '显示'},
-  'settings.hideSidebarOn': { ja: '隠す', en: 'Hidden', zh: '隐藏'},
   'settings.layout': { ja: 'レイアウト', en: 'Layout', zh: '布局'},
   'settings.layoutDesc': { ja: '記事一覧の並べ方を変更します。リスト・カード・マガジン・コンパクトから選べます', en: 'Change how articles are displayed. Choose from list, card, magazine, or compact views', zh: '更改文章显示方式。可选列表、卡片、杂志或紧凑视图' },
   'settings.layoutList': { ja: 'リスト', en: 'List', zh: '列表'},

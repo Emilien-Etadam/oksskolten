@@ -16,7 +16,7 @@ import { ArticleRawPage } from './components/article/article-raw-page'
 import { PageLayout } from './components/layout/page-layout'
 import { KeyboardNavigationProvider, useKeyboardNavigationContext } from './contexts/keyboard-navigation-context'
 import { CategoryTabs } from './components/feed/category-tabs'
-import { isSidebarHidden } from './hooks/use-hide-sidebar'
+import { isSidebarCollapsed, persistSidebarCollapsed } from './lib/sidebar-collapsed'
 const SettingsPage = lazy(() => import('./pages/settings-page').then(m => ({ default: m.SettingsPage })))
 const ChatPage = lazy(() => import('./pages/chat-page').then(m => ({ default: m.ChatPage })))
 const HomePage = lazy(() => import('./pages/home-page').then(m => ({ default: m.HomePage })))
@@ -35,11 +35,18 @@ export interface AppLayoutContext {
 
 function AppLayout() {
   const settings = useSettings()
-  const [sidebarOpen, setSidebarOpen] = useState(() => !isSidebarHidden() && window.matchMedia(`(min-width: ${MD_BREAKPOINT}px)`).matches)
+  const [sidebarOpen, setSidebarOpen] = useState(() => !isSidebarCollapsed() && window.matchMedia(`(min-width: ${MD_BREAKPOINT}px)`).matches)
+
+  // Remember the desktop collapse/open state so it survives reloads
+  useEffect(() => {
+    if (window.matchMedia(`(min-width: ${MD_BREAKPOINT}px)`).matches) {
+      persistSidebarCollapsed(!sidebarOpen)
+    }
+  }, [sidebarOpen])
 
   useEffect(() => {
     const mq = window.matchMedia(`(min-width: ${MD_BREAKPOINT}px)`)
-    const handler = (e: MediaQueryListEvent) => setSidebarOpen(e.matches && !isSidebarHidden())
+    const handler = (e: MediaQueryListEvent) => setSidebarOpen(e.matches && !isSidebarCollapsed())
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [])

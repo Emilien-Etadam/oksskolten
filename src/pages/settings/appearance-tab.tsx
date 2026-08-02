@@ -9,7 +9,6 @@ import { Separator } from '@/components/ui/separator'
 import { PixelDreamPuff, PixelSleepyGiant } from '../../components/ui/mascot'
 import type { MascotChoice } from '../../hooks/use-mascot'
 import { ThemeSection } from './theme-section'
-import { SidebarVisibilitySection } from './sidebar-visibility-section'
 
 /** Derive preview colors from a theme's color definitions */
 function previewColorsFromTheme(colors: Record<string, string>) {
@@ -147,10 +146,6 @@ export function AppearanceTab() {
           })}
         </div>
       </section>
-
-      <Separator />
-
-      <SidebarVisibilitySection />
 
       <Separator />
 
