@@ -1,5 +1,6 @@
 import path from 'node:path'
 import fs from 'node:fs'
+import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import Fastify from 'fastify'
 import fastifyStatic from '@fastify/static'
@@ -106,12 +107,28 @@ app.addHook('onResponse', (req, reply, done) => {
   done()
 })
 
+// CSP hashes for the inline bootstrap scripts in dist/index.html (theme flash
+// guard, boot error display). Computed from the built file at startup so the
+// hashes stay correct even if the build transforms the scripts.
+const inlineScriptHashes = (() => {
+  try {
+    const html = fs.readFileSync(path.join(projectRoot, 'dist', 'index.html'), 'utf8')
+    const hashes: string[] = []
+    for (const m of html.matchAll(/<script(?![^>]*\bsrc\b)[^>]*>([\s\S]*?)<\/script>/gi)) {
+      if (m[1].trim()) hashes.push(`'sha256-${createHash('sha256').update(m[1]).digest('base64')}'`)
+    }
+    return hashes.length > 0 ? ` ${hashes.join(' ')}` : ''
+  } catch {
+    return ''
+  }
+})()
+
 // Security headers
 app.addHook('onRequest', (_req, reply, done) => {
   reply.header('X-Frame-Options', 'DENY')
   reply.header('X-Content-Type-Options', 'nosniff')
   reply.header('Referrer-Policy', 'strict-origin-when-cross-origin')
-  reply.header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https: data:; connect-src 'self'; frame-ancestors 'none'")
+  reply.header('Content-Security-Policy', `default-src 'self'; script-src 'self'${inlineScriptHashes}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https: data:; connect-src 'self'; frame-ancestors 'none'`)
   done()
 })
 

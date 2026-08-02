@@ -16,8 +16,9 @@ export default {
           'sans-serif',
         ],
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
-        // TeX Gyre Pagella is an open-source Palatino clone
-        logo: ['TeX Gyre Pagella', 'Palatino', 'Palatino Linotype', 'Book Antiqua', 'Georgia', 'serif'],
+        // System Palatino stack — the downloadable TeX Gyre Pagella files are
+        // rejected by Firefox's font sanitizer, so rely on local equivalents
+        logo: ['Palatino', 'Palatino Linotype', 'Book Antiqua', 'Georgia', 'serif'],
       },
       colors: {
         // Existing project tokens

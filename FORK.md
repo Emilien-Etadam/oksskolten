@@ -38,6 +38,17 @@ automatically on desktop and navigation happens through the bottom tab bar; the 
 tab still opens the sidebar on demand. Wired via small insertions in `src/app.tsx`,
 `src/pages/settings/appearance-tab.tsx`, and four new keys in `src/lib/i18n.ts`.
 
+## Upstream fixes
+
+- **CSP inline scripts**: the strict `script-src 'self'` blocked the two inline
+  bootstrap scripts in `index.html` (theme flash guard, boot error display).
+  `server/index.ts` now computes their sha256 hashes from `dist/index.html` at
+  startup and includes them in the CSP header.
+- **Logo font**: the downloadable TeX Gyre Pagella files were rejected by
+  Firefox's font sanitizer. The `font-logo` stack now uses local Palatino
+  equivalents (`tailwind.config.ts`), and the font import was removed from
+  `src/index.css`.
+
 ## Upstream files touched
 
 | File | Change |
@@ -47,6 +58,9 @@ tab still opens the sidebar on demand. Wired via small insertions in `src/app.ts
 | `src/components/layout/page-layout.tsx` | +2 lines (import + `<BottomNav />`) |
 | `src/pages/settings/appearance-tab.tsx` | +4 lines (import + `<SidebarVisibilitySection />`) |
 | `src/lib/i18n.ts` | +4 keys (`settings.hideSidebar*`) |
+
+| `server/index.ts` | CSP script-src hashes for inline bootstrap scripts |
+| `tailwind.config.ts` + `src/index.css` | logo font swapped to local Palatino stack |
 
 `src/app.tsx` additionally has 2 lines adjusted (sidebar auto-open respects the
 hide-sidebar setting).
