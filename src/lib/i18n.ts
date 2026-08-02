@@ -128,6 +128,7 @@ const dict = {
   'articles.allCaughtUp': { ja: '全部読んだよ！', en: "You're all caught up!", zh: "全部读完了！"},
 
   // ArticleDetail
+  'article.markAsRead': { ja: '既読にする', en: 'Mark as read', zh: '标为已读'},
   'article.noContent': { ja: 'コンテンツがありません', en: 'No content available', zh: '暂无内容'},
   'article.jaTranslation': { ja: '日本語訳', en: 'Japanese', zh: '日语'},
   'article.original': { ja: '原文', en: 'Original', zh: '原文'},

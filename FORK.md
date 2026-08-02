@@ -38,6 +38,14 @@ automatically on desktop and navigation happens through the bottom tab bar; the 
 tab still opens the sidebar on demand. Wired via small insertions in `src/app.tsx`,
 `src/pages/settings/appearance-tab.tsx`, and four new keys in `src/lib/i18n.ts`.
 
+## Mark-as-read button
+
+`src/components/article/mark-read-button.tsx` — a small check button on every unread
+article card (all five layouts): mark as read without opening the article. Wired to
+the list's existing instant-update + batched-server mechanism via an `onMarkRead`
+prop threaded through `article-list.tsx` → `swipeable-article-card.tsx` →
+`article-card.tsx`, plus one i18n key (`article.markAsRead`).
+
 ## Upstream fixes
 
 - **CSP inline scripts**: the strict `script-src 'self'` blocked the two inline
@@ -59,6 +67,9 @@ tab still opens the sidebar on demand. Wired via small insertions in `src/app.ts
 | `src/pages/settings/appearance-tab.tsx` | +4 lines (import + `<SidebarVisibilitySection />`) |
 | `src/lib/i18n.ts` | +4 keys (`settings.hideSidebar*`) |
 
+| `src/components/article/article-card.tsx` | `onMarkRead` prop + button in the 5 card variants |
+| `src/components/article/swipeable-article-card.tsx` | `onMarkRead` pass-through |
+| `src/components/article/article-list.tsx` | +1 line (`onMarkRead: markRead` in card props) |
 | `server/index.ts` | CSP script-src hashes for inline bootstrap scripts |
 | `tailwind.config.ts` + `src/index.css` | logo font swapped to local Palatino stack |
 

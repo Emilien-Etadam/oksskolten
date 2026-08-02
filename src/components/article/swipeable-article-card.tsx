@@ -12,6 +12,7 @@ interface SwipeableArticleCardProps extends ArticleDisplayConfig {
   layout?: LayoutName
   isFeatured?: boolean
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void
+  onMarkRead?: (articleId: number) => void
 }
 
 const SWIPE_THRESHOLD = 80
@@ -26,6 +27,7 @@ export function SwipeableArticleCard({
   showUnreadIndicator,
   showThumbnails,
   onClick: onClickProp,
+  onMarkRead,
 }: SwipeableArticleCardProps) {
   const navigate = useNavigate()
   const x = useMotionValue(0)
@@ -86,6 +88,7 @@ export function SwipeableArticleCard({
           showUnreadIndicator={showUnreadIndicator}
           showThumbnails={showThumbnails}
           onClick={handleClick}
+          onMarkRead={onMarkRead}
         />
       </motion.div>
     </div>

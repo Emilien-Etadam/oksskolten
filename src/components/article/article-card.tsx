@@ -6,6 +6,7 @@ import { extractDomain, articleUrlToPath } from '../../lib/url'
 import { formatDate, formatRelativeDate } from '../../lib/dateFormat'
 import type { ArticleListItem } from '../../../shared/types'
 import type { LayoutName } from '../../data/layouts'
+import { MarkReadButton } from './mark-read-button'
 
 export interface ArticleDisplayConfig {
   dateMode: 'relative' | 'absolute'
@@ -19,6 +20,7 @@ interface ArticleCardProps extends ArticleDisplayConfig {
   layout?: LayoutName
   isFeatured?: boolean
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void
+  onMarkRead?: (articleId: number) => void
 }
 
 function Thumbnail({ src, articleUrl, className }: { src: string | null; articleUrl: string; className?: string }) {
@@ -123,7 +125,7 @@ function useCardBase(article: ArticleListItem, dateMode: 'relative' | 'absolute'
 }
 
 /** List layout — classic single-column (current default) */
-function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, showThumbnails, onClick }: ArticleCardProps) {
+function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, showThumbnails, onClick, onMarkRead }: ArticleCardProps) {
   const { isUnread, domain, dateText, href, handleClick, originalUrl } = useCardBase(article, dateMode, onClick)
   const showIndicator = isUnread && showUnreadIndicator
 
@@ -175,13 +177,14 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, show
           </div>
         </div>
         {showThumbnails && <Thumbnail src={article.og_image} articleUrl={article.url} />}
+        {isUnread && onMarkRead && <MarkReadButton onClick={() => onMarkRead(article.id)} />}
       </div>
     </a>
   )
 }
 
 /** Card layout — image-forward grid card */
-function GridCard({ article, dateMode, showThumbnails, onClick }: ArticleCardProps) {
+function GridCard({ article, dateMode, showThumbnails, onClick, onMarkRead }: ArticleCardProps) {
   const { isUnread, domain, dateText, href, handleClick, originalUrl } = useCardBase(article, dateMode, onClick)
 
   return (
@@ -220,6 +223,7 @@ function GridCard({ article, dateMode, showThumbnails, onClick }: ArticleCardPro
             </>
           )}
           <span className="shrink-0">{dateText}</span>
+          {isUnread && onMarkRead && <MarkReadButton className="ml-auto -my-1.5" onClick={() => onMarkRead(article.id)} />}
         </div>
       </div>
     </a>
@@ -227,7 +231,7 @@ function GridCard({ article, dateMode, showThumbnails, onClick }: ArticleCardPro
 }
 
 /** Magazine layout — hero card (large) */
-function HeroCard({ article, dateMode, showThumbnails, onClick }: ArticleCardProps) {
+function HeroCard({ article, dateMode, showThumbnails, onClick, onMarkRead }: ArticleCardProps) {
   const { isUnread, domain, dateText, href, handleClick, originalUrl } = useCardBase(article, dateMode, onClick)
 
   return (
@@ -266,6 +270,7 @@ function HeroCard({ article, dateMode, showThumbnails, onClick }: ArticleCardPro
             </>
           )}
           <span>{dateText}</span>
+          {isUnread && onMarkRead && <MarkReadButton className="ml-auto -my-1.5" onClick={() => onMarkRead(article.id)} />}
         </div>
       </div>
     </a>
@@ -273,7 +278,7 @@ function HeroCard({ article, dateMode, showThumbnails, onClick }: ArticleCardPro
 }
 
 /** Magazine layout — small card (below hero) */
-function SmallCard({ article, dateMode, showThumbnails, onClick }: ArticleCardProps) {
+function SmallCard({ article, dateMode, showThumbnails, onClick, onMarkRead }: ArticleCardProps) {
   const { isUnread, domain, dateText, href, handleClick, originalUrl } = useCardBase(article, dateMode, onClick)
 
   return (
@@ -312,6 +317,7 @@ function SmallCard({ article, dateMode, showThumbnails, onClick }: ArticleCardPr
             </>
           )}
           <span className="shrink-0">{dateText}</span>
+          {isUnread && onMarkRead && <MarkReadButton className="ml-auto -my-1.5" onClick={() => onMarkRead(article.id)} />}
         </div>
       </div>
     </a>
@@ -319,7 +325,7 @@ function SmallCard({ article, dateMode, showThumbnails, onClick }: ArticleCardPr
 }
 
 /** Compact layout — title and date only */
-function CompactCard({ article, dateMode, indicatorStyle, showUnreadIndicator, onClick }: ArticleCardProps) {
+function CompactCard({ article, dateMode, indicatorStyle, showUnreadIndicator, onClick, onMarkRead }: ArticleCardProps) {
   const { isUnread, dateText, href, handleClick, originalUrl } = useCardBase(article, dateMode, onClick)
   const showIndicator = isUnread && showUnreadIndicator
 
@@ -348,6 +354,7 @@ function CompactCard({ article, dateMode, indicatorStyle, showUnreadIndicator, o
           {article.title}
         </span>
         <span className="text-[11px] text-muted shrink-0 ml-2">{dateText}</span>
+        {isUnread && onMarkRead && <MarkReadButton className="w-6 h-6 -my-1" onClick={() => onMarkRead(article.id)} />}
       </div>
     </a>
   )
