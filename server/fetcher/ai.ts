@@ -131,7 +131,9 @@ async function runAiTask(
         messages: [{ role: 'user', content: prompt }],
       })
   return {
-    text: result.text,
+    // Strip a leading <think>…</think> block that some local reasoning models
+    // emit inline, so only the actual answer is stored
+    text: result.text.replace(/^\s*<think>[\s\S]*?<\/think>\s*/, ''),
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
     billingMode: providerName as AiBillingMode,

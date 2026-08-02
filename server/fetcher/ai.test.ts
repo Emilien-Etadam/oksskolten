@@ -222,6 +222,18 @@ describe('translateArticle', () => {
     expect(result.billingMode).toBe('anthropic')
   })
 
+  it('strips a leading inline <think> block from the result', async () => {
+    mockCreateMessage.mockResolvedValue({
+      text: '<think>Let me translate this carefully.</think>Texte traduit',
+      inputTokens: 10,
+      outputTokens: 10,
+    })
+
+    const result = await translateArticle('English article text')
+
+    expect(result.fullTextTranslated).toBe('Texte traduit')
+  })
+
   it('passes article text in translate prompt', async () => {
     mockCreateMessage.mockResolvedValue({ text: 'ok', inputTokens: 0, outputTokens: 0 })
     await translateArticle('Content to translate')

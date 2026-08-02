@@ -6,15 +6,14 @@ vi.mock('../../db.js', () => ({
   getSetting: vi.fn(),
 }))
 
+const { mockCreate } = vi.hoisted(() => ({ mockCreate: vi.fn() }))
+
 vi.mock('openai', () => {
   return {
     default: class {
       chat = {
         completions: {
-          create: vi.fn().mockResolvedValue({
-            choices: [{ message: { content: 'test response' } }],
-            usage: { prompt_tokens: 10, completion_tokens: 20 },
-          }),
+          create: mockCreate,
         },
       }
     },
@@ -25,6 +24,10 @@ describe('vllmProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.VLLM_BASE_URL = ''
+    mockCreate.mockResolvedValue({
+      choices: [{ message: { content: 'test response' } }],
+      usage: { prompt_tokens: 10, completion_tokens: 20 },
+    })
   })
 
   it('gets base URL from settings', () => {
@@ -69,5 +72,19 @@ describe('vllmProvider', () => {
     expect(result.text).toBe('test response')
     expect(result.inputTokens).toBe(10)
     expect(result.outputTokens).toBe(20)
+  })
+
+  it('disables reasoning-model thinking via chat_template_kwargs', async () => {
+    vi.mocked(db.getSetting).mockReturnValue(undefined)
+
+    await vllmProvider.createMessage({
+      model: 'qwen3',
+      maxTokens: 100,
+      messages: [{ role: 'user', content: 'hello' }],
+    })
+
+    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+      chat_template_kwargs: { enable_thinking: false },
+    }))
   })
 })

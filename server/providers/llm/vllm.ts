@@ -51,7 +51,10 @@ export const vllmProvider: LLMProvider = {
       model: params.model,
       max_completion_tokens: params.maxTokens,
       messages,
-    })
+      // vLLM extension: disable reasoning-model "thinking" (e.g. Qwen3) so the
+      // answer lands in content; chat templates without this variable ignore it
+      chat_template_kwargs: { enable_thinking: false },
+    } as OpenAI.ChatCompletionCreateParamsNonStreaming)
 
     const text = response.choices[0]?.message?.content ?? ''
     return {
@@ -80,7 +83,10 @@ export const vllmProvider: LLMProvider = {
       messages,
       stream: true,
       stream_options: { include_usage: true },
-    })
+      // vLLM extension: disable reasoning-model "thinking" (e.g. Qwen3) so the
+      // answer lands in content; chat templates without this variable ignore it
+      chat_template_kwargs: { enable_thinking: false },
+    } as OpenAI.ChatCompletionCreateParamsStreaming)
 
     let fullText = ''
     let inputTokens = 0
