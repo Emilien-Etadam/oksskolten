@@ -898,8 +898,10 @@ Unset items are `null`.
 | `chat.model` | Model ID depending on the provider |
 | `summary.provider` | `"anthropic"` / `"gemini"` / `"openai"` / `"claude-code"` |
 | `summary.model` | Model ID depending on the provider |
+| `summary.max_tokens` | Positive integer 1-200000 (max output tokens for summarization; default 2048). Empty string to delete |
 | `translate.provider` | `"anthropic"` / `"gemini"` / `"openai"` / `"claude-code"` / `"google-translate"` / `"deepl"` |
 | `translate.model` | Model ID depending on the provider (not needed for google-translate / deepl) |
+| `translate.max_tokens` | Positive integer 1-200000 (max output tokens for translation; default 16384). Empty string to delete |
 
 
 **GET /api/settings/api-keys/:provider** — Check API key configuration status (auth required)

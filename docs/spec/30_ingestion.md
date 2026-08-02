@@ -251,6 +251,8 @@ If the ratio of CJK characters (hiragana, katakana, kanji) in the first 1000 cha
 
 Any of Anthropic / Gemini / OpenAI can be selected from the settings screen. Streaming is supported. Provider and model can be configured independently for summarization and translation (`summary.provider`, `summary.model`, `translate.provider`, `translate.model`).
 
+The max output tokens for each task can also be overridden (`summary.max_tokens`, default 2048; `translate.max_tokens`, default 16384). This matters for local LLM backends (vLLM, Ollama) whose context window is smaller than the defaults: a request whose completion cap exceeds the backend's capacity fails outright, so lowering the cap makes summarization and translation usable on such models. Unset values fall back to the defaults.
+
 In addition to LLMs, Google Cloud Translation API v2 and DeepL API v2 are also available as translation providers. Google Translate is faster than LLMs (instant response) and offers a free tier of 500K characters per month ($20/1M characters beyond that). DeepL provides high-quality neural machine translation with particularly high accuracy for Japanese-European language pairs. API Free allows up to 500K characters per month for free; API Pro costs EUR 5.49/month + EUR 25/1M characters.
 
 **Summarization (Default: Anthropic Haiku)**

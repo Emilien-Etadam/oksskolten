@@ -15,6 +15,8 @@ import { ArticleDetail } from './components/article/article-detail'
 import { ArticleRawPage } from './components/article/article-raw-page'
 import { PageLayout } from './components/layout/page-layout'
 import { KeyboardNavigationProvider, useKeyboardNavigationContext } from './contexts/keyboard-navigation-context'
+import { CategoryTabs } from './components/feed/category-tabs'
+import { isSidebarCollapsed, persistSidebarCollapsed } from './lib/sidebar-collapsed'
 const SettingsPage = lazy(() => import('./pages/settings-page').then(m => ({ default: m.SettingsPage })))
 const ChatPage = lazy(() => import('./pages/chat-page').then(m => ({ default: m.ChatPage })))
 const HomePage = lazy(() => import('./pages/home-page').then(m => ({ default: m.HomePage })))
@@ -33,11 +35,18 @@ export interface AppLayoutContext {
 
 function AppLayout() {
   const settings = useSettings()
-  const [sidebarOpen, setSidebarOpen] = useState(() => window.matchMedia(`(min-width: ${MD_BREAKPOINT}px)`).matches)
+  const [sidebarOpen, setSidebarOpen] = useState(() => !isSidebarCollapsed() && window.matchMedia(`(min-width: ${MD_BREAKPOINT}px)`).matches)
+
+  // Remember the desktop collapse/open state so it survives reloads
+  useEffect(() => {
+    if (window.matchMedia(`(min-width: ${MD_BREAKPOINT}px)`).matches) {
+      persistSidebarCollapsed(!sidebarOpen)
+    }
+  }, [sidebarOpen])
 
   useEffect(() => {
     const mq = window.matchMedia(`(min-width: ${MD_BREAKPOINT}px)`)
-    const handler = (e: MediaQueryListEvent) => setSidebarOpen(e.matches)
+    const handler = (e: MediaQueryListEvent) => setSidebarOpen(e.matches && !isSidebarCollapsed())
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [])
@@ -46,17 +55,17 @@ function AppLayout() {
 
   const { data: profile } = useSWR<{ language: string | null }>('/api/settings/profile', fetcher)
 
-  // Query parameter ?lang=ja|en takes highest priority (useful for demo sharing links)
+  // Query parameter ?lang=ja|en|zh takes highest priority (useful for demo sharing links)
   const langFromUrl = useMemo(() => {
     const p = new URLSearchParams(window.location.search).get('lang')
-    return p === 'ja' || p === 'en' ? p : null
+    return p === 'ja' || p === 'en' || p === 'zh' ? p : null
   }, [])
 
   const [locale, setLocaleState] = useState<Locale>(() => {
     if (langFromUrl) return langFromUrl
     const cached = localStorage.getItem('locale')
-    if (cached === 'ja' || cached === 'en') return cached
-    return navigator.language.startsWith('ja') ? 'ja' : 'en'
+    if (cached === 'ja' || cached === 'en' || cached === 'zh') return cached
+    return navigator.language.startsWith('ja') ? 'ja' : navigator.language.startsWith('zh') ? 'zh' : 'en'
   })
 
   const setLocale = useCallback((l: Locale) => {
@@ -73,8 +82,8 @@ function AppLayout() {
     // Only apply profile language as initial fallback — if localStorage already
     // has a valid locale the user explicitly chose, respect it.
     const cached = localStorage.getItem('locale')
-    if (cached === 'ja' || cached === 'en') return
-    if (profile?.language === 'ja' || profile?.language === 'en') {
+    if (cached === 'ja' || cached === 'en' || cached === 'zh') return
+    if (profile?.language === 'ja' || profile?.language === 'en' || profile?.language === 'zh') {
       setLocale(profile.language)
     }
   }, [profile, setLocale, langFromUrl])
@@ -158,6 +167,7 @@ function ArticleListPage() {
       feedName={headerName}
       feedListProps={{ onMarkAllRead: revalidateArticles, onArticleMoved: revalidateArticles }}
     >
+      <CategoryTabs />
       {isInbox && <HintBanner storageKey="hint-dismissed-inbox">{t('hint.inbox')}</HintBanner>}
       {isBookmarks && <HintBanner storageKey="hint-dismissed-bookmarks">{t('hint.bookmarks')}</HintBanner>}
       {isLikes && <HintBanner storageKey="hint-dismissed-likes">{t('hint.likes')}</HintBanner>}
@@ -221,12 +231,17 @@ function ArticleDetailPage() {
 
   if (!splat) return null
 
+  // Reconstruct the article URL, preserving the original protocol.
+  // http:// articles are routed as /http/<host>/<path> so this page can
+  // reconstruct the exact stored URL without hardcoding https://.
+  const rawSplat = splat.endsWith('.md') ? splat.slice(0, -3) : splat
+  const articleUrl = rawSplat.startsWith('http/')
+    ? `http://${decodeURIComponent(rawSplat.slice(5))}`
+    : `https://${decodeURIComponent(rawSplat)}`
+
   if (splat.endsWith('.md')) {
-    const articleUrl = `https://${decodeURIComponent(splat.slice(0, -3))}`
     return <ArticleRawPage articleUrl={articleUrl} />
   }
-
-  const articleUrl = `https://${decodeURIComponent(splat)}`
 
   return (
     <>

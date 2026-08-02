@@ -1,10 +1,14 @@
 import {
   getEnabledFeeds,
+  countStaleArticlesByFeed,
+  getArticlesNeedingRefresh,
   getExistingArticleUrls,
   getRetryArticles,
   getRetryStats,
   getSetting,
   insertArticle,
+  markArticleRefreshAttempted,
+  normalizeUrl,
   updateArticleContent,
   updateFeedError,
   updateFeedRateLimit,
@@ -18,7 +22,7 @@ import { Semaphore, CONCURRENCY, errorMessage } from './fetcher/util.js'
 import { detectAndStoreSimilarArticles } from './similarity.js'
 import { type FetchProgressEvent, emitProgress, markFeedDone } from './fetcher/progress.js'
 import { fetchFullText, isBotBlockPage, convertHtmlToMarkdown, markdownToExcerpt, MIN_EXTRACTED_LENGTH } from './fetcher/content.js'
-import { type FetchRssResult, fetchAndParseRss, RateLimitError } from './fetcher/rss.js'
+import { type FetchRssResult, type RssItem, fetchAndParseRss, RateLimitError } from './fetcher/rss.js'
 import { computeInterval, computeEmpiricalInterval, sqliteFuture, DEFAULT_INTERVAL } from './fetcher/schedule.js'
 import { DEFAULT_LANGUAGE } from '../shared/lang.js'
 import { detectLanguage } from './fetcher/ai.js'
@@ -33,6 +37,61 @@ export { type FetchProgressEvent, fetchProgress, getFeedState } from './fetcher/
 export { discoverRssUrl } from './fetcher/rss.js'
 export { detectLanguage, summarizeArticle, streamSummarizeArticle, translateArticle, streamTranslateArticle } from './fetcher/ai.js'
 export type { AiTextResult, AiBillingMode } from './fetcher/ai.js'
+
+/**
+ * Replace garbage-extracted articles with the RSS excerpt when one is now
+ * available. Some sites (thin SPAs like essay.ink) return so little body
+ * HTML that Readability falls back to the OG title alone, leaving stored
+ * `full_text` as just a handful of characters. The new-article path
+ * already handles this via the `listingExcerpt` fallback in
+ * `fetchArticleContent`, but articles saved before that fallback existed,
+ * or saved when the RSS excerpt was temporarily missing, stay broken
+ * indefinitely because the retry queue only picks up rows with
+ * `last_error` set.
+ *
+ * Piggyback on every regular RSS fetch: for items still in the current
+ * feed whose stored body is shorter than `MIN_EXTRACTED_LENGTH`, swap in
+ * the markdown-converted RSS excerpt when it's larger than what's stored.
+ */
+function refreshStaleArticles(feedId: number, rssItems: RssItem[]): void {
+  const refreshCandidates = getArticlesNeedingRefresh(feedId, MIN_EXTRACTED_LENGTH)
+  if (refreshCandidates.length === 0) return
+  // Match RSS items against candidate articles using the same URL
+  // normalization the rest of the DB layer uses. Without this, a RSS item
+  // with a raw Unicode path won't line up with a stored article whose URL
+  // is percent-encoded (or vice versa) and the article would incorrectly
+  // be treated as rolled off the feed.
+  const itemsByUrl = new Map(rssItems.map(i => [normalizeUrl(i.url), i]))
+  const now = new Date().toISOString()
+  for (const candidate of refreshCandidates) {
+    const rssItem = itemsByUrl.get(normalizeUrl(candidate.url))
+    const currentLen = (candidate.full_text ?? '').replace(/\s+/g, ' ').trim().length
+    const md = rssItem?.excerpt ? convertHtmlToMarkdown(rssItem.excerpt) : ''
+    const mdLen = md.replace(/\s+/g, ' ').trim().length
+
+    if (md && mdLen > currentLen) {
+      updateArticleContent(candidate.id, {
+        full_text: md,
+        excerpt: markdownToExcerpt(md),
+        // The old full_text was garbage, so any derived summary or
+        // translation produced from it is also garbage. Clear them so
+        // the UI / chat tools regenerate on next access.
+        summary: null,
+        full_text_translated: null,
+        translated_lang: null,
+        last_refresh_attempt_at: now,
+      })
+      log.info({ url: candidate.url, prevLen: currentLen, newLen: mdLen }, 'refreshed stale article with RSS excerpt')
+    } else {
+      // Couldn't improve this one (no RSS excerpt, or excerpt no longer in
+      // the current feed). Record the attempt so the backoff window kicks
+      // in and we don't keep bypassing the RSS HTTP cache for this feed
+      // indefinitely. Use the lightweight helper so we don't trigger a
+      // Meilisearch resync for a no-op update.
+      markArticleRefreshAttempted(candidate.id, now)
+    }
+  }
+}
 
 // --- Article content fetching (shared by feed pipeline & clip) ---
 
@@ -211,7 +270,12 @@ export async function fetchSingleFeed(
 
   let rssResult: FetchRssResult
   try {
-    rssResult = await fetchAndParseRss(feed, opts)
+    // Bypass HTTP cache if this feed still has stale garbage-extracted
+    // articles. RSS XML is often unchanged for old items, so a 304 / cache
+    // hit would skip the refresh path and the broken articles would never
+    // get a chance to be repaired.
+    const skipCache = opts?.skipCache || countStaleArticlesByFeed(feed.id, MIN_EXTRACTED_LENGTH) > 0
+    rssResult = await fetchAndParseRss(feed, { ...opts, skipCache })
     updateFeedError(feed.id, null)
     updateFeedCacheHeaders(feed.id, rssResult.etag, rssResult.lastModified, rssResult.contentHash)
   } catch (err) {
@@ -243,6 +307,8 @@ export async function fetchSingleFeed(
 
   const urls = rssResult.items.map(i => i.url)
   const existing = getExistingArticleUrls(urls)
+  refreshStaleArticles(feed.id, rssResult.items)
+
   const tasks: ArticleTask[] = rssResult.items
     .filter(item => !existing.has(item.url))
     .map(item => ({
@@ -318,7 +384,8 @@ export async function fetchAllFeeds(
     feeds.map(feed =>
       semaphore.run(async () => {
         try {
-          const rssResult = await fetchAndParseRss(feed)
+          const skipCache = countStaleArticlesByFeed(feed.id, MIN_EXTRACTED_LENGTH) > 0
+          const rssResult = await fetchAndParseRss(feed, { skipCache })
           updateFeedError(feed.id, null)
           updateFeedCacheHeaders(feed.id, rssResult.etag, rssResult.lastModified, rssResult.contentHash)
 
@@ -339,6 +406,7 @@ export async function fetchAllFeeds(
 
           const urls = rssResult.items.map(i => i.url)
           const existing = getExistingArticleUrls(urls)
+          refreshStaleArticles(feed.id, rssResult.items)
 
           const newItems: ArticleTask[] = rssResult.items
             .filter(item => !existing.has(item.url))

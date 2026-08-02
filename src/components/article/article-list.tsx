@@ -491,6 +491,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
             layout,
             isFeatured: layout === 'magazine' && index === 0,
             onClick: handleOverlayOpen,
+            onMarkRead: markRead,
             ...displayConfig,
           }
           const isKbFocused = focusedItemId === String(article.id)

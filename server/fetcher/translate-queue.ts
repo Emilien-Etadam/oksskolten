@@ -51,10 +51,10 @@ async function processItem(item: TranslateQueueItem): Promise<void> {
       translated_lang: item.targetLang,
     })
     updateScore(item.articleId)
-    log.info({ articleId: item.articleId, targetLang: item.targetLang }, 'auto-translate complete')
+    log.info(`auto-translate complete for article ${item.articleId} (${item.targetLang})`)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    log.warn({ articleId: item.articleId, err: msg }, 'auto-translate failed')
+    log.warn(`auto-translate failed for article ${item.articleId}: ${msg}`)
   } finally {
     pending.delete(item.articleId)
   }

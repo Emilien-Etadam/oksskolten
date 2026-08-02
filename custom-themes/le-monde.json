@@ -1,0 +1,42 @@
+{
+  "name": "le-monde",
+  "label": "Le Monde",
+  "indicatorStyle": "line",
+  "highlight": "github-dimmed",
+  "colors": {
+    "light": {
+      "background": "#f5f4f0",
+      "background.sidebar": "#eceae4",
+      "background.subtle": "#f0eee9",
+      "background.avatar": "#d9d5cd",
+      "background.card": "#ffffff",
+      "background.header": "#ffffff",
+      "background.input": "#ffffff",
+      "text": "#1a1a18",
+      "text.muted": "#6e6d66",
+      "accent": "#026b9b",
+      "accent.text": "#ffffff",
+      "error": "#c4241d",
+      "border": "#e4e1da",
+      "hover": "rgba(2, 107, 155, 0.05)",
+      "overlay": "rgba(26, 26, 24, 0.4)"
+    },
+    "dark": {
+      "background": "#0d1014",
+      "background.sidebar": "#080a0d",
+      "background.subtle": "#181d23",
+      "background.avatar": "#2a323a",
+      "background.card": "#14181d",
+      "background.header": "#101418",
+      "background.input": "#1b2127",
+      "text": "#eceae6",
+      "text.muted": "#8d959c",
+      "accent": "#5d94cd",
+      "accent.text": "#0d1014",
+      "error": "#e5605c",
+      "border": "#232a31",
+      "hover": "rgba(255, 255, 255, 0.05)",
+      "overlay": "rgba(0, 0, 0, 0.6)"
+    }
+  }
+}

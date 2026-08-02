@@ -688,8 +688,92 @@ describe('PATCH /api/settings/preferences — retention validation', () => {
   })
 })
 
+describe('PATCH /api/settings/preferences — AI max tokens validation', () => {
+  it('accepts valid max token values', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'summary.max_tokens': '512', 'translate.max_tokens': '4096' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()['summary.max_tokens']).toBe('512')
+    expect(res.json()['translate.max_tokens']).toBe('4096')
+  })
+
+  it('clears max tokens with an empty string', async () => {
+    await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'summary.max_tokens': '512' },
+    })
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'summary.max_tokens': '' },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()['summary.max_tokens']).toBeNull()
+  })
+
+  it('rejects non-integer max tokens', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'summary.max_tokens': '2.5' },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('rejects zero max tokens', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'translate.max_tokens': '0' },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('rejects negative max tokens', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'summary.max_tokens': '-100' },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('rejects non-numeric max tokens', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'translate.max_tokens': 'lots' },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('rejects max tokens exceeding 200000', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/settings/preferences',
+      headers: json,
+      payload: { 'summary.max_tokens': '200001' },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+})
+
 describe('vLLM endpoints', () => {
   it('GET /api/settings/vllm/status returns connection failed when unreachable', async () => {
+    const mockFetch = vi.fn().mockRejectedValue(new Error('fetch failed'))
+    vi.stubGlobal('fetch', mockFetch)
+
     const res = await app.inject({
       method: 'GET',
       url: '/api/settings/vllm/status',
@@ -697,7 +781,7 @@ describe('vLLM endpoints', () => {
     expect(res.statusCode).toBe(200)
     const body = res.json()
     expect(body.ok).toBe(false)
-    expect(body.error).toBeDefined()
+    expect(body.error).toBe('fetch failed')
   })
 
   it('PATCH /api/settings/preferences updates vllm.base_url', async () => {

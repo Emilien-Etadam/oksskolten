@@ -1,0 +1,105 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { act, render, screen } from '@testing-library/react'
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
+import { KeyboardNavigationProvider } from '../../contexts/keyboard-navigation-context'
+import { ArticleSwipeNavigation } from './article-swipe-navigation'
+
+vi.mock('../../lib/url', () => ({
+  articleUrlToPath: (url: string) => `/articles/${encodeURIComponent(url)}`,
+}))
+
+function LocationProbe() {
+  const location = useLocation()
+  return <div data-testid="pathname">{location.pathname}</div>
+}
+
+function renderSwipeNav(currentArticleId: string) {
+  return render(
+    <KeyboardNavigationProvider>
+      <MemoryRouter initialEntries={['/current']}>
+        <ArticleSwipeNavigation currentArticleId={currentArticleId} />
+        <Routes>
+          <Route path="*" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>
+    </KeyboardNavigationProvider>,
+  )
+}
+
+function dispatchTouch(type: 'touchstart' | 'touchend', x: number, y: number) {
+  const event = new Event(type, { bubbles: true }) as Event & {
+    touches: Array<{ clientX: number; clientY: number }>
+    changedTouches: Array<{ clientX: number; clientY: number }>
+  }
+  event.touches = [{ clientX: x, clientY: y }]
+  event.changedTouches = [{ clientX: x, clientY: y }]
+  act(() => {
+    document.dispatchEvent(event)
+  })
+}
+
+function swipe(fromX: number, toX: number, fromY = 300, toY = 300) {
+  dispatchTouch('touchstart', fromX, fromY)
+  dispatchTouch('touchend', toX, toY)
+}
+
+describe('ArticleSwipeNavigation', () => {
+  beforeEach(() => {
+    sessionStorage.setItem('kb_article_ids', JSON.stringify(['1', '2', '3']))
+    sessionStorage.setItem('kb_article_urls', JSON.stringify({
+      '1': 'https://a.com/one',
+      '2': 'https://b.com/two',
+      '3': 'https://c.com/three',
+    }))
+  })
+
+  it('navigates to the next article on left swipe', () => {
+    renderSwipeNav('2')
+    swipe(300, 100)
+    expect(screen.getByTestId('pathname').textContent).toBe(`/articles/${encodeURIComponent('https://c.com/three')}`)
+  })
+
+  it('navigates to the previous article on right swipe', () => {
+    renderSwipeNav('2')
+    swipe(100, 300)
+    expect(screen.getByTestId('pathname').textContent).toBe(`/articles/${encodeURIComponent('https://a.com/one')}`)
+  })
+
+  it('stays put when swiping past the start of the list', () => {
+    renderSwipeNav('1')
+    swipe(100, 300)
+    expect(screen.getByTestId('pathname').textContent).toBe('/current')
+  })
+
+  it('ignores mostly-vertical swipes', () => {
+    renderSwipeNav('2')
+    swipe(300, 200, 100, 400)
+    expect(screen.getByTestId('pathname').textContent).toBe('/current')
+  })
+
+  it('ignores swipes below the distance threshold', () => {
+    renderSwipeNav('2')
+    swipe(300, 260)
+    expect(screen.getByTestId('pathname').textContent).toBe('/current')
+  })
+
+  it('ignores swipes starting at the left screen edge', () => {
+    renderSwipeNav('2')
+    swipe(10, 300)
+    expect(screen.getByTestId('pathname').textContent).toBe('/current')
+  })
+
+  it('navigates with arrow keys', () => {
+    renderSwipeNav('2')
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    })
+    expect(screen.getByTestId('pathname').textContent).toBe(`/articles/${encodeURIComponent('https://c.com/three')}`)
+  })
+
+  it('does nothing when the current article is not in the list', () => {
+    renderSwipeNav('99')
+    swipe(300, 100)
+    expect(screen.getByTestId('pathname').textContent).toBe('/current')
+  })
+})

@@ -1,5 +1,6 @@
 import path from 'node:path'
 import fs from 'node:fs'
+import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import Fastify from 'fastify'
 import fastifyStatic from '@fastify/static'
@@ -19,7 +20,7 @@ import { authRoutes } from './authRoutes.js'
 import { passkeyRoutes } from './passkeyRoutes.js'
 import { oauthRoutes } from './oauthRoutes.js'
 import { fetchAllFeeds } from './fetcher.js'
-import { rebuildSearchIndex, isSearchReady, syncAllScoredArticlesToSearch } from './search/sync.js'
+import { ensureSearchIndex, rebuildSearchIndex, isSearchReady, syncAllScoredArticlesToSearch } from './search/sync.js'
 
 // --- Startup guards ---
 if (process.env.AUTH_DISABLED === '1' && process.env.NODE_ENV !== 'development') {
@@ -106,11 +107,28 @@ app.addHook('onResponse', (req, reply, done) => {
   done()
 })
 
+// CSP hashes for the inline bootstrap scripts in dist/index.html (theme flash
+// guard, boot error display). Computed from the built file at startup so the
+// hashes stay correct even if the build transforms the scripts.
+const inlineScriptHashes = (() => {
+  try {
+    const html = fs.readFileSync(path.join(projectRoot, 'dist', 'index.html'), 'utf8')
+    const hashes: string[] = []
+    for (const m of html.matchAll(/<script(?![^>]*\bsrc\b)[^>]*>([\s\S]*?)<\/script>/gi)) {
+      if (m[1].trim()) hashes.push(`'sha256-${createHash('sha256').update(m[1]).digest('base64')}'`)
+    }
+    return hashes.length > 0 ? ` ${hashes.join(' ')}` : ''
+  } catch {
+    return ''
+  }
+})()
+
 // Security headers
 app.addHook('onRequest', (_req, reply, done) => {
   reply.header('X-Frame-Options', 'DENY')
   reply.header('X-Content-Type-Options', 'nosniff')
-  reply.header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https: data:; connect-src 'self'; frame-ancestors 'none'")
+  reply.header('Referrer-Policy', 'strict-origin-when-cross-origin')
+  reply.header('Content-Security-Policy', `default-src 'self'; script-src 'self'${inlineScriptHashes}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' https: data:; connect-src 'self'; frame-ancestors 'none'`)
   done()
 })
 
@@ -199,20 +217,24 @@ cronTasks.push(cron.schedule(SHRINK_MEM_SCHEDULE, () => {
 }))
 
 // --- Search index ---
-// Non-blocking: rebuild runs in background, search returns 503 until ready
-// Retry with backoff if initial rebuild fails (e.g. Meilisearch not yet ready)
+// Non-blocking: ensure the search index is ready in the background. Search
+// returns 503 until ready. `ensureSearchIndex` reuses an already-populated
+// index when one exists (the common case after a restart) and only triggers
+// a full rebuild when the index is missing or empty, so HMR restarts and
+// normal redeploys don't pile up rebuild tasks on the Meilisearch queue.
+// Retry with backoff if Meilisearch is not yet reachable on first attempt.
 void (async () => {
   const retries = [0, 5_000, 15_000, 30_000]
   for (const delay of retries) {
     if (delay) await new Promise((r) => setTimeout(r, delay))
     try {
-      await rebuildSearchIndex()
+      await ensureSearchIndex()
       return
     } catch (err) {
-      log.error(`[search] Index rebuild attempt failed (next retry in ${retries[retries.indexOf(delay) + 1] ?? 'none'}ms):`, err)
+      log.error(`[search] Index ensure attempt failed (next retry in ${retries[retries.indexOf(delay) + 1] ?? 'none'}ms):`, err)
     }
   }
-  log.error('[search] All initial rebuild attempts failed, will retry on next 6h cron')
+  log.error('[search] All initial ensure attempts failed, will retry on next 6h cron')
 })()
 
 cronTasks.push(cron.schedule('0 */6 * * *', async () => {

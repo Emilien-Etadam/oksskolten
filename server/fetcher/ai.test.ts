@@ -26,6 +26,7 @@ vi.mock('../providers/llm/index.js', () => ({
 
 import {
   detectLanguage,
+  _clearDetectLanguageCache,
   summarizeArticle,
   streamSummarizeArticle,
   translateArticle,
@@ -41,35 +42,38 @@ beforeEach(() => {
 // detectLanguage
 // ---------------------------------------------------------------------------
 describe('detectLanguage', () => {
+  beforeEach(() => {
+    _clearDetectLanguageCache()
+  })
+
   it('returns "ja" for Japanese text', () => {
     expect(detectLanguage('これは日本語のテキストです。テストのために書いています。')).toBe('ja')
   })
 
   it('returns "en" for English text', () => {
-    expect(detectLanguage('This is an English text written for testing purposes.')).toBe('en')
+    expect(detectLanguage('This is an English text written for testing purposes. It contains several sentences to make detection reliable.')).toBe('en')
   })
 
-  it('returns "en" for empty string', () => {
-    expect(detectLanguage('')).toBe('en')
+  it('returns "fr" for French text', () => {
+    expect(detectLanguage("Ceci est un texte en français écrit pour vérifier la détection automatique de la langue des articles.")).toBe('fr')
   })
 
-  it('uses only first 1000 chars for detection', () => {
-    const ja = 'あ'.repeat(200)
-    const en = 'a'.repeat(2000)
-    // First 1000 chars: 200 ja + 800 en → 200/1000 = 20% > 10% → "ja"
-    expect(detectLanguage(ja + en)).toBe('ja')
+  it('maps ISO 639-3 codes to ISO 639-1', () => {
+    expect(detectLanguage('Это русский текст, написанный для проверки автоматического определения языка статьи.')).toBe('ru')
   })
 
-  it('returns "en" when CJK ratio is at boundary (<=10%)', () => {
-    // 10 CJK chars + 90 ASCII = 10% → not > 10% → "en"
-    const text = 'あ'.repeat(10) + 'a'.repeat(90)
+  it('returns "unknown" for empty string', () => {
+    expect(detectLanguage('')).toBe('unknown')
+  })
+
+  it('returns "unknown" for very short text', () => {
+    expect(detectLanguage('short')).toBe('unknown')
+  })
+
+  it('caches repeated detections of the same sample', () => {
+    const text = 'This is an English text used twice to exercise the detection cache.'
     expect(detectLanguage(text)).toBe('en')
-  })
-
-  it('returns "ja" when CJK ratio is just above 10%', () => {
-    // 11 CJK chars + 89 ASCII = 11% → > 10% → "ja"
-    const text = 'あ'.repeat(11) + 'a'.repeat(89)
-    expect(detectLanguage(text)).toBe('ja')
+    expect(detectLanguage(text)).toBe('en')
   })
 
   it('detects kanji-heavy text as Japanese', () => {
@@ -123,6 +127,30 @@ describe('summarizeArticle', () => {
   })
 
   it('sets maxTokens to 2048 for summarize', async () => {
+    mockCreateMessage.mockResolvedValue({ text: 'ok', inputTokens: 0, outputTokens: 0 })
+    await summarizeArticle('text')
+
+    const params = mockCreateMessage.mock.calls[0][0]
+    expect(params.maxTokens).toBe(2048)
+  })
+
+  it('uses summary.max_tokens override from settings', async () => {
+    mockGetSetting.mockImplementation((key: string) => {
+      if (key === 'summary.max_tokens') return '512'
+      return null
+    })
+    mockCreateMessage.mockResolvedValue({ text: 'ok', inputTokens: 0, outputTokens: 0 })
+    await summarizeArticle('text')
+
+    const params = mockCreateMessage.mock.calls[0][0]
+    expect(params.maxTokens).toBe(512)
+  })
+
+  it('falls back to default when summary.max_tokens is not a positive integer', async () => {
+    mockGetSetting.mockImplementation((key: string) => {
+      if (key === 'summary.max_tokens') return 'not-a-number'
+      return null
+    })
     mockCreateMessage.mockResolvedValue({ text: 'ok', inputTokens: 0, outputTokens: 0 })
     await summarizeArticle('text')
 
@@ -209,6 +237,18 @@ describe('translateArticle', () => {
 
     const params = mockCreateMessage.mock.calls[0][0]
     expect(params.maxTokens).toBe(16384)
+  })
+
+  it('uses translate.max_tokens override from settings', async () => {
+    mockGetSetting.mockImplementation((key: string) => {
+      if (key === 'translate.max_tokens') return '4096'
+      return null
+    })
+    mockCreateMessage.mockResolvedValue({ text: 'ok', inputTokens: 0, outputTokens: 0 })
+    await translateArticle('text')
+
+    const params = mockCreateMessage.mock.calls[0][0]
+    expect(params.maxTokens).toBe(4096)
   })
 
   it('uses translate-specific settings keys', async () => {

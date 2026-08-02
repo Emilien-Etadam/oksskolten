@@ -19,7 +19,7 @@ import { parseOrBadRequest } from '../lib/validation.js'
 const ProfileBody = z.object({
   account_name: z.string().optional(),
   avatar_seed: z.string().nullable().optional(),
-  language: z.enum(['ja', 'en'], { error: 'language must be "ja" or "en"' }).optional(),
+  language: z.enum(['ja', 'en', 'zh'], { error: 'language must be "ja", "en", or "zh"' }).optional(),
 })
 
 const ProviderParams = z.object({ provider: z.string() })
@@ -48,8 +48,10 @@ const PREF_KEYS = [
   'chat.model',
   'summary.provider',
   'summary.model',
+  'summary.max_tokens',
   'translate.provider',
   'translate.model',
+  'translate.max_tokens',
   'translate.target_lang',
   'ollama.base_url',
   'ollama.custom_headers',
@@ -84,9 +86,11 @@ const PREF_ALLOWED: Record<PrefKey, string[] | null> = {
   'chat.model': getAllModelValues(),
   'summary.provider': ['anthropic', 'gemini', 'openai', 'claude-code', 'ollama', 'vllm'],
   'summary.model': getAllModelValues(),
+  'summary.max_tokens': null,
   'translate.provider': ['anthropic', 'gemini', 'openai', 'claude-code', 'ollama', 'vllm', 'google-translate', 'deepl'],
   'translate.model': getAllModelValues(),
-  'translate.target_lang': ['ja', 'en', 'fr'],
+  'translate.max_tokens': null,
+  'translate.target_lang': ['ja', 'en', 'zh', 'fr'],
   'ollama.base_url': null,
   'ollama.custom_headers': null,
   'vllm.base_url': null,
@@ -250,6 +254,14 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
         const parsed = z.coerce.number().int().min(1).max(5).safeParse(value)
         if (!parsed.success) {
           reply.status(400).send({ error: `${key} must be an integer between 1 and 5` })
+          return
+        }
+      }
+      // Validate AI max tokens: must be a positive integer
+      if (key === 'summary.max_tokens' || key === 'translate.max_tokens') {
+        const parsed = z.coerce.number().int().min(1).max(200000).safeParse(value)
+        if (!parsed.success) {
+          reply.status(400).send({ error: `${key} must be a positive integer (1-200000)` })
           return
         }
       }

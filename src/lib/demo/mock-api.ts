@@ -139,8 +139,10 @@ export async function demoFetcher(url: string): Promise<unknown> {
       'chat.model': 'claude-haiku-4-5-20251001',
       'summary.provider': 'anthropic',
       'summary.model': 'claude-haiku-4-5-20251001',
+      'summary.max_tokens': null,
       'translate.provider': 'deepl',
       'translate.model': '',
+      'translate.max_tokens': null,
       'translate.target_lang': null,
     }
   }

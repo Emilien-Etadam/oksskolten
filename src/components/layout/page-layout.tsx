@@ -3,6 +3,7 @@ import { useAppLayout } from '../../app'
 import { MD_BREAKPOINT } from '../../lib/breakpoints'
 import { FeedList } from '../feed/feed-list'
 import { Header } from './header'
+import { BottomNav } from './bottom-nav'
 
 interface PageLayoutProps {
   /** Header mode */
@@ -55,6 +56,7 @@ export function PageLayout({ mode = 'list', feedName, onBack, detailTitle, feedL
         )}
         <div ref={sentinelRef} className="h-0" />
         {children}
+        <BottomNav />
       </div>
     </>
   )

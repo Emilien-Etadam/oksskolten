@@ -48,8 +48,10 @@ interface Prefs {
   'chat.model': string | null
   'summary.provider': string | null
   'summary.model': string | null
+  'summary.max_tokens': string | null
   'translate.provider': string | null
   'translate.model': string | null
+  'translate.max_tokens': string | null
   'translate.target_lang': string | null
   'custom_themes': string | null
 }
@@ -65,6 +67,7 @@ export function useSettings() {
   const { themeName, setTheme, themes } = useTheme(isDark, customThemes)
   const { dateMode, setDateMode } = useDateMode()
   const { autoMarkRead, setAutoMarkRead } = useAutoMarkRead()
+  const { autoTranslate, setAutoTranslate } = useAutoTranslate()
   const { showUnreadIndicator, setShowUnreadIndicator } = useUnreadIndicator()
   const { internalLinks, setInternalLinks } = useInternalLinks()
   const currentTheme = themes.find(t => t.name === themeName) ?? themes[0]
@@ -87,6 +90,8 @@ export function useSettings() {
   const [translateProvider, setTranslateProviderState] = useState<string | null>(null)
   const [translateModel, setTranslateModelState] = useState<string | null>(null)
   const [translateTargetLang, setTranslateTargetLangState] = useState<string | null>(null)
+  const [summaryMaxTokens, setSummaryMaxTokensState] = useState<string | null>(null)
+  const [translateMaxTokens, setTranslateMaxTokensState] = useState<string | null>(null)
 
   // --- DB sync ---
   const { data: prefs, mutate: mutatePrefs } = useSWR<Prefs>(
@@ -108,6 +113,8 @@ export function useSettings() {
   dateModeRef.current = dateMode
   const autoMarkReadRef = useRef(autoMarkRead)
   autoMarkReadRef.current = autoMarkRead
+  const autoTranslateRef = useRef(autoTranslate)
+  autoTranslateRef.current = autoTranslate
   const showUnreadIndicatorRef = useRef(showUnreadIndicator)
   showUnreadIndicatorRef.current = showUnreadIndicator
   const internalLinksRef = useRef(internalLinks)
@@ -146,6 +153,8 @@ export function useSettings() {
         validate: v => v === 'relative' || v === 'absolute' },
       { key: 'reading.auto_mark_read', setter: setAutoMarkRead, backfillRef: autoMarkReadRef,
         validate: v => v === 'on' || v === 'off' },
+      { key: 'reading.auto_translate', setter: setAutoTranslate, backfillRef: autoTranslateRef,
+        validate: v => v === 'on' || v === 'off' },
       { key: 'reading.unread_indicator', setter: setShowUnreadIndicator, backfillRef: showUnreadIndicatorRef,
         validate: v => v === 'on' || v === 'off' },
       { key: 'reading.internal_links', setter: setInternalLinks, backfillRef: internalLinksRef,
@@ -178,6 +187,8 @@ export function useSettings() {
       { key: 'translate.provider', setter: setTranslateProviderState },
       { key: 'translate.model', setter: setTranslateModelState },
       { key: 'translate.target_lang', setter: setTranslateTargetLangState },
+      { key: 'summary.max_tokens', setter: setSummaryMaxTokensState },
+      { key: 'translate.max_tokens', setter: setTranslateMaxTokensState },
     ]
 
     for (const { key, setter, backfillRef, validate } of hydrationMap) {
@@ -194,7 +205,7 @@ export function useSettings() {
     if (Object.keys(backfill).length > 0) {
       apiPatch('/api/settings/preferences', backfill).catch(() => {})
     }
-  }, [prefs, setTheme, setDateMode, setAutoMarkRead, setShowUnreadIndicator, setInternalLinks, setShowThumbnails, setShowFeedActivity, setChatPosition, setArticleOpenMode, setCategoryUnreadOnly, setLayout, setMascot, setHighlightTheme, setArticleFont, setKeyboardNavigation, setKeybindings])
+  }, [prefs, setTheme, setDateMode, setAutoMarkRead, setAutoTranslate, setShowUnreadIndicator, setInternalLinks, setShowThumbnails, setShowFeedActivity, setChatPosition, setArticleOpenMode, setCategoryUnreadOnly, setLayout, setMascot, setHighlightTheme, setArticleFont, setKeyboardNavigation, setKeybindings])
 
   // Hydrate custom themes from DB
   useEffect(() => {
@@ -300,6 +311,7 @@ export function useSettings() {
   const {
     syncedSetDateMode,
     syncedSetAutoMarkRead,
+    syncedSetAutoTranslate,
     syncedSetShowUnreadIndicator,
     syncedSetInternalLinks,
     syncedSetShowThumbnails,
@@ -319,6 +331,8 @@ export function useSettings() {
     syncedSetTranslateProvider,
     syncedSetTranslateModel,
     syncedSetTranslateTargetLang,
+    syncedSetSummaryMaxTokens,
+    syncedSetTranslateMaxTokens,
   } = useMemo(() => {
     const make = <T extends string>(key: keyof Prefs, setter: (v: T) => void) =>
       (value: T) => {
@@ -330,6 +344,7 @@ export function useSettings() {
     return {
       syncedSetDateMode: make<'relative' | 'absolute'>('reading.date_mode', setDateMode),
       syncedSetAutoMarkRead: make<'on' | 'off'>('reading.auto_mark_read', setAutoMarkRead),
+      syncedSetAutoTranslate: make<'on' | 'off'>('reading.auto_translate', setAutoTranslate),
       syncedSetShowUnreadIndicator: make<'on' | 'off'>('reading.unread_indicator', setShowUnreadIndicator),
       syncedSetInternalLinks: make<'on' | 'off'>('reading.internal_links', setInternalLinks),
       syncedSetShowThumbnails: make<'on' | 'off'>('reading.show_thumbnails', setShowThumbnails),
@@ -354,10 +369,12 @@ export function useSettings() {
       syncedSetTranslateProvider: make<string>('translate.provider', setTranslateProviderState),
       syncedSetTranslateModel: make<string>('translate.model', setTranslateModelState),
       syncedSetTranslateTargetLang: make<string>('translate.target_lang', setTranslateTargetLangState),
+      syncedSetSummaryMaxTokens: make<string>('summary.max_tokens', setSummaryMaxTokensState),
+      syncedSetTranslateMaxTokens: make<string>('translate.max_tokens', setTranslateMaxTokensState),
     }
     // scheduleSave and dirtyKeysRef are stable refs; remaining setters are useState/useCallback-stable
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setDateMode, setAutoMarkRead, setShowUnreadIndicator, setInternalLinks, setShowThumbnails, setShowFeedActivity, setChatPosition, setArticleOpenMode, setCategoryUnreadOnly, setLayout, setArticleFont, setMascot])
+  }, [setDateMode, setAutoMarkRead, setAutoTranslate, setShowUnreadIndicator, setInternalLinks, setShowThumbnails, setShowFeedActivity, setChatPosition, setArticleOpenMode, setCategoryUnreadOnly, setLayout, setArticleFont, setMascot])
 
   // Special: theme setter updates 2 keys + resets highlight
   const syncedSetTheme = useCallback((name: string) => {
@@ -402,6 +419,8 @@ export function useSettings() {
     setDateMode: syncedSetDateMode,
     autoMarkRead,
     setAutoMarkRead: syncedSetAutoMarkRead,
+    autoTranslate,
+    setAutoTranslate: syncedSetAutoTranslate,
     showUnreadIndicator,
     setShowUnreadIndicator: syncedSetShowUnreadIndicator,
     internalLinks,
@@ -442,6 +461,10 @@ export function useSettings() {
     setTranslateModel: syncedSetTranslateModel,
     translateTargetLang,
     setTranslateTargetLang: syncedSetTranslateTargetLang,
+    summaryMaxTokens,
+    setSummaryMaxTokens: syncedSetSummaryMaxTokens,
+    translateMaxTokens,
+    setTranslateMaxTokens: syncedSetTranslateMaxTokens,
     keyboardNavigation,
     setKeyboardNavigation: syncedSetKeyboardNavigation,
     keybindings,

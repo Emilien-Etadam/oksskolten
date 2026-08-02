@@ -13,6 +13,7 @@ import {
 } from '../../../data/aiModels'
 import type { ModelGroup } from '../../../data/aiModels'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectLabel, SelectItem } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
 import type { Settings } from '../../../hooks/use-settings'
 import type { TranslateFn } from '../../../lib/i18n'
 
@@ -27,6 +28,9 @@ interface TaskConfig {
   setModel: (v: string) => void
   defaultModel: string
   hasTranslateServices?: boolean
+  maxTokensValue?: string
+  setMaxTokens?: (v: string) => void
+  defaultMaxTokens?: number
 }
 
 const SWR_KEY_OPTS = { revalidateOnFocus: false } as const
@@ -91,6 +95,9 @@ export function TaskModelSection({ settings, t }: { settings: Settings; t: TFunc
       modelValue: settings.summaryModel || '',
       setModel: settings.setSummaryModel,
       defaultModel: 'claude-haiku-4-5-20251001',
+      maxTokensValue: settings.summaryMaxTokens || '',
+      setMaxTokens: settings.setSummaryMaxTokens,
+      defaultMaxTokens: 2048,
     },
     {
       labelKey: 'integration.task.translate',
@@ -104,13 +111,16 @@ export function TaskModelSection({ settings, t }: { settings: Settings; t: TFunc
       setModel: settings.setTranslateModel,
       defaultModel: 'claude-sonnet-4-6',
       hasTranslateServices: true,
+      maxTokensValue: settings.translateMaxTokens || '',
+      setMaxTokens: settings.setTranslateMaxTokens,
+      defaultMaxTokens: 16384,
     },
   ]
 
   // Show brief "Saved" feedback on any task provider/model change
   const [showSaved, setShowSaved] = useState(false)
-  const prevValues = useRef(tasks.map(t => `${t.providerValue}:${t.modelValue}`).join('|'))
-  const currentValues = tasks.map(t => `${t.providerValue}:${t.modelValue}`).join('|')
+  const prevValues = useRef(tasks.map(t => `${t.providerValue}:${t.modelValue}:${t.maxTokensValue ?? ''}`).join('|'))
+  const currentValues = tasks.map(t => `${t.providerValue}:${t.modelValue}:${t.maxTokensValue ?? ''}`).join('|')
   useEffect(() => {
     if (prevValues.current !== currentValues) {
       prevValues.current = currentValues
@@ -170,6 +180,7 @@ function TaskModelRow({ task, t, configuredKeys, hasAnyTranslateKey }: { task: T
         <span className="block text-xs font-medium text-text select-none">{t(task.labelKey)}</span>
         <ProviderButtons providers={LLM_TASK_PROVIDERS} selected={task.providerValue} onSelect={task.setProvider} t={t} configuredKeys={configuredKeys} />
         <ModelSelect provider={task.providerValue} modelValue={task.modelValue} setModel={task.setModel} t={t} />
+        {task.setMaxTokens && <MaxTokensInput task={task} t={t} />}
       </div>
     )
   }
@@ -214,8 +225,39 @@ function TaskModelRow({ task, t, configuredKeys, hasAnyTranslateKey }: { task: T
         <>
           <ProviderButtons providers={LLM_TASK_PROVIDERS} selected={task.providerValue} onSelect={task.setProvider} t={t} configuredKeys={configuredKeys} />
           <ModelSelect provider={task.providerValue} modelValue={task.modelValue} setModel={task.setModel} t={t} />
+          {task.setMaxTokens && <MaxTokensInput task={task} t={t} />}
         </>
       )}
+    </div>
+  )
+}
+
+/* ── Max Tokens Input ── */
+
+const MAX_TOKENS_LIMIT = 200000
+
+function MaxTokensInput({ task, t }: { task: TaskConfig; t: TFunc }) {
+  const onChange = (raw: string) => {
+    // Digits only; strip leading zeros so '0' clears back to the default.
+    // Clamp to the server-side limit so the debounced PATCH never gets a 400.
+    const digits = raw.replace(/\D/g, '').replace(/^0+/, '')
+    task.setMaxTokens!(digits ? String(Math.min(Number(digits), MAX_TOKENS_LIMIT)) : '')
+  }
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <span className="block text-[11px] text-text select-none">{t('integration.maxTokens')}</span>
+        <span className="block text-[11px] text-muted/70 select-none">{t('integration.maxTokensDesc')}</span>
+      </div>
+      <Input
+        type="text"
+        inputMode="numeric"
+        value={task.maxTokensValue ?? ''}
+        onChange={e => onChange(e.target.value)}
+        placeholder={String(task.defaultMaxTokens)}
+        className="w-24 text-right shrink-0"
+        aria-label={t('integration.maxTokens')}
+      />
     </div>
   )
 }
