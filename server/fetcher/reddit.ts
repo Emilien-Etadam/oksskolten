@@ -63,12 +63,81 @@ function parseJsonBody(body: string): unknown {
  */
 const BROWSER_USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64; rv:132.0) Gecko/20100101 Firefox/132.0'
 
+/** Descriptive UA required by Reddit's API guidelines for OAuth clients */
+const OAUTH_USER_AGENT = 'web:oksskolten:v0.5 (self-hosted RSS reader)'
+
+let cachedOauthToken: { token: string; expiresAt: number } | null = null
+
+/**
+ * Application-only OAuth token (client_credentials) when REDDIT_CLIENT_ID /
+ * REDDIT_CLIENT_SECRET are configured. oauth.reddit.com is the official API
+ * host and is not subject to the anonymous-endpoint IP blocks.
+ */
+async function getOauthToken(requestLog: RedditLogger): Promise<string | null> {
+  const clientId = process.env.REDDIT_CLIENT_ID
+  const clientSecret = process.env.REDDIT_CLIENT_SECRET
+  if (!clientId || !clientSecret) return null
+  if (cachedOauthToken && Date.now() < cachedOauthToken.expiresAt - 60_000) {
+    return cachedOauthToken.token
+  }
+
+  try {
+    const res = await fetch('https://www.reddit.com/api/v1/access_token', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Basic ' + Buffer.from(`${clientId}:${clientSecret}`).toString('base64'),
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': OAUTH_USER_AGENT,
+      },
+      body: 'grant_type=client_credentials',
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    })
+    if (!res.ok) {
+      requestLog.warn(`reddit oauth token request failed: ${res.status}`)
+      return null
+    }
+    const data = await res.json() as { access_token?: string; expires_in?: number }
+    if (!data.access_token) return null
+    cachedOauthToken = {
+      token: data.access_token,
+      expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000,
+    }
+    return data.access_token
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    requestLog.warn(`reddit oauth token request failed: ${msg}`)
+    return null
+  }
+}
+
+/** @internal test helper */
+export function _resetRedditOauthForTests(): void {
+  cachedOauthToken = null
+}
+
 /**
  * Fetch a Reddit JSON document. Attempt ladder: default UA, then a browser
  * UA, then old.reddit.com, then FlareSolverr (when configured) for IPs
  * Reddit blocks outright.
  */
 export async function fetchRedditJson(jsonUrl: string, requestLog: RedditLogger = log): Promise<RedditListing[] | null> {
+  // Preferred path: the official OAuth API when credentials are configured
+  const token = await getOauthToken(requestLog)
+  if (token) {
+    try {
+      const oauthUrl = jsonUrl.replace('https://www.reddit.com/', 'https://oauth.reddit.com/')
+      const res = await fetch(oauthUrl, {
+        headers: { Authorization: `Bearer ${token}`, 'User-Agent': OAUTH_USER_AGENT, Accept: 'application/json' },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      })
+      if (res.ok) return await res.json() as RedditListing[]
+      requestLog.warn(`reddit oauth responded ${res.status} for ${oauthUrl}`)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      requestLog.warn(`reddit oauth fetch failed: ${msg}`)
+    }
+  }
+
   const attempts = [
     { url: jsonUrl, ua: USER_AGENT, label: 'default UA' },
     { url: jsonUrl, ua: BROWSER_USER_AGENT, label: 'browser UA' },
