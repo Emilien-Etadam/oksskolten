@@ -1,9 +1,14 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { getArticleById } from '../db/articles.js'
+import { translateSnippet } from '../fetcher/ai.js'
 import { USER_AGENT } from '../fetcher/http.js'
 
 const NumericIdParams = z.object({ id: z.coerce.number().int() })
+
+const TranslateBody = z.object({
+  texts: z.array(z.string().min(1).max(8000)).min(1).max(32),
+})
 
 export interface ArticleComment {
   author: string
@@ -97,5 +102,27 @@ export async function commentRoutes(api: FastifyInstance): Promise<void> {
       request.log.warn(err, 'comments fetch failed')
       return reply.send({ provider: 'reddit', comments: [] })
     }
+  })
+
+  api.post('/api/comments/translate', async (request, reply) => {
+    const body = TranslateBody.safeParse(request.body)
+    if (!body.success) {
+      reply.status(400).send({ error: 'texts must be 1-32 strings of at most 8000 chars' })
+      return
+    }
+
+    // Per-item fallback: a failed translation returns the original text so
+    // one bad comment never breaks the whole batch
+    const translations = await Promise.all(body.data.texts.map(async (text) => {
+      try {
+        const result = await translateSnippet(text)
+        return result.textTranslated.trim() || text
+      } catch (err) {
+        request.log.warn(err, 'comment translation failed')
+        return text
+      }
+    }))
+
+    return reply.send({ translations })
   })
 }

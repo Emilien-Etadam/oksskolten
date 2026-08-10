@@ -192,6 +192,45 @@ function unquoteTitle(text: string): string {
   return trimmed
 }
 
+const SNIPPET_MAX_TOKENS = 2048
+
+function buildTranslateSnippetPrompt(text: string): string {
+  const lang = getSetting('translate.target_lang') || getSetting('general.language') || DEFAULT_LANGUAGE
+  return `Translate the following comment into ${languageName(lang)}.
+Preserve Markdown formatting. Output only the translation, nothing else.
+
+${text}`
+}
+
+const translateSnippetConfig: AiTaskConfig = {
+  providerKey: 'translate.provider',
+  modelKey: 'translate.model',
+  defaultModel: TASK_DEFAULTS.translate.model,
+  maxTokensKey: 'translate.snippet_max_tokens',
+  defaultMaxTokens: SNIPPET_MAX_TOKENS,
+  buildPrompt: buildTranslateSnippetPrompt,
+}
+
+/** Translate a short standalone text (e.g. a discussion comment). */
+export async function translateSnippet(
+  text: string,
+  options?: { provider?: string },
+): Promise<{ textTranslated: string } & AiTextResult> {
+  const provider = options?.provider || getSetting('translate.provider') || TASK_DEFAULTS.translate.provider
+  if (!options?.provider) {
+    if (provider === 'google-translate') {
+      const r = await runGoogleTranslate(text)
+      return { textTranslated: r.fullTextTranslated, inputTokens: r.inputTokens, outputTokens: r.outputTokens, billingMode: r.billingMode, model: r.model, monthlyChars: r.monthlyChars }
+    }
+    if (provider === 'deepl') {
+      const r = await runDeepl(text)
+      return { textTranslated: r.fullTextTranslated, inputTokens: r.inputTokens, outputTokens: r.outputTokens, billingMode: r.billingMode, model: r.model, monthlyChars: r.monthlyChars }
+    }
+  }
+  const r = await runAiTask(translateSnippetConfig, text, undefined, options?.provider)
+  return { textTranslated: r.text, inputTokens: r.inputTokens, outputTokens: r.outputTokens, billingMode: r.billingMode, model: r.model }
+}
+
 export async function translateTitle(
   title: string,
   options?: { provider?: string },

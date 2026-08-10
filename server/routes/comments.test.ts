@@ -3,6 +3,17 @@ import { setupTestDb } from '../__tests__/helpers/testDb.js'
 import { buildApp } from '../__tests__/helpers/buildApp.js'
 import { createFeed, insertArticle } from '../db.js'
 import type { FastifyInstance } from 'fastify'
+
+const mockTranslateSnippet = vi.fn()
+
+vi.mock('../fetcher/ai.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../fetcher/ai.js')>()
+  return {
+    ...actual,
+    translateSnippet: (text: string) => mockTranslateSnippet(text),
+  }
+})
+
 import { redditJsonUrl } from './comments.js'
 
 let app: FastifyInstance
@@ -104,5 +115,48 @@ describe('GET /api/articles/:id/comments', () => {
   it('404s for unknown articles', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/articles/99999/comments' })
     expect(res.statusCode).toBe(404)
+  })
+})
+
+describe('POST /api/comments/translate', () => {
+  it('translates each text preserving order', async () => {
+    mockTranslateSnippet.mockImplementation((text: string) =>
+      Promise.resolve({ textTranslated: `FR:${text}` }))
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/comments/translate',
+      headers: { 'content-type': 'application/json' },
+      payload: { texts: ['Hello', 'World'] },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ translations: ['FR:Hello', 'FR:World'] })
+  })
+
+  it('falls back to the original text when one translation fails', async () => {
+    mockTranslateSnippet
+      .mockResolvedValueOnce({ textTranslated: 'FR:Hello' })
+      .mockRejectedValueOnce(new Error('vLLM down'))
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/comments/translate',
+      headers: { 'content-type': 'application/json' },
+      payload: { texts: ['Hello', 'World'] },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ translations: ['FR:Hello', 'World'] })
+  })
+
+  it('rejects invalid payloads', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/comments/translate',
+      headers: { 'content-type': 'application/json' },
+      payload: { texts: [] },
+    })
+    expect(res.statusCode).toBe(400)
   })
 })

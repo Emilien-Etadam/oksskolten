@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { LocaleContext } from '../../lib/i18n'
 import { ArticleComments, hasCommentsProvider } from './article-comments'
 
@@ -16,6 +16,7 @@ vi.mock('swr', () => ({
 
 vi.mock('../../lib/fetcher', () => ({
   fetcher: vi.fn(),
+  authHeaders: () => ({}),
 }))
 
 function renderComments(articleUrl: string) {
@@ -78,5 +79,57 @@ describe('ArticleComments', () => {
     swrIsLoading = true
     renderComments('https://www.reddit.com/r/x/comments/1/t/')
     expect(screen.getByText('Comments')).toBeTruthy()
+  })
+
+  describe('translation', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('translates all comment bodies on demand and toggles back to originals', async () => {
+      swrCommentsData = {
+        provider: 'reddit',
+        comments: [
+          {
+            author: 'alice', score: 1, body: 'Hello world',
+            replies: [{ author: 'bob', score: 2, body: 'Nice', replies: [] }],
+          },
+        ],
+      }
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ translations: ['Bonjour le monde', 'Bien'] }),
+      })
+      vi.stubGlobal('fetch', mockFetch)
+
+      renderComments('https://www.reddit.com/r/x/comments/1/t/')
+      fireEvent.click(screen.getByRole('button', { name: 'Translate' }))
+
+      await screen.findByText('Bonjour le monde')
+      expect(screen.getByText('Bien')).toBeTruthy()
+      // Bodies are sent flattened depth-first (comment then its replies)
+      const payload = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string)
+      expect(payload.texts).toEqual(['Hello world', 'Nice'])
+
+      // Toggle back to originals without a new request
+      fireEvent.click(screen.getByRole('button', { name: 'Original' }))
+      expect(screen.getByText('Hello world')).toBeTruthy()
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps the originals displayed when the translation request fails', async () => {
+      swrCommentsData = {
+        provider: 'reddit',
+        comments: [{ author: 'alice', score: 1, body: 'Hello world', replies: [] }],
+      }
+      const mockFetch = vi.fn().mockRejectedValue(new Error('down'))
+      vi.stubGlobal('fetch', mockFetch)
+
+      renderComments('https://www.reddit.com/r/x/comments/1/t/')
+      fireEvent.click(screen.getByRole('button', { name: 'Translate' }))
+
+      await screen.findByRole('button', { name: 'Translate' })
+      expect(screen.getByText('Hello world')).toBeTruthy()
+    })
   })
 })
