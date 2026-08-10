@@ -14,6 +14,7 @@ interface SwipeableArticleCardProps extends ArticleDisplayConfig {
   isFeatured?: boolean
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void
   onMarkRead?: (articleId: number) => void
+  groupCount?: number
 }
 
 const SWIPE_THRESHOLD = 80
@@ -29,6 +30,7 @@ export function SwipeableArticleCard({
   showThumbnails,
   onClick: onClickProp,
   onMarkRead,
+  groupCount,
 }: SwipeableArticleCardProps) {
   const navigate = useNavigate()
   const x = useMotionValue(0)
@@ -121,6 +123,7 @@ export function SwipeableArticleCard({
           showThumbnails={showThumbnails}
           onClick={handleClick}
           onMarkRead={onMarkRead}
+          groupCount={groupCount}
         />
       </motion.div>
     </div>

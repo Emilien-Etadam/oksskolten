@@ -87,8 +87,11 @@ vi.mock('./swipeable-article-card', () => ({
 }))
 
 vi.mock('./article-card', () => ({
-  ArticleCard: ({ article }: { article: ArticleListItem }) => (
-    <div data-testid={`article-${article.id}`}>{article.title}</div>
+  ArticleCard: ({ article, groupCount }: { article: ArticleListItem; groupCount?: number }) => (
+    <div data-testid={`article-${article.id}`}>
+      {article.title}
+      {groupCount != null && groupCount > 1 && <span>{`×${groupCount}`}</span>}
+    </div>
   ),
 }))
 
@@ -266,6 +269,57 @@ describe('ArticleList', () => {
     renderArticleList()
     expect(screen.getByText('First Article')).toBeTruthy()
     expect(screen.getByText('Second Article')).toBeTruthy()
+  })
+
+  it('groups similar articles behind the first one with a badge', () => {
+    swrInfiniteReturn = {
+      data: [{
+        articles: [
+          makeArticle({ id: 1, title: 'Story on subreddit A', similar_ids: '2,3' }),
+          makeArticle({ id: 2, title: 'Story on subreddit B', similar_ids: '1,3' }),
+          makeArticle({ id: 3, title: 'Story on subreddit C', similar_ids: '1,2' }),
+          makeArticle({ id: 4, title: 'Unrelated article' }),
+        ],
+        total: 4,
+        has_more: false,
+      }],
+      error: undefined,
+      size: 1,
+      setSize: vi.fn(),
+      isLoading: false,
+      isValidating: false,
+      mutate: vi.fn(),
+    }
+    renderArticleList()
+    expect(screen.getByText('Story on subreddit A')).toBeTruthy()
+    expect(screen.queryByText('Story on subreddit B')).toBeNull()
+    expect(screen.queryByText('Story on subreddit C')).toBeNull()
+    expect(screen.getByText('Unrelated article')).toBeTruthy()
+    expect(screen.getByText('×3')).toBeTruthy()
+  })
+
+  it('does not group articles that are merely counted as similar elsewhere', () => {
+    swrInfiniteReturn = {
+      data: [{
+        articles: [
+          makeArticle({ id: 1, title: 'Solo leader', similar_ids: '99' }),
+          makeArticle({ id: 2, title: 'Other article' }),
+        ],
+        total: 2,
+        has_more: false,
+      }],
+      error: undefined,
+      size: 1,
+      setSize: vi.fn(),
+      isLoading: false,
+      isValidating: false,
+      mutate: vi.fn(),
+    }
+    renderArticleList()
+    // Article 99 is not loaded, so nothing collapses and no badge shows
+    expect(screen.getByText('Solo leader')).toBeTruthy()
+    expect(screen.getByText('Other article')).toBeTruthy()
+    expect(screen.queryByText(/^×/)).toBeNull()
   })
 
   it('shows mascot at end of feed', () => {

@@ -78,6 +78,8 @@ export interface ArticleListItem {
   liked_at: string | null
   score?: number
   similar_count?: number
+  /** Comma-separated ids of similar articles (bidirectional pairs), list queries only */
+  similar_ids?: string | null
 }
 
 export interface ArticleDetail extends ArticleListItem {

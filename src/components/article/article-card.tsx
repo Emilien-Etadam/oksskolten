@@ -21,6 +21,8 @@ interface ArticleCardProps extends ArticleDisplayConfig {
   isFeatured?: boolean
   onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void
   onMarkRead?: (articleId: number) => void
+  /** Number of similar articles collapsed into this row (>= 2 shows a badge) */
+  groupCount?: number
 }
 
 function Thumbnail({ src, articleUrl, className }: { src: string | null; articleUrl: string; className?: string }) {
@@ -131,6 +133,7 @@ interface CardMetaProps {
   dateText: string
   article: ArticleListItem
   isUnread: boolean
+  groupCount?: number
   onMarkRead?: (articleId: number) => void
   /** md = 12px text / 14px favicon, sm = 11px text / 12px favicon */
   size?: 'md' | 'sm'
@@ -138,7 +141,7 @@ interface CardMetaProps {
 }
 
 /** Shared meta row: favicon + domain + date, with an optional mark-read button. */
-function CardMeta({ domain, dateText, article, isUnread, onMarkRead, size = 'md', className = '' }: CardMetaProps) {
+function CardMeta({ domain, dateText, article, isUnread, groupCount, onMarkRead, size = 'md', className = '' }: CardMetaProps) {
   const iconSize = size === 'md' ? 14 : 12
   return (
     <div className={`flex items-center gap-1 ${size === 'md' ? 'text-[12px]' : 'text-[11px]'} text-muted whitespace-nowrap min-w-0 ${className}`}>
@@ -156,13 +159,16 @@ function CardMeta({ domain, dateText, article, isUnread, onMarkRead, size = 'md'
         </>
       )}
       <span className="shrink-0">{dateText}</span>
+      {groupCount != null && groupCount > 1 && (
+        <span className="shrink-0 rounded-full bg-bg-subtle px-1.5 text-[10.5px] font-medium leading-4">{`×${groupCount}`}</span>
+      )}
       {isUnread && onMarkRead && <MarkReadButton className="ml-auto -my-1.5" onClick={() => onMarkRead(article.id)} />}
     </div>
   )
 }
 
 /** List layout — classic single-column (current default) */
-function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, showThumbnails, onClick, onMarkRead }: ArticleCardProps) {
+function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, showThumbnails, onClick, onMarkRead, groupCount }: ArticleCardProps) {
   const { isUnread, domain, dateText, href, handleClick, originalUrl, title } = useCardBase(article, dateMode, onClick)
   const showIndicator = isUnread && showUnreadIndicator
 
@@ -196,7 +202,7 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, show
               {article.excerpt}
             </p>
           )}
-          <CardMeta domain={domain} dateText={dateText} article={article} isUnread={isUnread} className="mt-1" />
+          <CardMeta domain={domain} dateText={dateText} article={article} isUnread={isUnread} groupCount={groupCount} className="mt-1" />
         </div>
         {showThumbnails && <Thumbnail src={article.og_image} articleUrl={article.url} />}
         {isUnread && onMarkRead && <MarkReadButton onClick={() => onMarkRead(article.id)} />}
@@ -206,7 +212,7 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, show
 }
 
 /** Card layout — image-forward grid card */
-function GridCard({ article, dateMode, showThumbnails, onClick, onMarkRead }: ArticleCardProps) {
+function GridCard({ article, dateMode, showThumbnails, onClick, onMarkRead, groupCount }: ArticleCardProps) {
   const { isUnread, domain, dateText, href, handleClick, originalUrl, title } = useCardBase(article, dateMode, onClick)
 
   return (
@@ -230,14 +236,14 @@ function GridCard({ article, dateMode, showThumbnails, onClick, onMarkRead }: Ar
             {article.excerpt}
           </p>
         )}
-        <CardMeta domain={domain} dateText={dateText} article={article} isUnread={isUnread} onMarkRead={onMarkRead} size="sm" className="mt-2" />
+        <CardMeta domain={domain} dateText={dateText} article={article} isUnread={isUnread} groupCount={groupCount} onMarkRead={onMarkRead} size="sm" className="mt-2" />
       </div>
     </a>
   )
 }
 
 /** Magazine layout — hero card (large) */
-function HeroCard({ article, dateMode, showThumbnails, onClick, onMarkRead }: ArticleCardProps) {
+function HeroCard({ article, dateMode, showThumbnails, onClick, onMarkRead, groupCount }: ArticleCardProps) {
   const { isUnread, domain, dateText, href, handleClick, originalUrl, title } = useCardBase(article, dateMode, onClick)
 
   return (
@@ -261,14 +267,14 @@ function HeroCard({ article, dateMode, showThumbnails, onClick, onMarkRead }: Ar
             {article.excerpt}
           </p>
         )}
-        <CardMeta domain={domain} dateText={dateText} article={article} isUnread={isUnread} onMarkRead={onMarkRead} className="mt-2" />
+        <CardMeta domain={domain} dateText={dateText} article={article} isUnread={isUnread} groupCount={groupCount} onMarkRead={onMarkRead} className="mt-2" />
       </div>
     </a>
   )
 }
 
 /** Magazine layout — small card (below hero) */
-function SmallCard({ article, dateMode, showThumbnails, onClick, onMarkRead }: ArticleCardProps) {
+function SmallCard({ article, dateMode, showThumbnails, onClick, onMarkRead, groupCount }: ArticleCardProps) {
   const { isUnread, domain, dateText, href, handleClick, originalUrl, title } = useCardBase(article, dateMode, onClick)
 
   return (
@@ -292,14 +298,14 @@ function SmallCard({ article, dateMode, showThumbnails, onClick, onMarkRead }: A
             {article.excerpt}
           </p>
         )}
-        <CardMeta domain={domain} dateText={dateText} article={article} isUnread={isUnread} onMarkRead={onMarkRead} size="sm" className="mt-1" />
+        <CardMeta domain={domain} dateText={dateText} article={article} isUnread={isUnread} groupCount={groupCount} onMarkRead={onMarkRead} size="sm" className="mt-1" />
       </div>
     </a>
   )
 }
 
 /** Compact layout — title and date only */
-function CompactCard({ article, dateMode, indicatorStyle, showUnreadIndicator, onClick, onMarkRead }: ArticleCardProps) {
+function CompactCard({ article, dateMode, indicatorStyle, showUnreadIndicator, onClick, onMarkRead, groupCount }: ArticleCardProps) {
   const { isUnread, dateText, href, handleClick, originalUrl, title } = useCardBase(article, dateMode, onClick)
   const showIndicator = isUnread && showUnreadIndicator
 
@@ -328,6 +334,9 @@ function CompactCard({ article, dateMode, indicatorStyle, showUnreadIndicator, o
           {title}
         </span>
         <span className="text-[11px] text-muted shrink-0 ml-2">{dateText}</span>
+        {groupCount != null && groupCount > 1 && (
+          <span className="shrink-0 rounded-full bg-bg-subtle px-1.5 text-[10.5px] font-medium leading-4 text-muted">{`×${groupCount}`}</span>
+        )}
         {isUnread && onMarkRead && <MarkReadButton className="w-6 h-6 -my-1" onClick={() => onMarkRead(article.id)} />}
       </div>
     </a>

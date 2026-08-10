@@ -194,7 +194,8 @@ export function getArticles(opts: {
     SELECT a.id, a.feed_id, f.name AS feed_name,
            a.title, a.title_translated, a.url, a.published_at, a.lang, a.summary, a.excerpt, a.og_image, a.seen_at, a.read_at, a.bookmarked_at, a.liked_at,
            a.score,
-           (SELECT COUNT(*) FROM article_similarities WHERE article_id = a.id) AS similar_count
+           (SELECT COUNT(*) FROM article_similarities WHERE article_id = a.id) AS similar_count,
+           (SELECT GROUP_CONCAT(similar_to_id) FROM article_similarities WHERE article_id = a.id) AS similar_ids
     FROM active_articles a
     JOIN feeds f ON a.feed_id = f.id
     ${where}

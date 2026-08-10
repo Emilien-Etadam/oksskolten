@@ -108,7 +108,36 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     revalidate: () => mutate(),
   }), [mutate])
 
-  const articles = useMemo(() => data ? data.flatMap(page => page.articles) : [], [data])
+  const allArticles = useMemo(() => data ? data.flatMap(page => page.articles) : [], [data])
+
+  // Group similar articles (e.g. the same story posted on several subreddits):
+  // the first loaded member of a similarity group is shown with a ×N badge and
+  // the later members are hidden; marking or opening the leader marks the
+  // whole group as read.
+  const { articles, groupCounts, absorbedIds } = useMemo(() => {
+    const position = new Map(allArticles.map((a, i) => [a.id, i]))
+    const hidden = new Set<number>()
+    const counts = new Map<number, number>()
+    const absorbed = new Map<number, number[]>()
+    for (const [index, article] of allArticles.entries()) {
+      if (hidden.has(article.id)) continue
+      const similarIds = (article.similar_ids ?? '').split(',').filter(Boolean).map(Number)
+      const later = similarIds.filter(id => (position.get(id) ?? -1) > index && !hidden.has(id))
+      if (later.length > 0) {
+        for (const id of later) hidden.add(id)
+        counts.set(article.id, later.length + 1)
+        absorbed.set(article.id, later)
+      }
+    }
+    return {
+      articles: hidden.size > 0 ? allArticles.filter(a => !hidden.has(a.id)) : allArticles,
+      groupCounts: counts,
+      absorbedIds: absorbed,
+    }
+  }, [allArticles])
+
+  const absorbedIdsRef = useRef(absorbedIds)
+  absorbedIdsRef.current = absorbedIds
   const hasMore = data ? data[data.length - 1]?.has_more ?? false : false
   const isEmpty = data?.[0]?.articles.length === 0
   const totalAll = data?.[0]?.total_all
@@ -306,9 +335,17 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     scheduleFlush()
   }, [scheduleFlush])
 
+  // Mark an article and its absorbed similar articles as read together
+  const markReadWithGroup = useCallback((articleId: number) => {
+    markRead(articleId)
+    for (const id of absorbedIdsRef.current.get(articleId) ?? []) {
+      markRead(id)
+    }
+  }, [markRead])
+
   // Stable ref so the observer callback always sees the latest markRead
-  const markReadRef = useRef(markRead)
-  markReadRef.current = markRead
+  const markReadRef = useRef(markReadWithGroup)
+  markReadRef.current = markReadWithGroup
 
   const isAutoMarkEnabled = autoMarkRead === 'on'
   const isTouchDevice = useIsTouchDevice()
@@ -491,7 +528,8 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
             layout,
             isFeatured: layout === 'magazine' && index === 0,
             onClick: handleOverlayOpen,
-            onMarkRead: markRead,
+            onMarkRead: markReadWithGroup,
+            groupCount: groupCounts.get(article.id),
             ...displayConfig,
           }
           const isKbFocused = focusedItemId === String(article.id)
@@ -509,6 +547,10 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
               onClick={() => {
                 if (!isGridLayout) {
                   setFocusedItemId(String(article.id))
+                }
+                // Opening a grouped story marks the absorbed duplicates too
+                for (const id of absorbedIdsRef.current.get(article.id) ?? []) {
+                  markRead(id)
                 }
               }}
             >

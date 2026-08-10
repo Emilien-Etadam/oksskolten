@@ -276,6 +276,20 @@ describe('Articles', () => {
 
 
   describe('getArticles filtering', () => {
+    it('exposes similar article ids on list items', async () => {
+      const feed = seedFeed()
+      const a1 = seedArticle(feed.id, { url: 'https://example.com/s1' })
+      const a2 = seedArticle(feed.id, { url: 'https://example.com/s2' })
+      const { insertSimilarity } = await import('./db/similarities.js')
+      insertSimilarity(a1, a2, 0.9)
+
+      const { articles } = getArticles({ limit: 100, offset: 0 })
+      const first = articles.find(a => a.id === a1)
+      const second = articles.find(a => a.id === a2)
+      expect(first?.similar_ids).toBe(String(a2))
+      expect(second?.similar_ids).toBe(String(a1))
+    })
+
     it('filters by feedId', () => {
       const feed1 = seedFeed({ url: 'https://a.com' })
       const feed2 = seedFeed({ url: 'https://b.com' })
