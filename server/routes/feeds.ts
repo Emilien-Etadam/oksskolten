@@ -24,6 +24,7 @@ import {
 import { requireJson } from '../auth.js'
 import { fetchSingleFeed, discoverRssUrl } from '../fetcher.js'
 import { queryRssBridge, inferCssSelectorBridge } from '../rss-bridge.js'
+import { resolveSocialSearchFeed } from '../fetcher/social-search.js'
 import { parseOpml, generateOpml } from '../opml.js'
 import { NumericIdParams, parseOrBadRequest } from '../lib/validation.js'
 
@@ -102,6 +103,12 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
         let discoveredTitle: string | null = null
         let requiresJsChallenge = false
 
+        // Bluesky searches and Mastodon hashtag timelines resolve to a feed
+        // without the discovery/bridge pipeline.
+        const socialFeedUrl = body.discovered_rss_url || body.force_page_selector
+          ? null
+          : await resolveSocialSearchFeed(body.url)
+
         if (body.discovered_rss_url) {
           // Phase 2: user chose "whole site" — use the provided RSS URL directly
           rssUrl = body.discovered_rss_url
@@ -116,6 +123,12 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
           send({ type: 'step', step: 'css-selector', status: 'running' })
           rssBridgeUrl = await inferCssSelectorBridge(body.url)
           send({ type: 'step', step: 'css-selector', status: 'done', found: !!rssBridgeUrl })
+        } else if (socialFeedUrl) {
+          // Social search/hashtag URL: the feed is known without discovery
+          rssUrl = socialFeedUrl
+          send({ type: 'step', step: 'rss-discovery', status: 'done', found: true })
+          send({ type: 'step', step: 'rss-bridge', status: 'skipped' })
+          send({ type: 'step', step: 'css-selector', status: 'skipped' })
         } else {
           // Phase 1: normal discovery flow
           send({ type: 'step', step: 'rss-discovery', status: 'running' })

@@ -14,6 +14,7 @@ import {
   assignCssBridgePseudoDates,
   fixGenericTitlesAndEnrichExcerpts,
 } from './css-bridge.js'
+import { isBlueskySearchUrl, fetchBlueskySearch } from './social-search.js'
 
 export interface RssItem {
   title: string
@@ -127,6 +128,19 @@ export async function fetchAndParseRss(feed: Feed, opts?: { skipCache?: boolean 
   const skipCache = opts?.skipCache ?? false
   const rssUrl = feed.rss_url || feed.rss_bridge_url
   if (!rssUrl) throw new Error('No RSS URL')
+
+  // Bluesky search has no RSS endpoint — query the API and build items directly
+  if (isBlueskySearchUrl(rssUrl)) {
+    return {
+      items: cleanItems(await fetchBlueskySearch(rssUrl)),
+      notModified: false,
+      etag: null,
+      lastModified: null,
+      contentHash: null,
+      httpCacheSeconds: null,
+      rssTtlSeconds: null,
+    }
+  }
 
   const isCssBridge = isCssSelectorBridgeUrl(rssUrl)
 

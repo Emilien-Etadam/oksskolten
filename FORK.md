@@ -111,6 +111,24 @@ blocked by network security"), so fetches escalate through a ladder, first match
 5. **Anti-bot solver** — FlareSolverr or the API-compatible
    [Byparr](https://github.com/ThePhaseless/Byparr) via `FLARESOLVERR_URL`.
 
+## Social searches as feeds
+
+Adding a search or hashtag URL creates a feed from it
+(`server/fetcher/social-search.ts`, resolved in `server/routes/feeds.ts` and
+fetched in `server/fetcher/rss.ts`):
+
+- **Bluesky search** — paste `https://bsky.app/search?q=…` (the URL the web app
+  produces, `sort` and `lang` included). Bluesky serves no RSS for searches, so
+  the public AppView (`app.bsky.feed.searchPosts`, no authentication) is queried
+  and its posts are converted to feed items. Post titles are derived from the
+  opening line of the text.
+- **Mastodon hashtag** — paste `https://<instance>/tags/<tag>`; Mastodon already
+  serves RSS at `<tag>.rss`. Since ordinary sites use `/tags/…` paths too, the
+  candidate is probed and only accepted when it actually returns a feed.
+
+X/Twitter has no equivalent: it removed anonymous guest access in 2024, so no
+account-free path exists.
+
 ## Tooling
 
 - **E2E smoke tests**: `npm run test:e2e` (Playwright) builds the app, boots the
