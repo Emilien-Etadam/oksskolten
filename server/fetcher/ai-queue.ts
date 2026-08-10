@@ -1,14 +1,15 @@
 import { getSetting } from '../db.js'
 import { getDb } from '../db/connection.js'
 import { getArticleById, updateArticleContent, updateScore } from '../db/articles.js'
-import { translateArticle, translateTitle, summarizeArticle } from './ai.js'
+import { getFeedById } from '../db/feeds.js'
+import { translateArticle, translateTitle, summarizeArticle, evaluateArticleRelevance } from './ai.js'
 import { Semaphore } from './util.js'
 import { logger } from '../logger.js'
 import { DEFAULT_LANGUAGE } from '../../shared/lang.js'
 
 const log = logger.child('ai-queue')
 
-export type AiQueueTask = 'translate' | 'summarize'
+export type AiQueueTask = 'translate' | 'summarize' | 'filter'
 
 interface QueueItem {
   articleId: number
@@ -54,10 +55,40 @@ function ensureSemaphore(): Semaphore {
   return semaphore
 }
 
+const PENDING_COLUMN: Record<AiQueueTask, 'translate_pending_at' | 'summarize_pending_at' | 'filter_pending_at'> = {
+  translate: 'translate_pending_at',
+  summarize: 'summarize_pending_at',
+  filter: 'filter_pending_at',
+}
+
 function markPending(task: AiQueueTask, articleId: number, value: string | null): void {
-  updateArticleContent(articleId, task === 'translate'
-    ? { translate_pending_at: value }
-    : { summarize_pending_at: value })
+  updateArticleContent(articleId, { [PENDING_COLUMN[task]]: value })
+}
+
+/** Text the relevance check sees: enough to judge, short enough to stay cheap. */
+const FILTER_TEXT_MAX_CHARS = 1500
+
+async function processFilter(item: QueueItem): Promise<void> {
+  const article = getArticleById(item.articleId)
+  if (!article) return
+
+  const criterion = article.feed_id ? getFeedById(article.feed_id)?.ai_filter : null
+  if (!criterion?.trim() || article.filtered_at) {
+    markPending('filter', item.articleId, null)
+    return
+  }
+
+  const body = article.summary || article.full_text || article.excerpt || ''
+  const text = `${article.title}\n\n${body}`.slice(0, FILTER_TEXT_MAX_CHARS)
+
+  const { keep } = await evaluateArticleRelevance(text, criterion, { provider: 'vllm' })
+  updateArticleContent(item.articleId, {
+    filter_pending_at: null,
+    ...(keep ? {} : { filtered_at: nowIso() }),
+  })
+  if (!keep) {
+    log.info(`ai-filter hid article ${item.articleId} ("${article.title.slice(0, 60)}")`)
+  }
 }
 
 async function processTranslate(item: QueueItem): Promise<void> {
@@ -122,8 +153,10 @@ async function processItem(item: QueueItem): Promise<void> {
   try {
     if (item.task === 'translate') {
       await processTranslate(item)
-    } else {
+    } else if (item.task === 'summarize') {
       await processSummarize(item)
+    } else {
+      await processFilter(item)
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
@@ -175,6 +208,15 @@ export function enqueueAutoSummarize(articleId: number, fullText: string): void 
   enqueue('summarize', articleId)
 }
 
+/**
+ * Queue the relevance check for a new article. No-op unless its feed carries a
+ * filter criterion.
+ */
+export function enqueueAiFilter(articleId: number, feedId: number): void {
+  if (!getFeedById(feedId)?.ai_filter?.trim()) return
+  enqueue('filter', articleId)
+}
+
 export function isAutoTranslateEnabled(): boolean {
   return getSetting('reading.auto_translate') === 'on'
 }
@@ -191,19 +233,20 @@ export function isAutoSummarizeEnabled(): boolean {
 export function resumePendingAiTasks(): void {
   const translateOn = isAutoTranslateEnabled()
   const summarizeOn = isAutoSummarizeEnabled()
-  if (!translateOn && !summarizeOn) return
 
   const cutoff = new Date(Date.now() - RESUME_MIN_AGE_MS).toISOString()
   const rows = getDb().prepare(`
-    SELECT id, translate_pending_at, summarize_pending_at
+    SELECT id, translate_pending_at, summarize_pending_at, filter_pending_at
     FROM active_articles
     WHERE (translate_pending_at IS NOT NULL AND translate_pending_at < ?)
        OR (summarize_pending_at IS NOT NULL AND summarize_pending_at < ?)
+       OR (filter_pending_at IS NOT NULL AND filter_pending_at < ?)
     LIMIT ?
-  `).all(cutoff, cutoff, RESUME_BATCH_LIMIT) as Array<{
+  `).all(cutoff, cutoff, cutoff, RESUME_BATCH_LIMIT) as Array<{
     id: number
     translate_pending_at: string | null
     summarize_pending_at: string | null
+    filter_pending_at: string | null
   }>
 
   let resumed = 0
@@ -214,6 +257,11 @@ export function resumePendingAiTasks(): void {
     }
     if (summarizeOn && row.summarize_pending_at && row.summarize_pending_at < cutoff) {
       enqueue('summarize', row.id, { skipMark: true })
+      resumed++
+    }
+    // The filter has no global toggle: it runs whenever a feed defines a criterion
+    if (row.filter_pending_at && row.filter_pending_at < cutoff) {
+      enqueue('filter', row.id, { skipMark: true })
       resumed++
     }
   }

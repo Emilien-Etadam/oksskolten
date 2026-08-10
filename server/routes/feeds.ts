@@ -53,11 +53,14 @@ const CreateFeedBody = z
     message: 'discovered_rss_url and force_page_selector are mutually exclusive',
   })
 
+const AI_FILTER_MAX_CHARS = 1000
+
 const UpdateFeedBody = z.object({
   name: z.string().optional(),
   rss_bridge_url: z.string().nullable().optional(),
   disabled: z.number().optional(),
   category_id: z.number().nullable().optional(),
+  ai_filter: z.string().max(AI_FILTER_MAX_CHARS).nullable().optional(),
 })
 
 export async function feedRoutes(api: FastifyInstance): Promise<void> {

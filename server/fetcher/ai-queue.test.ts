@@ -7,6 +7,8 @@ const mockUpdateScore = vi.fn()
 const mockTranslateArticle = vi.fn()
 const mockTranslateTitle = vi.fn()
 const mockSummarizeArticle = vi.fn()
+const mockEvaluateRelevance = vi.fn()
+const mockGetFeedById = vi.fn()
 const mockDbAll = vi.fn()
 
 vi.mock('../db.js', () => ({
@@ -25,13 +27,20 @@ vi.mock('../db/articles.js', () => ({
   updateScore: (id: number) => mockUpdateScore(id),
 }))
 
+vi.mock('../db/feeds.js', () => ({
+  getFeedById: (id: number) => mockGetFeedById(id),
+}))
+
 vi.mock('./ai.js', () => ({
   translateArticle: (fullText: string, options?: unknown) => mockTranslateArticle(fullText, options),
   translateTitle: (title: string, options?: unknown) => mockTranslateTitle(title, options),
   summarizeArticle: (fullText: string, options?: unknown) => mockSummarizeArticle(fullText, options),
+  evaluateArticleRelevance: (text: string, criterion: string, options?: unknown) =>
+    mockEvaluateRelevance(text, criterion, options),
 }))
 
 import {
+  enqueueAiFilter,
   enqueueAutoTranslate,
   enqueueAutoSummarize,
   isAutoTranslateEnabled,
@@ -178,10 +187,18 @@ describe('ai-queue', () => {
     expect(mockSummarizeArticle).toHaveBeenCalledTimes(1)
   })
 
-  it('does not query the database when both features are off', () => {
+  it('resumes nothing but the filter when translate and summarize are off', async () => {
+    // The filter has no global toggle — it runs per feed — so the resume pass
+    // still scans, but must not re-enqueue translate/summarize work.
     settings({})
+    mockDbAll.mockReturnValue([
+      { id: 1, translate_pending_at: '2020-01-01T00:00:00Z', summarize_pending_at: '2020-01-01T00:00:00Z', filter_pending_at: null },
+    ])
     resumePendingAiTasks()
-    expect(mockDbAll).not.toHaveBeenCalled()
+    await flushQueue()
+
+    expect(mockTranslateArticle).not.toHaveBeenCalled()
+    expect(mockSummarizeArticle).not.toHaveBeenCalled()
   })
 
   it('translateArticleTitle stores the translated title with the configured provider', async () => {
@@ -200,5 +217,58 @@ describe('ai-queue', () => {
     resolveTranslate!({ fullTextTranslated: 'Texte traduit' })
     await flushQueue()
     expect(mockTranslateArticle).toHaveBeenCalledTimes(1)
+  })
+
+  describe('ai filter', () => {
+    beforeEach(() => {
+      mockGetArticleById.mockReturnValue({
+        id: 1,
+        feed_id: 7,
+        title: 'A post title',
+        summary: null,
+        full_text: 'Body of the post',
+        excerpt: null,
+        filtered_at: null,
+      })
+      mockGetFeedById.mockReturnValue({ id: 7, ai_filter: 'self-hosting only' })
+    })
+
+    it('does nothing when the feed has no criterion', async () => {
+      mockGetFeedById.mockReturnValue({ id: 7, ai_filter: null })
+      enqueueAiFilter(1, 7)
+      await flushQueue()
+      expect(mockEvaluateRelevance).not.toHaveBeenCalled()
+    })
+
+    it('leaves a matching article visible', async () => {
+      mockEvaluateRelevance.mockResolvedValue({ keep: true })
+      enqueueAiFilter(1, 7)
+      await flushQueue()
+
+      expect(mockEvaluateRelevance).toHaveBeenCalledWith(
+        expect.stringContaining('A post title'),
+        'self-hosting only',
+        { provider: 'vllm' },
+      )
+      expect(updatesFor(1).filtered_at).toBeUndefined()
+      expect(updatesFor(1).filter_pending_at).toBeNull()
+    })
+
+    it('hides a rejected article without deleting it', async () => {
+      mockEvaluateRelevance.mockResolvedValue({ keep: false })
+      enqueueAiFilter(1, 7)
+      await flushQueue()
+
+      expect(updatesFor(1).filtered_at).toEqual(expect.any(String))
+    })
+
+    it('keeps the pending marker when the model call fails, for a later retry', async () => {
+      mockEvaluateRelevance.mockRejectedValue(new Error('vllm down'))
+      enqueueAiFilter(1, 7)
+      await flushQueue()
+
+      expect(updatesFor(1).filter_pending_at).toEqual(expect.any(String))
+      expect(updatesFor(1).filtered_at).toBeUndefined()
+    })
   })
 })

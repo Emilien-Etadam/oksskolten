@@ -99,7 +99,8 @@ export function getArticles(opts: {
   offset: number
   smartFloor?: boolean
 }): { articles: ArticleListItem[]; total: number; totalWithoutFloor?: number } {
-  const conditions: string[] = []
+  // Articles rejected by a feed's AI filter keep their row but stay out of view
+  const conditions: string[] = ['a.filtered_at IS NULL']
   const params: Record<string, unknown> = {}
 
   if (opts.feedId) {
@@ -428,6 +429,8 @@ export function updateArticleContent(
     title_translated?: string | null
     translate_pending_at?: string | null
     summarize_pending_at?: string | null
+    filter_pending_at?: string | null
+    filtered_at?: string | null
     summary?: string | null
     excerpt?: string | null
     og_image?: string | null

@@ -139,6 +139,23 @@ fetched in `server/fetcher/rss.ts`):
 X/Twitter has no equivalent: it removed anonymous guest access in 2024, so no
 account-free path exists.
 
+## Per-feed AI relevance filter
+
+Each feed can carry a criterion written by the reader in their own words
+(`feeds.ai_filter`, set from the feed's context menu →
+`src/components/feed/feed-ai-filter-dialog.tsx`). Every new article of such a
+feed is queued for a relevance check on the local model
+(`evaluateArticleRelevance` in `server/fetcher/ai.ts`, task `filter` in
+`server/fetcher/ai-queue.ts`, forced provider `vllm`).
+
+Rejected articles are not deleted: `articles.filtered_at` is stamped and the
+list query hides them, so a bad criterion is reversible. The verdict is a single
+word and anything other than a clear "no" keeps the article — an ambiguous model
+answer must never swallow content. Failures leave `filter_pending_at` set, so
+the usual 10-minute-backoff resume pass retries them. Unlike auto-translate and
+auto-summarize, the filter has no global toggle: it runs exactly for the feeds
+that define a criterion.
+
 ## Tooling
 
 - **E2E smoke tests**: `npm run test:e2e` (Playwright) builds the app, boots the

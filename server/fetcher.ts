@@ -26,7 +26,7 @@ import { type FetchRssResult, type RssItem, fetchAndParseRss, RateLimitError } f
 import { computeInterval, computeEmpiricalInterval, sqliteFuture, DEFAULT_INTERVAL } from './fetcher/schedule.js'
 import { DEFAULT_LANGUAGE } from '../shared/lang.js'
 import { detectLanguage } from './fetcher/ai.js'
-import { enqueueAutoTranslate, enqueueAutoSummarize, isAutoTranslateEnabled, isAutoSummarizeEnabled, resumePendingAiTasks } from './fetcher/ai-queue.js'
+import { enqueueAutoTranslate, enqueueAutoSummarize, enqueueAiFilter, isAutoTranslateEnabled, isAutoSummarizeEnabled, resumePendingAiTasks } from './fetcher/ai-queue.js'
 import { logger } from './logger.js'
 
 const log = logger.child('fetcher')
@@ -241,6 +241,7 @@ async function processArticle(task: ArticleTask): Promise<boolean> {
         last_error: content.lastError,
       })
       maybeEnqueueAutoTranslate(articleId, content.fullText, effectiveLang)
+      enqueueAiFilter(articleId, task.feed_id)
       // Fire-and-forget: detect similar articles asynchronously
       void detectAndStoreSimilarArticles(articleId, task.title, task.feed_id, task.published_at)
     } catch (err) {

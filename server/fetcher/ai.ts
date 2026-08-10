@@ -192,6 +192,58 @@ function unquoteTitle(text: string): string {
   return trimmed
 }
 
+const FILTER_MAX_TOKENS = 8
+
+/**
+ * Relevance check against a criterion the reader wrote in their own words
+ * (any language). The verdict is a single word so the check stays cheap.
+ */
+function buildFilterPrompt(criterion: string): (text: string) => string {
+  return (text: string) => `You decide whether an item belongs in a reader's feed.
+
+The reader's criterion, in their own words:
+"""
+${criterion}
+"""
+
+Answer with exactly one word: YES to keep the item, NO to discard it.
+Discard items unrelated to the criterion, and items carrying no information of
+their own (bare reactions, greetings, one-line jokes, links posted without any
+context). When in doubt, answer YES.
+
+Item:
+${text}`
+}
+
+/**
+ * Ask the model whether an article matches a feed's filter criterion.
+ * Anything other than a clear "no" keeps the article: a filter must never
+ * silently swallow content because the model was ambiguous.
+ */
+export async function evaluateArticleRelevance(
+  text: string,
+  criterion: string,
+  options?: { provider?: string },
+): Promise<{ keep: boolean } & AiTextResult> {
+  const config: AiTaskConfig = {
+    providerKey: 'summary.provider',
+    modelKey: 'summary.model',
+    defaultModel: TASK_DEFAULTS.summarize.model,
+    maxTokensKey: 'filter.max_tokens',
+    defaultMaxTokens: FILTER_MAX_TOKENS,
+    buildPrompt: buildFilterPrompt(criterion),
+  }
+  const r = await runAiTask(config, text, undefined, options?.provider)
+  const verdict = r.text.trim().toLowerCase()
+  return {
+    keep: !/^\W*no\b/.test(verdict),
+    inputTokens: r.inputTokens,
+    outputTokens: r.outputTokens,
+    billingMode: r.billingMode,
+    model: r.model,
+  }
+}
+
 const SNIPPET_MAX_TOKENS = 2048
 
 function buildTranslateSnippetPrompt(text: string): string {

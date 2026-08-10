@@ -26,6 +26,8 @@ export interface Feed {
   last_content_hash: string | null
   next_check_at: string | null
   check_interval: number | null
+  /** Criterion for the per-feed AI relevance filter; absent or null disables it */
+  ai_filter?: string | null
   created_at: string
 }
 
@@ -89,4 +91,6 @@ export interface ArticleDetail extends ArticleListItem {
   images_archived_at: string | null
   feed_type: 'rss' | 'clip'
   imageArchivingEnabled: boolean
+  /** Set when the feed's AI filter rejected the article; it stays hidden from lists */
+  filtered_at?: string | null
 }

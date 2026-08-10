@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
 import useSWR from 'swr'
-import { fetcher } from '../../lib/fetcher'
+import { fetcher, apiPatch } from '../../lib/fetcher'
 import { useI18n } from '../../lib/i18n'
 import { MD_BREAKPOINT } from '../../lib/breakpoints'
 import { Inbox, Plus, ChevronRight, Bookmark, ThumbsUp, Clock, Paperclip, Search, Command, ArrowBigUp, AlertTriangle, MessagesSquare } from 'lucide-react'
@@ -20,6 +20,7 @@ import { FeedContextMenu, MultiSelectContextMenu, CategoryContextMenu } from './
 import { SidebarMenu } from '../layout/sidebar-menu'
 import { SidebarNavItem } from '../layout/sidebar-nav-item'
 import { FeedListHeader } from './feed-list-header'
+import { FeedAiFilterDialog } from './feed-ai-filter-dialog'
 import { SearchDialog } from '../ui/search-dialog'
 import { CommandPalette } from '../command-palette'
 import { useGlobalShortcuts } from '../../hooks/use-global-shortcuts'
@@ -73,6 +74,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
   const isChat = location.pathname.startsWith('/chat')
   const selectedFeedId = feedId ? Number(feedId) : null
   const selectedCategoryId = categoryId ? Number(categoryId) : null
+  const [aiFilterFeed, setAiFilterFeed] = useState<FeedWithCounts | null>(null)
   const { progress, startFeedFetch, subscribeFeedFetch } = useFetchProgressContext()
   const { data: feedsData, mutate: mutateFeeds } = useSWR<{ feeds: FeedWithCounts[]; bookmark_count: number; like_count: number; clip_feed_id: number | null }>('/api/feeds', fetcher)
   const { data: categoriesData, mutate: mutateCategories } = useSWR<{ categories: Category[] }>('/api/categories', fetcher)
@@ -362,6 +364,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
         onMoveToCategory={(catId) => handleMoveToCategory(feed, catId)}
         onFetch={() => handleFetchFeed(feed)}
         onReDetect={() => handleReDetectFeed(feed)}
+        onEditAiFilter={() => setAiFilterFeed(feed)}
       >
         {button}
       </FeedContextMenu>
@@ -539,6 +542,19 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
           onFetchStarted={(feedId) => void subscribeFeedFetch(feedId)}
           onArticleCreated={() => { void mutateFeeds(); onArticleMoved?.() }}
           categories={categories}
+        />
+      )}
+
+      {aiFilterFeed && (
+        <FeedAiFilterDialog
+          feedName={aiFilterFeed.name}
+          value={aiFilterFeed.ai_filter ?? null}
+          open
+          onOpenChange={open => { if (!open) setAiFilterFeed(null) }}
+          onSave={async criterion => {
+            await apiPatch(`/api/feeds/${aiFilterFeed.id}`, { ai_filter: criterion })
+            void mutateFeeds()
+          }}
         />
       )}
 

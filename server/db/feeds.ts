@@ -86,7 +86,7 @@ export function createFeed(data: {
 
 export function updateFeed(
   id: number,
-  data: { name?: string; rss_url?: string | null; rss_bridge_url?: string | null; disabled?: number; category_id?: number | null; requires_js_challenge?: number },
+  data: { name?: string; rss_url?: string | null; rss_bridge_url?: string | null; disabled?: number; category_id?: number | null; requires_js_challenge?: number; ai_filter?: string | null },
 ): Feed | undefined {
   const feed = getFeedById(id)
   if (!feed) return undefined
@@ -105,6 +105,10 @@ export function updateFeed(
   if (data.rss_bridge_url !== undefined) {
     fields.push('rss_bridge_url = @rss_bridge_url')
     params.rss_bridge_url = data.rss_bridge_url
+  }
+  if (data.ai_filter !== undefined) {
+    fields.push('ai_filter = @ai_filter')
+    params.ai_filter = data.ai_filter?.trim() || null
   }
   if (data.disabled !== undefined) {
     fields.push('disabled = @disabled')
