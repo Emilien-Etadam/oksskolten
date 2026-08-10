@@ -178,6 +178,19 @@ that define a criterion.
   equivalents (`tailwind.config.ts`), and the font import was removed from
   `src/index.css`.
 
+## Extraction debugging + over-broad cleaner pattern
+
+`scripts/debug-extract.ts` — replays the fetch/clean/extract phases for one URL
+and reports where the article text is lost, then re-runs the real `parseHtml()`
+with each cleaning stage disabled so the responsible stage names itself.
+
+It was written to diagnose next.ink articles storing an empty `full_text` with
+no `last_error`: the `'next-'` partial pattern (meant for next-article links)
+matched `id="next-single-post"` and deleted the whole body. The pattern is now
+spelled out as `next-post` / `next-article` / `next-story` / `nextprev`, and
+`postClean()` rolls itself back when a pass leaves under 200 characters behind.
+Both changes are upstream bugs, not fork-specific behaviour.
+
 ## Upstream files touched
 
 | File | Change |
@@ -192,6 +205,8 @@ that define a criterion.
 | `src/components/article/article-list.tsx` | +1 line (`onMarkRead: markRead` in card props) |
 | `server/index.ts` | CSP script-src hashes for inline bootstrap scripts |
 | `tailwind.config.ts` + `src/index.css` | logo font swapped to local Palatino stack |
+| `server/lib/cleaner/selectors.ts` | `'next-'` partial pattern narrowed to the next/prev link spellings |
+| `server/lib/cleaner/index.ts` | `postClean()` rolls back a pass that empties the body |
 
 `src/app.tsx` additionally has 2 lines adjusted and a small effect added (sidebar
 auto-open respects the persisted collapse state).

@@ -193,6 +193,11 @@ fetchFullText(articleUrl, cleanerConfig?)
 │         ├─ removeEmptyElements: recursively remove empty elements (preserve br/hr/img, etc.)
 │         └─ stripExtraBrElements: limit consecutive <br> to max 2
 │     * Fail-open: on exception, continue with Readability output
+│     * All-content-removed guard: if the document held at least 200 chars of
+│       text on entry and holds fewer than 200 on exit, the whole post-clean is
+│       rolled back to the Readability output. The ~400 partial patterns are
+│       substrings tested against class/id/data-*, so a site that namespaces its
+│       markup with one of them would otherwise lose its entire article body.
 │
 ├─ 5. <picture> simplification
 │     <picture> -> convert to simple <img> (avoid srcset issues)
@@ -233,6 +238,12 @@ server/lib/cleaner/
   selector-remover.ts   <- removeBySelectors() pure function
   content-scorer.ts     <- CJK-aware scoring + findBestContentBlock()
   html-normalizer.ts    <- HTML structure normalization (6 functions)
+```
+
+**Debugging an empty or truncated extraction**: `scripts/debug-extract.ts` replays the phases above for one URL (or a saved HTML file via `--file`), printing the surviving text length after each one and naming the individual partial pattern behind each removal. It then re-runs the real `parseHtml()` with each cleaning stage disabled in turn, so a stage that recovers the body identifies itself.
+
+```bash
+node --import tsx scripts/debug-extract.ts <url>
 ```
 
 ### Language Detection (Local Processing)

@@ -315,6 +315,69 @@ describe('postClean — config options', () => {
   })
 })
 
+describe('postClean — next/prev navigation patterns', () => {
+  /** Long enough to clear MIN_SURVIVING_TEXT so the guard stays out of the way. */
+  const body = `<p>${'Article body text that runs well past the guard threshold. '.repeat(6)}</p>`
+
+  it('removes next-post navigation links', () => {
+    const text = postCleanAndGetText(`<div class="next-post"><a href="/2">Next up</a></div>${body}`)
+    expect(text).not.toContain('Next up')
+    expect(text).toContain('Article body text')
+  })
+
+  it('removes next-article and next-story navigation links', () => {
+    const text = postCleanAndGetText(
+      `<div class="next-article">Following</div><div id="next-story">After that</div>${body}`,
+    )
+    expect(text).not.toContain('Following')
+    expect(text).not.toContain('After that')
+  })
+
+  it('removes combined next/prev widgets in either spelling', () => {
+    const text = postCleanAndGetText(
+      `<div class="nextprev">Pager</div><div class="next-prev">Pager2</div>` +
+      `<div class="prevnext">Pager3</div>${body}`,
+    )
+    expect(text).not.toContain('Pager')
+    expect(text).not.toContain('Pager2')
+    expect(text).not.toContain('Pager3')
+  })
+
+  it('keeps a body whose id merely starts with the site namespace "next"', () => {
+    // next.ink wraps every article in id="next-single-post". A bare 'next-'
+    // pattern matched it and deleted the entire post.
+    const text = postCleanAndGetText(`<div id="next-single-post">${body}</div>`)
+    expect(text).toContain('Article body text')
+  })
+})
+
+describe('postClean — all-content-removed guard', () => {
+  const longBody = 'Substantial article prose that comfortably clears the threshold. '.repeat(6)
+
+  it('restores the document when a pattern would delete the whole body', () => {
+    const text = postCleanAndGetText(
+      `<div class="newsletter-signup"><p>${longBody}</p></div>`,
+    )
+    expect(text).toContain('Substantial article prose')
+  })
+
+  it('still removes noise when enough content survives', () => {
+    const text = postCleanAndGetText(
+      `<div class="newsletter-signup">Join our list</div><p>${longBody}</p>`,
+    )
+    expect(text).not.toContain('Join our list')
+    expect(text).toContain('Substantial article prose')
+  })
+
+  it('leaves genuinely short documents alone', () => {
+    // Below the threshold before cleaning, so there is nothing to protect and
+    // the guard must not resurrect removed noise.
+    const text = postCleanAndGetText('<div class="newsletter-signup">Join our list</div><p>Tiny.</p>')
+    expect(text).not.toContain('Join our list')
+    expect(text).toContain('Tiny.')
+  })
+})
+
 describe('postClean — fail-open', () => {
   it('does not throw on empty document', () => {
     const d = doc('')
