@@ -136,6 +136,23 @@ describe('fetchRedditJson via OAuth', () => {
     expect(mockFetch.mock.calls.filter(c => String(c[0]).includes('/api/v1/access_token'))).toHaveLength(1)
   })
 
+  it('tries the session cookie first in the anonymous ladder when REDDIT_COOKIE is set', async () => {
+    vi.stubEnv('REDDIT_CLIENT_ID', '')
+    vi.stubEnv('REDDIT_CLIENT_SECRET', '')
+    vi.stubEnv('REDDIT_COOKIE', 'reddit_session=abc')
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      const headers = init?.headers as Record<string, string>
+      if (String(url).startsWith('https://www.reddit.com/r/') && headers.Cookie === 'reddit_session=abc') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([{ data: { children: [] } }]) })
+      }
+      return Promise.resolve({ ok: false, status: 403 })
+    })
+
+    const payload = await fetchRedditJson(jsonUrl)
+    expect(payload).toEqual([{ data: { children: [] } }])
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
   it('falls back to the anonymous ladder when the token request fails', async () => {
     mockFetch.mockImplementation((url: string) => {
       if (String(url).includes('/api/v1/access_token')) {

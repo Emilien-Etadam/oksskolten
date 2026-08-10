@@ -138,16 +138,25 @@ export async function fetchRedditJson(jsonUrl: string, requestLog: RedditLogger 
     }
   }
 
+  // A logged-in session cookie (REDDIT_COOKIE) lets requests through IP
+  // reputation blocks that reject anonymous traffic while accepting
+  // established browser sessions.
+  const sessionCookie = process.env.REDDIT_COOKIE
   const attempts = [
+    ...(sessionCookie ? [{ url: jsonUrl, ua: BROWSER_USER_AGENT, label: 'browser UA + session cookie', cookie: sessionCookie }] : []),
     { url: jsonUrl, ua: USER_AGENT, label: 'default UA' },
     { url: jsonUrl, ua: BROWSER_USER_AGENT, label: 'browser UA' },
     { url: jsonUrl.replace('https://www.reddit.com/', 'https://old.reddit.com/'), ua: BROWSER_USER_AGENT, label: 'old.reddit.com' },
-  ]
+  ] as Array<{ url: string; ua: string; label: string; cookie?: string }>
 
   for (const attempt of attempts) {
     try {
       const res = await fetch(attempt.url, {
-        headers: { 'User-Agent': attempt.ua, 'Accept': 'application/json' },
+        headers: {
+          'User-Agent': attempt.ua,
+          'Accept': 'application/json',
+          ...(attempt.cookie ? { Cookie: attempt.cookie } : {}),
+        },
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       })
       if (res.ok) return await res.json() as RedditListing[]
