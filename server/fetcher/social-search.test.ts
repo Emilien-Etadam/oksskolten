@@ -11,6 +11,7 @@ import {
   isBlueskySearchUrl,
   fetchBlueskySearch,
   mastodonTagRssCandidate,
+  blueskyProfileRssCandidate,
   resolveSocialSearchFeed,
   _resetBlueskySessionForTests,
 } from './social-search.js'
@@ -238,7 +239,32 @@ describe('mastodonTagRssCandidate', () => {
   })
 })
 
+describe('blueskyProfileRssCandidate', () => {
+  it('builds the native RSS URL for a profile', () => {
+    expect(blueskyProfileRssCandidate('https://bsky.app/profile/alice.bsky.social'))
+      .toBe('https://bsky.app/profile/alice.bsky.social/rss')
+    expect(blueskyProfileRssCandidate('https://bsky.app/profile/alice.bsky.social/rss'))
+      .toBe('https://bsky.app/profile/alice.bsky.social/rss')
+  })
+
+  it('returns null for other Bluesky pages and other hosts', () => {
+    expect(blueskyProfileRssCandidate('https://bsky.app/search?q=x')).toBeNull()
+    expect(blueskyProfileRssCandidate('https://bsky.app/profile/alice/post/3k')).toBeNull()
+    expect(blueskyProfileRssCandidate('https://example.com/profile/alice')).toBeNull()
+  })
+})
+
 describe('resolveSocialSearchFeed', () => {
+  it('accepts a Bluesky profile URL when the probe returns a feed', async () => {
+    mockSafeFetch.mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('<?xml version="1.0"?><rss version="2.0"><channel/></rss>'),
+    })
+
+    expect(await resolveSocialSearchFeed('https://bsky.app/profile/alice.bsky.social'))
+      .toBe('https://bsky.app/profile/alice.bsky.social/rss')
+  })
+
   it('returns Bluesky search URLs unchanged, without probing', async () => {
     expect(await resolveSocialSearchFeed('https://bsky.app/search?q=rust'))
       .toBe('https://bsky.app/search?q=rust')

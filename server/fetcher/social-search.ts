@@ -218,6 +218,24 @@ export async function fetchBlueskySearch(searchUrl: string): Promise<RssItem[]> 
 }
 
 /**
+ * Candidate RSS URL for a Bluesky profile (`bsky.app/profile/<handle>`).
+ * Unlike search, profile feeds are served anonymously.
+ */
+export function blueskyProfileRssCandidate(pageUrl: string): string | null {
+  let parsed: URL
+  try {
+    parsed = new URL(pageUrl)
+  } catch {
+    return null
+  }
+  if (parsed.hostname.replace(/^www\./, '') !== 'bsky.app') return null
+
+  const match = parsed.pathname.match(/^\/profile\/([^/]+)(?:\/rss)?\/?$/)
+  if (!match) return null
+  return `https://bsky.app/profile/${match[1]}/rss`
+}
+
+/**
  * Candidate RSS URL for a Mastodon hashtag timeline (`/tags/<tag>`). Many
  * ordinary sites also use `/tags/<something>` paths, so the candidate must be
  * verified before it is trusted — see resolveMastodonTagFeed.
@@ -236,14 +254,8 @@ export function mastodonTagRssCandidate(pageUrl: string): string | null {
   return `${parsed.origin}/tags/${match[1]}.rss`
 }
 
-/**
- * Resolve a Mastodon hashtag page to its native RSS feed, or null when the URL
- * is not a hashtag timeline that actually serves a feed.
- */
-export async function resolveMastodonTagFeed(pageUrl: string): Promise<string | null> {
-  const candidate = mastodonTagRssCandidate(pageUrl)
-  if (!candidate) return null
-
+/** Accept a candidate only when it really serves a feed. */
+async function probeFeedUrl(candidate: string): Promise<string | null> {
   try {
     const res = await safeFetch(candidate, {
       headers: { 'User-Agent': USER_AGENT },
@@ -258,11 +270,24 @@ export async function resolveMastodonTagFeed(pageUrl: string): Promise<string | 
 }
 
 /**
- * Feed URL for a social search/timeline page, or null when the URL is not one.
- * Bluesky search URLs are returned unchanged — fetchAndParseRss recognizes them
- * and queries the API directly.
+ * Resolve a Mastodon hashtag page to its native RSS feed, or null when the URL
+ * is not a hashtag timeline that actually serves a feed.
+ */
+export async function resolveMastodonTagFeed(pageUrl: string): Promise<string | null> {
+  const candidate = mastodonTagRssCandidate(pageUrl)
+  return candidate ? probeFeedUrl(candidate) : null
+}
+
+/**
+ * Feed URL for a social search, hashtag, or profile page, or null when the URL
+ * is not one. Bluesky search URLs are returned unchanged — fetchAndParseRss
+ * recognizes them and queries the API directly.
  */
 export async function resolveSocialSearchFeed(pageUrl: string): Promise<string | null> {
   if (isBlueskySearchUrl(pageUrl)) return pageUrl
+
+  const blueskyProfile = blueskyProfileRssCandidate(pageUrl)
+  if (blueskyProfile) return probeFeedUrl(blueskyProfile)
+
   return resolveMastodonTagFeed(pageUrl)
 }

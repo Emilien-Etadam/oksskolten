@@ -117,6 +117,9 @@ Adding a search or hashtag URL creates a feed from it
 (`server/fetcher/social-search.ts`, resolved in `server/routes/feeds.ts` and
 fetched in `server/fetcher/rss.ts`):
 
+- **Bluesky profile** — paste `https://bsky.app/profile/<handle>`; Bluesky serves
+  RSS at `/rss` and, unlike search, does so anonymously. Probed like the Mastodon
+  candidate below.
 - **Bluesky search** — paste `https://bsky.app/search?q=…` (the URL the web app
   produces, `sort` and `lang` included). Bluesky serves no RSS for searches, so
   `app.bsky.feed.searchPosts` is queried and its posts are converted to feed
