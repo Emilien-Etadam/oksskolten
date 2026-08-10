@@ -164,7 +164,11 @@ export async function fetchRedditJson(jsonUrl: string, requestLog: RedditLogger 
     return null
   }
   const parsed = parseJsonBody(solved.body)
-  return Array.isArray(parsed) ? parsed as RedditListing[] : null
+  if (!Array.isArray(parsed)) {
+    requestLog.warn(`solver returned a body for ${jsonUrl} but no JSON listing could be extracted (${solved.body.length} bytes, content-type: ${solved.contentType || 'unknown'})`)
+    return null
+  }
+  return parsed as RedditListing[]
 }
 
 export interface RedditPostContent {
