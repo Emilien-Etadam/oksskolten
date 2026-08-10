@@ -246,6 +246,16 @@ describe('Articles', () => {
     expect(article!.url).toBe('https://example.com/%E8%A8%98%E4%BA%8B')
   })
 
+  it('getArticleByUrl matches raw-Unicode stored URL from either lookup form', () => {
+    const feed = seedFeed()
+    seedArticle(feed.id, { url: 'https://example.com/from_colibrì_to_lumabri/' })
+
+    // Percent-encoded lookup (reader route round-trip) finds the raw stored URL
+    expect(getArticleByUrl('https://example.com/from_colibr%C3%AC_to_lumabri/')).toBeDefined()
+    // Raw Unicode lookup finds it too
+    expect(getArticleByUrl('https://example.com/from_colibrì_to_lumabri/')).toBeDefined()
+  })
+
   it('getArticleByUrl handles protocol fallback (https -> http)', () => {
     const feed = seedFeed()
     seedArticle(feed.id, { url: 'http://example.com/http-only' })

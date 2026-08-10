@@ -219,20 +219,33 @@ export function getArticleByUrl(url: string): ArticleDetail | undefined {
     WHERE a.url = ?
   `)
 
-  const article = stmt.get(normalized) as ArticleDetail | undefined
-  if (article) return article
+  // Candidate forms: WHATWG-normalized (percent-encodes non-ASCII), the raw
+  // input, and the fully decoded form — feeds store either encoding, and the
+  // reader route decodes percent-escapes on its round-trip.
+  const forms = [normalized, url]
+  try {
+    forms.push(decodeURI(normalized))
+  } catch { /* malformed percent-escapes — skip the decoded form */ }
 
   // Protocol fallback: handle articles stored under one protocol when the
   // request arrives with the other. This covers the transition period where
   // some articles were saved before http:// feed registration was allowed.
-  let fallbackUrl: string | null = null
-  if (normalized.startsWith('https://')) {
-    fallbackUrl = 'http://' + normalized.slice(8)
-  } else if (normalized.startsWith('http://')) {
-    fallbackUrl = 'https://' + normalized.slice(7)
+  const swapProtocol = (u: string): string | null => {
+    if (u.startsWith('https://')) return 'http://' + u.slice(8)
+    if (u.startsWith('http://')) return 'https://' + u.slice(7)
+    return null
   }
-  if (fallbackUrl) {
-    return stmt.get(fallbackUrl) as ArticleDetail | undefined
+
+  const candidates: string[] = []
+  for (const form of forms) {
+    for (const variant of [form, swapProtocol(form)]) {
+      if (variant && !candidates.includes(variant)) candidates.push(variant)
+    }
+  }
+
+  for (const candidate of candidates) {
+    const article = stmt.get(candidate) as ArticleDetail | undefined
+    if (article) return article
   }
 
   return undefined
