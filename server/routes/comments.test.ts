@@ -5,6 +5,7 @@ import { createFeed, insertArticle } from '../db.js'
 import type { FastifyInstance } from 'fastify'
 
 const mockTranslateSnippet = vi.fn()
+const mockFlareSolverr = vi.fn()
 
 vi.mock('../fetcher/ai.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../fetcher/ai.js')>()
@@ -13,6 +14,10 @@ vi.mock('../fetcher/ai.js', async (importOriginal) => {
     translateSnippet: (text: string) => mockTranslateSnippet(text),
   }
 })
+
+vi.mock('../fetcher/flaresolverr.js', () => ({
+  fetchViaFlareSolverr: (url: string) => mockFlareSolverr(url),
+}))
 
 import { redditJsonUrl } from './comments.js'
 
@@ -56,6 +61,8 @@ beforeEach(async () => {
   setupTestDb()
   app = await buildApp()
   mockFetch.mockReset()
+  mockFlareSolverr.mockReset()
+  mockFlareSolverr.mockResolvedValue(null)
   vi.stubGlobal('fetch', mockFetch)
 })
 
@@ -103,13 +110,32 @@ describe('GET /api/articles/:id/comments', () => {
     expect(body.comments[0].replies[0].author).toBe('bob')
   })
 
-  it('returns an empty list when reddit is unreachable', async () => {
+  it('returns an empty list when reddit and FlareSolverr are unreachable', async () => {
     const id = seedArticle('https://www.reddit.com/r/LocalLLM/comments/abc/post/')
     mockFetch.mockRejectedValue(new Error('network down'))
 
     const res = await app.inject({ method: 'GET', url: `/api/articles/${id}/comments` })
     expect(res.statusCode).toBe(200)
     expect(res.json()).toEqual({ provider: 'reddit', comments: [] })
+    expect(mockFlareSolverr).toHaveBeenCalled()
+  })
+
+  it('falls back to FlareSolverr when reddit blocks the direct request', async () => {
+    const id = seedArticle('https://www.reddit.com/r/LocalLLM/comments/abc/post/')
+    mockFetch.mockImplementation((url: string) =>
+      String(url).includes('reddit.com')
+        ? Promise.resolve({ ok: false, status: 403 })
+        : Promise.resolve({ ok: true, json: () => Promise.resolve({}) }))
+    // Chromium wraps JSON responses in an HTML viewer with a <pre> element
+    const wrapped = `<html><body><pre>${JSON.stringify(redditPayload).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre></body></html>`
+    mockFlareSolverr.mockResolvedValue({ body: wrapped, contentType: 'text/html', url: 'x' })
+
+    const res = await app.inject({ method: 'GET', url: `/api/articles/${id}/comments` })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.provider).toBe('reddit')
+    expect(body.comments).toHaveLength(1)
+    expect(body.comments[0].author).toBe('alice')
   })
 
   it('404s for unknown articles', async () => {

@@ -1,7 +1,8 @@
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyBaseLogger } from 'fastify'
 import { z } from 'zod'
 import { getArticleById } from '../db/articles.js'
 import { translateSnippet } from '../fetcher/ai.js'
+import { fetchViaFlareSolverr } from '../fetcher/flaresolverr.js'
 import { USER_AGENT } from '../fetcher/http.js'
 
 const NumericIdParams = z.object({ id: z.coerce.number().int() })
@@ -41,6 +42,55 @@ export function redditJsonUrl(articleUrl: string): string | null {
 
 interface RedditListing {
   data?: { children?: unknown[] }
+}
+
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+}
+
+/** Parse a JSON body, unwrapping Chromium's <pre> JSON viewer when needed. */
+function parseJsonBody(body: string): unknown {
+  try {
+    return JSON.parse(body)
+  } catch { /* possibly wrapped in an HTML viewer by a headless browser */ }
+  const match = body.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i)
+  if (!match) return null
+  try {
+    return JSON.parse(decodeHtmlEntities(match[1]))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Fetch a Reddit JSON document: direct request first, then FlareSolverr
+ * (when configured) for IPs or user agents Reddit blocks.
+ */
+async function fetchRedditJson(jsonUrl: string, log: FastifyBaseLogger): Promise<RedditListing[] | null> {
+  try {
+    const res = await fetch(jsonUrl, {
+      headers: { 'User-Agent': USER_AGENT },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    })
+    if (res.ok) return await res.json() as RedditListing[]
+    log.warn(`reddit responded ${res.status} for ${jsonUrl}, trying FlareSolverr`)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    log.warn(`reddit fetch failed (${msg}), trying FlareSolverr`)
+  }
+
+  const solved = await fetchViaFlareSolverr(jsonUrl)
+  if (!solved) {
+    log.warn('FlareSolverr unavailable or failed for reddit comments')
+    return null
+  }
+  const parsed = parseJsonBody(solved.body)
+  return Array.isArray(parsed) ? parsed as RedditListing[] : null
 }
 
 function parseComments(children: unknown[], limit: number, depth: number): ArticleComment[] {
@@ -88,20 +138,13 @@ export async function commentRoutes(api: FastifyInstance): Promise<void> {
       return reply.send({ provider: null, comments: [] })
     }
 
-    try {
-      const res = await fetch(jsonUrl, {
-        headers: { 'User-Agent': USER_AGENT },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      })
-      if (!res.ok) throw new Error(`reddit responded ${res.status}`)
-      const payload = await res.json() as RedditListing[]
-      const comments = parseComments(payload?.[1]?.data?.children ?? [], TOP_COMMENTS, 1)
-      reply.header('Cache-Control', 'private, max-age=300')
-      return reply.send({ provider: 'reddit', comments })
-    } catch (err) {
-      request.log.warn(err, 'comments fetch failed')
+    const payload = await fetchRedditJson(jsonUrl, request.log)
+    if (!payload) {
       return reply.send({ provider: 'reddit', comments: [] })
     }
+    const comments = parseComments(payload?.[1]?.data?.children ?? [], TOP_COMMENTS, 1)
+    reply.header('Cache-Control', 'private, max-age=300')
+    return reply.send({ provider: 'reddit', comments })
   })
 
   api.post('/api/comments/translate', async (request, reply) => {
