@@ -119,9 +119,12 @@ fetched in `server/fetcher/rss.ts`):
 
 - **Bluesky search** — paste `https://bsky.app/search?q=…` (the URL the web app
   produces, `sort` and `lang` included). Bluesky serves no RSS for searches, so
-  the public AppView (`app.bsky.feed.searchPosts`, no authentication) is queried
-  and its posts are converted to feed items. Post titles are derived from the
-  opening line of the text.
+  `app.bsky.feed.searchPosts` is queried and its posts are converted to feed
+  items, with titles derived from the opening line of the text. Search rejects
+  unauthenticated requests (403 from the public AppView, while profiles and
+  author feeds stay open), so it needs `BLUESKY_IDENTIFIER` plus
+  `BLUESKY_APP_PASSWORD` — an app password from bsky.app Settings, not the
+  account password. The session is cached for an hour and renewed once on 401.
 - **Mastodon hashtag** — paste `https://<instance>/tags/<tag>`; Mastodon already
   serves RSS at `<tag>.rss`. Since ordinary sites use `/tags/…` paths too, the
   candidate is probed and only accepted when it actually returns a feed.

@@ -12,6 +12,7 @@ import {
   fetchBlueskySearch,
   mastodonTagRssCandidate,
   resolveSocialSearchFeed,
+  _resetBlueskySessionForTests,
 } from './social-search.js'
 
 const mockFetch = vi.fn()
@@ -29,11 +30,13 @@ function post(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   mockFetch.mockReset()
   mockSafeFetch.mockReset()
+  _resetBlueskySessionForTests()
   vi.stubGlobal('fetch', mockFetch)
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 describe('parseBlueskySearchUrl', () => {
@@ -125,9 +128,94 @@ describe('fetchBlueskySearch', () => {
     await expect(fetchBlueskySearch('https://bsky.app/search?q=x')).rejects.toThrow('HTTP 502')
   })
 
+  it('names the missing credentials when unauthenticated search is refused', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 403 })
+    await expect(fetchBlueskySearch('https://bsky.app/search?q=x'))
+      .rejects.toThrow('BLUESKY_IDENTIFIER')
+  })
+
   it('returns nothing without fetching for a non-search URL', async () => {
     expect(await fetchBlueskySearch('https://example.com/')).toEqual([])
     expect(mockFetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('fetchBlueskySearch with an app password', () => {
+  beforeEach(() => {
+    vi.stubEnv('BLUESKY_IDENTIFIER', 'alice.bsky.social')
+    vi.stubEnv('BLUESKY_APP_PASSWORD', 'abcd-efgh-ijkl-mnop')
+  })
+
+  function mockLoginAndSearch(searchResponses: Array<Record<string, unknown>>) {
+    let searchCall = 0
+    mockFetch.mockImplementation((url: string | URL) => {
+      if (String(url).includes('com.atproto.server.createSession')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ accessJwt: `jwt-${++loginCount}` }) })
+      }
+      return Promise.resolve(searchResponses[Math.min(searchCall++, searchResponses.length - 1)])
+    })
+  }
+
+  let loginCount = 0
+  beforeEach(() => { loginCount = 0 })
+
+  it('logs in and searches through the PDS with a bearer token', async () => {
+    mockLoginAndSearch([{ ok: true, status: 200, json: () => Promise.resolve({ posts: [post()] }) }])
+
+    const items = await fetchBlueskySearch('https://bsky.app/search?q=selfhosted')
+    expect(items).toHaveLength(1)
+
+    const login = mockFetch.mock.calls[0]
+    expect(String(login[0])).toBe('https://bsky.social/xrpc/com.atproto.server.createSession')
+    expect(JSON.parse((login[1] as RequestInit).body as string)).toEqual({
+      identifier: 'alice.bsky.social', password: 'abcd-efgh-ijkl-mnop',
+    })
+
+    const search = mockFetch.mock.calls[1]
+    expect(String(search[0])).toContain('https://bsky.social/xrpc/app.bsky.feed.searchPosts')
+    expect((search[1] as RequestInit).headers).toMatchObject({ Authorization: 'Bearer jwt-1' })
+  })
+
+  it('reuses the session across searches', async () => {
+    mockLoginAndSearch([{ ok: true, status: 200, json: () => Promise.resolve({ posts: [] }) }])
+
+    await fetchBlueskySearch('https://bsky.app/search?q=a')
+    await fetchBlueskySearch('https://bsky.app/search?q=b')
+    expect(loginCount).toBe(1)
+  })
+
+  it('logs in again once when the token has expired', async () => {
+    mockLoginAndSearch([
+      { ok: false, status: 401 },
+      { ok: true, status: 200, json: () => Promise.resolve({ posts: [post()] }) },
+    ])
+
+    expect(await fetchBlueskySearch('https://bsky.app/search?q=a')).toHaveLength(1)
+    expect(loginCount).toBe(2)
+  })
+
+  it('falls back to the public AppView when the authenticated search fails', async () => {
+    mockFetch.mockImplementation((url: string | URL) => {
+      if (String(url).includes('com.atproto.server.createSession')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ accessJwt: 'jwt' }) })
+      }
+      if (String(url).startsWith('https://bsky.social/')) return Promise.resolve({ ok: false, status: 500 })
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ posts: [post()] }) })
+    })
+
+    expect(await fetchBlueskySearch('https://bsky.app/search?q=a')).toHaveLength(1)
+    expect(mockFetch.mock.calls.some(c => String(c[0]).startsWith('https://public.api.bsky.app/'))).toBe(true)
+  })
+
+  it('falls back to the public AppView when the login is rejected', async () => {
+    mockFetch.mockImplementation((url: string | URL) => {
+      if (String(url).includes('com.atproto.server.createSession')) {
+        return Promise.resolve({ ok: false, status: 401 })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ posts: [post()] }) })
+    })
+
+    expect(await fetchBlueskySearch('https://bsky.app/search?q=a')).toHaveLength(1)
   })
 })
 

@@ -14,9 +14,15 @@ const log = logger.child('social-search')
  * hashtag timelines, so those only need a URL rewrite.
  */
 
-const BLUESKY_SEARCH_ENDPOINT = 'https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts'
+/** Unauthenticated AppView — serves profiles and author feeds, but no longer search */
+const BLUESKY_PUBLIC_APPVIEW = 'https://public.api.bsky.app'
+const DEFAULT_BLUESKY_PDS = 'https://bsky.social'
 const BLUESKY_SEARCH_LIMIT = 40
 const SEARCH_TIMEOUT_MS = 10_000
+
+/** createSession does not report a lifetime; re-authenticating is cheap. */
+const SESSION_TTL_MS = 60 * 60_000
+const AUTH_BACKOFF_MS = 10 * 60_000
 
 /** Posts have no title, so one is derived from the opening line of the text. */
 const TITLE_MAX_CHARS = 120
@@ -99,31 +105,116 @@ function toRssItem(post: BlueskyPost): RssItem | null {
   }
 }
 
-/**
- * Run a Bluesky search and return its posts as feed items. The public AppView
- * needs no authentication, so this works without an account.
- */
-export async function fetchBlueskySearch(searchUrl: string): Promise<RssItem[]> {
-  const query = parseBlueskySearchUrl(searchUrl)
-  if (!query) return []
+interface BlueskySession {
+  accessJwt: string
+  pdsUrl: string
+}
 
-  const endpoint = new URL(BLUESKY_SEARCH_ENDPOINT)
+let cachedSession: { session: BlueskySession; expiresAt: number } | null = null
+let authFailedAt = 0
+
+/**
+ * Log in with an app password (Settings → App Passwords on bsky.app). Bluesky
+ * requires authentication for searchPosts, while profiles and author feeds stay
+ * open on the public AppView. Returns null when no credentials are configured.
+ */
+async function getBlueskySession(): Promise<BlueskySession | null> {
+  const identifier = process.env.BLUESKY_IDENTIFIER
+  const password = process.env.BLUESKY_APP_PASSWORD
+  if (!identifier || !password) return null
+
+  if (cachedSession && Date.now() < cachedSession.expiresAt) return cachedSession.session
+  if (Date.now() - authFailedAt < AUTH_BACKOFF_MS) return null
+
+  const pdsUrl = process.env.BLUESKY_PDS_URL || DEFAULT_BLUESKY_PDS
+  try {
+    const res = await fetch(`${pdsUrl}/xrpc/com.atproto.server.createSession`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'User-Agent': USER_AGENT },
+      body: JSON.stringify({ identifier, password }),
+      signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
+    })
+    if (!res.ok) {
+      log.warn(`Bluesky login failed: HTTP ${res.status}`)
+      authFailedAt = Date.now()
+      return null
+    }
+    const data = await res.json() as { accessJwt?: unknown }
+    if (typeof data.accessJwt !== 'string') {
+      authFailedAt = Date.now()
+      return null
+    }
+    const session = { accessJwt: data.accessJwt, pdsUrl }
+    cachedSession = { session, expiresAt: Date.now() + SESSION_TTL_MS }
+    return session
+  } catch (err) {
+    log.warn(`Bluesky login failed: ${err instanceof Error ? err.message : String(err)}`)
+    authFailedAt = Date.now()
+    return null
+  }
+}
+
+/** @internal test helper */
+export function _resetBlueskySessionForTests(): void {
+  cachedSession = null
+  authFailedAt = 0
+}
+
+function searchRequest(host: string, query: BlueskySearchQuery, token: string | null): Promise<Response> {
+  const endpoint = new URL(`${host}/xrpc/app.bsky.feed.searchPosts`)
   endpoint.searchParams.set('q', query.q)
   endpoint.searchParams.set('limit', String(BLUESKY_SEARCH_LIMIT))
   if (query.sort) endpoint.searchParams.set('sort', query.sort)
   if (query.lang) endpoint.searchParams.set('lang', query.lang)
 
-  const res = await fetch(endpoint, {
-    headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+  return fetch(endpoint, {
+    headers: {
+      'User-Agent': USER_AGENT,
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
   })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+}
 
-  const data = await res.json() as { posts?: unknown }
+function toItems(data: { posts?: unknown }, query: BlueskySearchQuery): RssItem[] {
   const posts = Array.isArray(data.posts) ? data.posts as BlueskyPost[] : []
   const items = posts.map(toRssItem).filter((item): item is RssItem => item !== null)
   log.info(`Bluesky search "${query.q}": ${items.length} items`)
   return items
+}
+
+/**
+ * Run a Bluesky search and return its posts as feed items. Uses the app-password
+ * session when configured (searchPosts requires authentication), and otherwise
+ * falls back to the public AppView.
+ */
+export async function fetchBlueskySearch(searchUrl: string): Promise<RssItem[]> {
+  const query = parseBlueskySearchUrl(searchUrl)
+  if (!query) return []
+
+  const session = await getBlueskySession()
+  if (session) {
+    let res = await searchRequest(session.pdsUrl, query, session.accessJwt)
+    if (res.status === 401) {
+      // Access token expired — log in again once before giving up
+      cachedSession = null
+      const renewed = await getBlueskySession()
+      if (renewed) res = await searchRequest(renewed.pdsUrl, query, renewed.accessJwt)
+    }
+    if (res.ok) return toItems(await res.json() as { posts?: unknown }, query)
+    log.warn(`Bluesky authenticated search responded ${res.status}, falling back to the public AppView`)
+  }
+
+  const res = await searchRequest(BLUESKY_PUBLIC_APPVIEW, query, null)
+  if (!res.ok) {
+    // Bluesky restricts unauthenticated search — point at the way out
+    if (res.status === 401 || res.status === 403) {
+      throw new Error(`HTTP ${res.status} — Bluesky search requires BLUESKY_IDENTIFIER / BLUESKY_APP_PASSWORD`)
+    }
+    throw new Error(`HTTP ${res.status}`)
+  }
+  return toItems(await res.json() as { posts?: unknown }, query)
 }
 
 /**
