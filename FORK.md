@@ -87,6 +87,30 @@ score, image preferred) followed by the top unread articles of each category,
 reusing the magazine card variants. The chat-first home screen it replaces remains
 available as the chat page (`/chat`). Note: `/` is not wired into demo mode.
 
+## Reddit articles: comments, crossposts, and access
+
+Reddit-hosted articles get their body from the post's JSON (`server/fetcher/reddit.ts`,
+short-circuited in `server/fetcher/content.ts`), including the embedded parent of a
+crosspost, and the top comments are rendered below the article
+(`server/routes/comments.ts`, `src/components/article/article-comments.tsx`) with an
+on-demand "translate comments" button.
+
+Reddit blocks anonymous `.json` requests from many residential IPs ("You've been
+blocked by network security"), so fetches escalate through a ladder, first match wins:
+
+1. **Registered app OAuth** — `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET`
+   (client_credentials against `oauth.reddit.com`).
+2. **Anonymous Android-app OAuth** — the technique used by
+   [Redlib](https://github.com/redlib-org/redlib): request a `loid` token with the
+   official Android client id and app-build User-Agent, then query
+   `oauth.reddit.com`. Needs no account and no registered app, and is not subject to
+   the anonymous-endpoint IP blocks. Failures back off for 10 minutes.
+3. **Browser session cookie** — `REDDIT_COOKIE=reddit_session=…` copied from a
+   logged-in browser.
+4. **Anonymous ladder** — default UA, browser UA, then `old.reddit.com`.
+5. **Anti-bot solver** — FlareSolverr or the API-compatible
+   [Byparr](https://github.com/ThePhaseless/Byparr) via `FLARESOLVERR_URL`.
+
 ## Tooling
 
 - **E2E smoke tests**: `npm run test:e2e` (Playwright) builds the app, boots the

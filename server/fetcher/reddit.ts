@@ -110,9 +110,87 @@ async function getOauthToken(requestLog: RedditLogger): Promise<string | null> {
   }
 }
 
+/**
+ * Anonymous OAuth fallback emulating Reddit's official Android app — the
+ * approach used by Redlib. Reddit grants these "loid" tokens to app installs
+ * without any registered app or account, and oauth.reddit.com is not subject
+ * to the anonymous-endpoint IP reputation blocks.
+ */
+const REDDIT_ANDROID_CLIENT_ID = 'ohXpoqrZYub1kg'
+
+/** Real Android app builds (from Redlib's generated version list) */
+const ANDROID_APP_VERSIONS = [
+  'Version 2024.22.1/Build 1652272',
+  'Version 2023.45.0/Build 1281371',
+  'Version 2022.25.0/Build 515072',
+]
+
+interface AndroidSession {
+  token: string
+  expiresAt: number
+  userAgent: string
+  deviceId: string
+  loid: string | null
+  session: string | null
+}
+
+let androidSession: AndroidSession | null = null
+let androidAuthFailedAt = 0
+const ANDROID_AUTH_BACKOFF_MS = 10 * 60_000
+
+async function getAndroidSession(requestLog: RedditLogger): Promise<AndroidSession | null> {
+  if (androidSession && Date.now() < androidSession.expiresAt - 60_000) return androidSession
+  if (Date.now() - androidAuthFailedAt < ANDROID_AUTH_BACKOFF_MS) return null
+
+  const deviceId = crypto.randomUUID()
+  const appVersion = ANDROID_APP_VERSIONS[Math.floor(Math.random() * ANDROID_APP_VERSIONS.length)]
+  const userAgent = `Reddit/${appVersion}/Android ${9 + Math.floor(Math.random() * 6)}`
+  try {
+    const res = await fetch('https://www.reddit.com/auth/v2/oauth/access-token/loid', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Basic ' + Buffer.from(`${REDDIT_ANDROID_CLIENT_ID}:`).toString('base64'),
+        'User-Agent': userAgent,
+        'Content-Type': 'application/json; charset=UTF-8',
+        'client-vendor-id': deviceId,
+        'X-Reddit-Device-Id': deviceId,
+        'x-reddit-retry': 'algo=no-retries',
+      },
+      body: JSON.stringify({ scopes: ['*', 'email', 'pii'] }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    })
+    if (!res.ok) {
+      requestLog.warn(`reddit android-app token request failed: ${res.status}`)
+      androidAuthFailedAt = Date.now()
+      return null
+    }
+    const data = await res.json() as { access_token?: string; expires_in?: number }
+    if (!data.access_token) {
+      androidAuthFailedAt = Date.now()
+      return null
+    }
+    androidSession = {
+      token: data.access_token,
+      expiresAt: Date.now() + (data.expires_in ?? 86_400) * 1000,
+      userAgent,
+      deviceId,
+      loid: res.headers.get('x-reddit-loid'),
+      session: res.headers.get('x-reddit-session'),
+    }
+    return androidSession
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    requestLog.warn(`reddit android-app token request failed: ${msg}`)
+    androidAuthFailedAt = Date.now()
+    return null
+  }
+}
+
 /** @internal test helper */
 export function _resetRedditOauthForTests(): void {
   cachedOauthToken = null
+  androidSession = null
+  androidAuthFailedAt = 0
 }
 
 /**
@@ -135,6 +213,33 @@ export async function fetchRedditJson(jsonUrl: string, requestLog: RedditLogger 
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       requestLog.warn(`reddit oauth fetch failed: ${msg}`)
+    }
+  }
+
+  // Anonymous Android-app OAuth (Redlib's technique): no account, no
+  // registered app, and oauth.reddit.com bypasses the anonymous-endpoint
+  // IP blocks that reject www.reddit.com/.json requests.
+  const android = await getAndroidSession(requestLog)
+  if (android) {
+    try {
+      const oauthUrl = jsonUrl.replace('https://www.reddit.com/', 'https://oauth.reddit.com/')
+      const res = await fetch(oauthUrl, {
+        headers: {
+          Authorization: `Bearer ${android.token}`,
+          'User-Agent': android.userAgent,
+          'client-vendor-id': android.deviceId,
+          'X-Reddit-Device-Id': android.deviceId,
+          ...(android.loid ? { 'x-reddit-loid': android.loid } : {}),
+          ...(android.session ? { 'x-reddit-session': android.session } : {}),
+          Accept: 'application/json',
+        },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      })
+      if (res.ok) return await res.json() as RedditListing[]
+      requestLog.warn(`reddit android-app oauth responded ${res.status} for ${oauthUrl}`)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      requestLog.warn(`reddit android-app oauth fetch failed: ${msg}`)
     }
   }
 

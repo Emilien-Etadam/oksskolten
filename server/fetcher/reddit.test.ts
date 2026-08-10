@@ -136,6 +136,33 @@ describe('fetchRedditJson via OAuth', () => {
     expect(mockFetch.mock.calls.filter(c => String(c[0]).includes('/api/v1/access_token'))).toHaveLength(1)
   })
 
+  it('uses an anonymous Android-app OAuth token when no credentials are set', async () => {
+    vi.stubEnv('REDDIT_CLIENT_ID', '')
+    vi.stubEnv('REDDIT_CLIENT_SECRET', '')
+    mockFetch.mockImplementation((url: string, init?: RequestInit) => {
+      if (String(url).includes('/auth/v2/oauth/access-token/loid')) {
+        expect((init?.headers as Record<string, string>).Authorization.startsWith('Basic ')).toBe(true)
+        return Promise.resolve({
+          ok: true,
+          headers: new Headers({ 'x-reddit-loid': 'loid1', 'x-reddit-session': 'sess1' }),
+          json: () => Promise.resolve({ access_token: 'android-tok', expires_in: 86400 }),
+        })
+      }
+      if (String(url).startsWith('https://oauth.reddit.com/')) {
+        const headers = init?.headers as Record<string, string>
+        expect(headers.Authorization).toBe('Bearer android-tok')
+        expect(headers['x-reddit-loid']).toBe('loid1')
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([{ data: { children: [] } }]) })
+      }
+      return Promise.resolve({ ok: false, status: 403 })
+    })
+
+    const payload = await fetchRedditJson(jsonUrl)
+    expect(payload).toEqual([{ data: { children: [] } }])
+    // No anonymous www.reddit.com/r/ requests were needed
+    expect(mockFetch.mock.calls.filter(c => String(c[0]).startsWith('https://www.reddit.com/r/'))).toHaveLength(0)
+  })
+
   it('tries the session cookie first in the anonymous ladder when REDDIT_COOKIE is set', async () => {
     vi.stubEnv('REDDIT_CLIENT_ID', '')
     vi.stubEnv('REDDIT_CLIENT_SECRET', '')
@@ -150,7 +177,9 @@ describe('fetchRedditJson via OAuth', () => {
 
     const payload = await fetchRedditJson(jsonUrl)
     expect(payload).toEqual([{ data: { children: [] } }])
-    expect(mockFetch).toHaveBeenCalledTimes(1)
+    // Exactly one request carried the session cookie, and it succeeded
+    const cookieCalls = mockFetch.mock.calls.filter(c => (c[1]?.headers as Record<string, string>)?.Cookie === 'reddit_session=abc')
+    expect(cookieCalls).toHaveLength(1)
   })
 
   it('falls back to the anonymous ladder when the token request fails', async () => {
