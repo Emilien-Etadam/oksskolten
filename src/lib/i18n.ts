@@ -127,6 +127,7 @@ const dict = {
   'articles.showOlder': { ja: 'もっと読む（${count}件）', en: 'Show older articles (${count})', zh: '显示更早的文章（${count}）'},
   'articles.allCaughtUp': { ja: '全部読んだよ！', en: "You're all caught up!", zh: "全部读完了！"},
   'frontpage.title': { ja: 'トップ', en: 'Front Page', zh: '头版'},
+  'comments.title': { ja: 'コメント', en: 'Comments', zh: '评论'},
 
   // ArticleDetail
   'article.markAsRead': { ja: '既読にする', en: 'Mark as read', zh: '标为已读'},

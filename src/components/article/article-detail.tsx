@@ -28,6 +28,7 @@ import { ArticleSummarySection } from './article-summary-section'
 import { ArticleTranslationBanner } from './article-translation-banner'
 import { ArticleContentBody } from './article-content-body'
 import { ArticleSimilarBanner } from './article-similar-banner'
+import { ArticleComments } from './article-comments'
 import type { ArticleDetail as ArticleDetailData } from '../../../shared/types'
 
 interface ArticleDetailProps {
@@ -243,6 +244,7 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
         <ArticleSimilarBanner articleId={article.id} similarCount={article.similar_count} />
       )}
 
+
       {/* Translate error */}
       {translateError && !translating && (
         <Callout variant="error">
@@ -280,6 +282,9 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
         translatingHtml={translatingHtml}
         displayContent={displayContent}
       />
+
+      {/* Discussion comments (Reddit posts) */}
+      <ArticleComments articleId={article.id} articleUrl={article.url} />
       <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </article>
     {chatPosition === 'fab' && article && <ChatFab key={article.id} articleId={article.id} />}
