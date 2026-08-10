@@ -58,20 +58,35 @@ function parseJsonBody(body: string): unknown {
 }
 
 /**
- * Fetch a Reddit JSON document: direct request first, then FlareSolverr
- * (when configured) for IPs or user agents Reddit blocks.
+ * Reddit rejects bot-looking user agents on its .json endpoints with 403
+ * (while accepting them on .rss), so retries escalate to a browser UA.
+ */
+const BROWSER_USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64; rv:132.0) Gecko/20100101 Firefox/132.0'
+
+/**
+ * Fetch a Reddit JSON document. Attempt ladder: default UA, then a browser
+ * UA, then old.reddit.com, then FlareSolverr (when configured) for IPs
+ * Reddit blocks outright.
  */
 export async function fetchRedditJson(jsonUrl: string, requestLog: RedditLogger = log): Promise<RedditListing[] | null> {
-  try {
-    const res = await fetch(jsonUrl, {
-      headers: { 'User-Agent': USER_AGENT },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    })
-    if (res.ok) return await res.json() as RedditListing[]
-    requestLog.warn(`reddit responded ${res.status} for ${jsonUrl}, trying FlareSolverr`)
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    requestLog.warn(`reddit fetch failed (${msg}), trying FlareSolverr`)
+  const attempts = [
+    { url: jsonUrl, ua: USER_AGENT, label: 'default UA' },
+    { url: jsonUrl, ua: BROWSER_USER_AGENT, label: 'browser UA' },
+    { url: jsonUrl.replace('https://www.reddit.com/', 'https://old.reddit.com/'), ua: BROWSER_USER_AGENT, label: 'old.reddit.com' },
+  ]
+
+  for (const attempt of attempts) {
+    try {
+      const res = await fetch(attempt.url, {
+        headers: { 'User-Agent': attempt.ua, 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      })
+      if (res.ok) return await res.json() as RedditListing[]
+      requestLog.warn(`reddit responded ${res.status} (${attempt.label}) for ${attempt.url}`)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      requestLog.warn(`reddit fetch failed (${attempt.label}): ${msg}`)
+    }
   }
 
   const solved = await fetchViaFlareSolverr(jsonUrl)
