@@ -75,10 +75,10 @@ describe('ArticleComments', () => {
     expect(container.innerHTML).toBe('')
   })
 
-  it('shows a skeleton while loading', () => {
+  it('renders nothing while loading (no flash for empty threads)', () => {
     swrIsLoading = true
-    renderComments('https://www.reddit.com/r/x/comments/1/t/')
-    expect(screen.getByText('Comments')).toBeTruthy()
+    const { container } = renderComments('https://www.reddit.com/r/x/comments/1/t/')
+    expect(container.innerHTML).toBe('')
   })
 
   describe('translation', () => {

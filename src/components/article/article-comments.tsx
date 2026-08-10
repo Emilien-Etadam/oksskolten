@@ -5,7 +5,6 @@ import { fetcher, authHeaders } from '../../lib/fetcher'
 import { renderMarkdown } from '../../lib/markdown'
 import { sanitizeHtml } from '../../lib/sanitize'
 import { useI18n } from '../../lib/i18n'
-import { Skeleton } from '../ui/skeleton'
 
 interface ArticleComment {
   author: string
@@ -100,10 +99,11 @@ export function ArticleComments({ articleId, articleUrl }: { articleId: number; 
   const [showTranslated, setShowTranslated] = useState(false)
   const [translating, setTranslating] = useState(false)
 
-  if (!enabled) return null
-  if (!isLoading && (!data || data.comments.length === 0)) return null
+  // Render nothing until comments have actually arrived — showing a loading
+  // skeleton that vanishes when the thread is empty reads as a glitch
+  if (!enabled || isLoading || !data || data.comments.length === 0) return null
 
-  const comments = data?.comments ?? []
+  const comments = data.comments
   const displayed = showTranslated && translations
     ? applyTranslations(comments, translations)
     : comments
@@ -147,15 +147,7 @@ export function ArticleComments({ articleId, articleUrl }: { articleId: number; 
           </button>
         )}
       </div>
-      {isLoading ? (
-        <div className="mt-4 space-y-3">
-          <Skeleton className="h-3.5 w-1/4" />
-          <Skeleton className="h-3.5 w-full" />
-          <Skeleton className="h-3.5 w-2/3" />
-        </div>
-      ) : (
-        displayed.map((comment, i) => <CommentItem key={i} comment={comment} />)
-      )}
+      {displayed.map((comment, i) => <CommentItem key={i} comment={comment} />)}
     </section>
   )
 }
