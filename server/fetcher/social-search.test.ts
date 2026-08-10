@@ -10,6 +10,8 @@ import {
   parseBlueskySearchUrl,
   isBlueskySearchUrl,
   fetchBlueskySearch,
+  parseBlueskyFeedUrl,
+  fetchBlueskyFeed,
   mastodonTagRssCandidate,
   blueskyProfileRssCandidate,
   resolveSocialSearchFeed,
@@ -137,6 +139,68 @@ describe('fetchBlueskySearch', () => {
 
   it('returns nothing without fetching for a non-search URL', async () => {
     expect(await fetchBlueskySearch('https://example.com/')).toEqual([])
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('parseBlueskyFeedUrl', () => {
+  it('parses a custom-feed URL', () => {
+    expect(parseBlueskyFeedUrl('https://bsky.app/profile/skyfeed.xyz/feed/tech'))
+      .toEqual({ actor: 'skyfeed.xyz', rkey: 'tech' })
+  })
+
+  it('rejects profile, search and foreign URLs', () => {
+    expect(parseBlueskyFeedUrl('https://bsky.app/profile/alice.bsky.social')).toBeNull()
+    expect(parseBlueskyFeedUrl('https://bsky.app/search?q=x')).toBeNull()
+    expect(parseBlueskyFeedUrl('https://example.com/profile/a/feed/b')).toBeNull()
+  })
+})
+
+describe('fetchBlueskyFeed', () => {
+  it('resolves the handle and fetches the feed anonymously', async () => {
+    mockFetch.mockImplementation((url: string | URL) => {
+      if (String(url).includes('resolveHandle')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ did: 'did:plc:xyz' }) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ feed: [{ post: post() }] }) })
+    })
+
+    const items = await fetchBlueskyFeed('https://bsky.app/profile/skyfeed.xyz/feed/tech')
+    expect(items).toHaveLength(1)
+    expect(items[0].url).toBe('https://bsky.app/profile/alice.bsky.social/post/3kxyz')
+
+    const getFeed = new URL(String(mockFetch.mock.calls[1][0]))
+    expect(getFeed.pathname).toBe('/xrpc/app.bsky.feed.getFeed')
+    expect(getFeed.searchParams.get('feed')).toBe('at://did:plc:xyz/app.bsky.feed.generator/tech')
+    // No Authorization header — custom feeds are public
+    expect((mockFetch.mock.calls[1][1] as RequestInit).headers).not.toHaveProperty('Authorization')
+  })
+
+  it('skips handle resolution when the URL already carries a DID', async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ feed: [] }) })
+
+    await fetchBlueskyFeed('https://bsky.app/profile/did:plc:abc/feed/news')
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(String(mockFetch.mock.calls[0][0])).toContain('at%3A%2F%2Fdid%3Aplc%3Aabc')
+  })
+
+  it('throws when the handle cannot be resolved', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 400 })
+    await expect(fetchBlueskyFeed('https://bsky.app/profile/ghost.invalid/feed/x'))
+      .rejects.toThrow('Could not resolve')
+  })
+
+  it('throws on an API error', async () => {
+    mockFetch.mockImplementation((url: string | URL) => String(url).includes('resolveHandle')
+      ? Promise.resolve({ ok: true, json: () => Promise.resolve({ did: 'did:plc:xyz' }) })
+      : Promise.resolve({ ok: false, status: 500 }))
+
+    await expect(fetchBlueskyFeed('https://bsky.app/profile/a.bsky.social/feed/x'))
+      .rejects.toThrow('HTTP 500')
+  })
+
+  it('returns nothing without fetching for a non-feed URL', async () => {
+    expect(await fetchBlueskyFeed('https://bsky.app/search?q=x')).toEqual([])
     expect(mockFetch).not.toHaveBeenCalled()
   })
 })

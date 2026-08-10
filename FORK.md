@@ -117,6 +117,10 @@ Adding a search or hashtag URL creates a feed from it
 (`server/fetcher/social-search.ts`, resolved in `server/routes/feeds.ts` and
 fetched in `server/fetcher/rss.ts`):
 
+- **Bluesky custom feed** — paste `https://bsky.app/profile/<actor>/feed/<name>`,
+  a community-curated topical feed. `app.bsky.feed.getFeed` serves these
+  anonymously, so this is the account-free way to follow Bluesky by topic
+  (search is not). Handles are resolved to DIDs to build the `at://` URI.
 - **Bluesky profile** — paste `https://bsky.app/profile/<handle>`; Bluesky serves
   RSS at `/rss` and, unlike search, does so anonymously. Probed like the Mastodon
   candidate below.

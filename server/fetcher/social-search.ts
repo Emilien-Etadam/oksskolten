@@ -61,6 +61,37 @@ export function isBlueskySearchUrl(url: string): boolean {
   return parseBlueskySearchUrl(url) !== null
 }
 
+export interface BlueskyFeedRef {
+  actor: string
+  rkey: string
+}
+
+/**
+ * Parse a Bluesky custom-feed URL (`https://bsky.app/profile/<actor>/feed/<name>`).
+ * These curated topical feeds are served anonymously, unlike search.
+ */
+export function parseBlueskyFeedUrl(url: string): BlueskyFeedRef | null {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return null
+  }
+  if (parsed.hostname.replace(/^www\./, '') !== 'bsky.app') return null
+
+  const match = parsed.pathname.match(/^\/profile\/([^/]+)\/feed\/([^/]+)\/?$/)
+  return match ? { actor: match[1], rkey: match[2] } : null
+}
+
+export function isBlueskyFeedUrl(url: string): boolean {
+  return parseBlueskyFeedUrl(url) !== null
+}
+
+/** Any Bluesky URL served by the API rather than by an RSS endpoint. */
+export function isBlueskyApiUrl(url: string): boolean {
+  return isBlueskySearchUrl(url) || isBlueskyFeedUrl(url)
+}
+
 interface BlueskyPost {
   uri?: unknown
   indexedAt?: unknown
@@ -103,6 +134,52 @@ function toRssItem(post: BlueskyPost): RssItem | null {
     published_at: normalizeDate(createdAt ?? indexedAt ?? ''),
     excerpt: text || undefined,
   }
+}
+
+/** Handles must be resolved to DIDs to build the feed's at:// URI. */
+async function resolveDid(actor: string): Promise<string | null> {
+  if (actor.startsWith('did:')) return actor
+
+  const endpoint = new URL(`${BLUESKY_PUBLIC_APPVIEW}/xrpc/com.atproto.identity.resolveHandle`)
+  endpoint.searchParams.set('handle', actor)
+  const res = await fetch(endpoint, {
+    headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+    signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
+  })
+  if (!res.ok) return null
+
+  const data = await res.json() as { did?: unknown }
+  return typeof data.did === 'string' ? data.did : null
+}
+
+/**
+ * Fetch a Bluesky custom feed — curated topical feeds published by the
+ * community, served by the public AppView without authentication.
+ */
+export async function fetchBlueskyFeed(feedUrl: string): Promise<RssItem[]> {
+  const ref = parseBlueskyFeedUrl(feedUrl)
+  if (!ref) return []
+
+  const did = await resolveDid(ref.actor)
+  if (!did) throw new Error(`Could not resolve Bluesky handle "${ref.actor}"`)
+
+  const endpoint = new URL(`${BLUESKY_PUBLIC_APPVIEW}/xrpc/app.bsky.feed.getFeed`)
+  endpoint.searchParams.set('feed', `at://${did}/app.bsky.feed.generator/${ref.rkey}`)
+  endpoint.searchParams.set('limit', String(BLUESKY_SEARCH_LIMIT))
+
+  const res = await fetch(endpoint, {
+    headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+    signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+  const data = await res.json() as { feed?: unknown }
+  const entries = Array.isArray(data.feed) ? data.feed as Array<{ post?: BlueskyPost }> : []
+  const items = entries
+    .map(entry => entry.post ? toRssItem(entry.post) : null)
+    .filter((item): item is RssItem => item !== null)
+  log.info(`Bluesky feed "${ref.rkey}": ${items.length} items`)
+  return items
 }
 
 interface BlueskySession {
@@ -284,7 +361,7 @@ export async function resolveMastodonTagFeed(pageUrl: string): Promise<string | 
  * recognizes them and queries the API directly.
  */
 export async function resolveSocialSearchFeed(pageUrl: string): Promise<string | null> {
-  if (isBlueskySearchUrl(pageUrl)) return pageUrl
+  if (isBlueskyApiUrl(pageUrl)) return pageUrl
 
   const blueskyProfile = blueskyProfileRssCandidate(pageUrl)
   if (blueskyProfile) return probeFeedUrl(blueskyProfile)
