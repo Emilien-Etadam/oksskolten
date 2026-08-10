@@ -4,6 +4,7 @@ import { Piscina as PiscinaPool } from 'piscina'
 import { JSDOM } from 'jsdom'
 import { fetchHtml } from './http.js'
 import { fetchViaFlareSolverr } from './flaresolverr.js'
+import { fetchRedditPostContent } from './reddit.js'
 import type { CleanerConfig } from '../lib/cleaner/selectors.js'
 import type { ParseHtmlInput, ParseHtmlResult } from './contentWorker.js'
 
@@ -183,6 +184,19 @@ export interface FetchFullTextOptions {
 export async function fetchFullText(articleUrl: string, options?: FetchFullTextOptions): Promise<ParseHtmlResult> {
   const cleanerConfig = options?.cleanerConfig
   const requiresJsChallenge = options?.requiresJsChallenge ?? false
+
+  // Reddit posts: build content from the public JSON — the selftext is
+  // already Markdown, and crossposted parents are invisible to HTML
+  // extraction. Falls through to the regular pipeline on failure.
+  const redditPost = await fetchRedditPostContent(articleUrl)
+  if (redditPost) {
+    return {
+      fullText: redditPost.fullText,
+      ogImage: redditPost.ogImage,
+      excerpt: redditPost.excerpt,
+      title: redditPost.title,
+    }
+  }
 
   // Step 1: Fetch HTML (async I/O, non-blocking — stays on main thread)
   const { html } = await fetchHtml(articleUrl, { useFlareSolverr: requiresJsChallenge })
