@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useKeyboardNavigationContext } from '../../contexts/keyboard-navigation-context'
 import { useKeyboardNavigation } from '../../hooks/use-keyboard-navigation'
+import { useExtendArticleList } from '../../hooks/use-extend-article-list'
 import { useAppLayout } from '../../app'
 
 import { articleUrlToPath } from '../../lib/url'
@@ -16,6 +17,7 @@ export function ArticleZapNavigation({ currentArticleId, onBookmarkToggle, onOpe
   const navigate = useNavigate()
   const { articleIds, articleUrls, setFocusedItemId, lastListUrl } = useKeyboardNavigationContext()
   const { settings: { keyboardNavigation, keybindings } } = useAppLayout()
+  const extendList = useExtendArticleList()
 
   useKeyboardNavigation({
     items: articleIds,
@@ -30,6 +32,7 @@ export function ArticleZapNavigation({ currentArticleId, onBookmarkToggle, onOpe
     onEscape: () => {
       void navigate(lastListUrl || '/inbox')
     },
+    onNearEnd: () => { void extendList() },
     enabled: keyboardNavigation === 'on' && articleIds.length > 0,
     keyBindings: keybindings,
   })

@@ -1,11 +1,14 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useKeyboardNavigationContext } from '../../contexts/keyboard-navigation-context'
+import { useExtendArticleList } from '../../hooks/use-extend-article-list'
 import { articleUrlToPath } from '../../lib/url'
 
 const SWIPE_THRESHOLD_PX = 60
 /** Touches starting this close to the left edge are left to the browser's native back gesture */
 const EDGE_GUARD_PX = 32
+/** Prefetch the next window of the list when this few loaded articles remain ahead */
+const NEAR_END_THRESHOLD = 5
 
 interface ArticleSwipeNavigationProps {
   currentArticleId: string
@@ -19,21 +22,40 @@ interface ArticleSwipeNavigationProps {
 export function ArticleSwipeNavigation({ currentArticleId }: ArticleSwipeNavigationProps) {
   const navigate = useNavigate()
   const { articleIds, articleUrls, setFocusedItemId } = useKeyboardNavigationContext()
+  const extendList = useExtendArticleList()
 
   // Keep latest values in refs so the stable document listeners never go stale
-  const stateRef = useRef({ currentArticleId, articleIds, articleUrls, navigate, setFocusedItemId })
-  stateRef.current = { currentArticleId, articleIds, articleUrls, navigate, setFocusedItemId }
+  const stateRef = useRef({ currentArticleId, articleIds, articleUrls, navigate, setFocusedItemId, extendList })
+  stateRef.current = { currentArticleId, articleIds, articleUrls, navigate, setFocusedItemId, extendList }
 
   useEffect(() => {
     const goTo = (offset: 1 | -1): boolean => {
-      const { currentArticleId, articleIds, articleUrls, navigate, setFocusedItemId } = stateRef.current
+      const { currentArticleId, articleIds, articleUrls, navigate, setFocusedItemId, extendList } = stateRef.current
       const index = articleIds.indexOf(currentArticleId)
       if (index === -1) return false
       const targetId = articleIds[index + offset]
       const url = targetId ? articleUrls[targetId] : undefined
-      if (!targetId || !url) return false
+      if (!targetId || !url) {
+        // End of the loaded list: fetch the next window, then navigate
+        if (offset === 1) {
+          void extendList().then(extended => {
+            if (!extended) return
+            const nextId = extended.ids[extended.ids.indexOf(currentArticleId) + 1]
+            const nextUrl = nextId ? extended.urls[nextId] : undefined
+            if (nextId && nextUrl) {
+              stateRef.current.setFocusedItemId(nextId)
+              void stateRef.current.navigate(articleUrlToPath(nextUrl))
+            }
+          })
+        }
+        return false
+      }
       setFocusedItemId(targetId)
       void navigate(articleUrlToPath(url))
+      // Prefetch more of the list when nearing the end of what is loaded
+      if (offset === 1 && articleIds.length - (index + 1) <= NEAR_END_THRESHOLD) {
+        void extendList()
+      }
       return true
     }
 

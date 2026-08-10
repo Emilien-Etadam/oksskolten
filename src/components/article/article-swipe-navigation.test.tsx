@@ -8,6 +8,11 @@ vi.mock('../../lib/url', () => ({
   articleUrlToPath: (url: string) => `/articles/${encodeURIComponent(url)}`,
 }))
 
+const mockExtendList = vi.fn()
+vi.mock('../../hooks/use-extend-article-list', () => ({
+  useExtendArticleList: () => mockExtendList,
+}))
+
 function LocationProbe() {
   const location = useLocation()
   return <div data-testid="pathname">{location.pathname}</div>
@@ -45,6 +50,8 @@ function swipe(fromX: number, toX: number, fromY = 300, toY = 300) {
 
 describe('ArticleSwipeNavigation', () => {
   beforeEach(() => {
+    mockExtendList.mockReset()
+    mockExtendList.mockResolvedValue(null)
     sessionStorage.setItem('kb_article_ids', JSON.stringify(['1', '2', '3']))
     sessionStorage.setItem('kb_article_urls', JSON.stringify({
       '1': 'https://a.com/one',
@@ -101,5 +108,38 @@ describe('ArticleSwipeNavigation', () => {
     renderSwipeNav('99')
     swipe(300, 100)
     expect(screen.getByTestId('pathname').textContent).toBe('/current')
+  })
+
+  it('extends the list and navigates when swiping next at the end of the loaded list', async () => {
+    mockExtendList.mockResolvedValue({
+      ids: ['1', '2', '3', '4'],
+      urls: {
+        '1': 'https://a.com/one',
+        '2': 'https://b.com/two',
+        '3': 'https://c.com/three',
+        '4': 'https://d.com/four',
+      },
+    })
+    renderSwipeNav('3')
+    swipe(300, 100)
+    expect(mockExtendList).toHaveBeenCalled()
+    await vi.waitFor(() => {
+      expect(screen.getByTestId('pathname').textContent).toBe(`/articles/${encodeURIComponent('https://d.com/four')}`)
+    })
+  })
+
+  it('stays put at the end of the list when there is nothing left to load', async () => {
+    renderSwipeNav('3')
+    swipe(300, 100)
+    expect(mockExtendList).toHaveBeenCalled()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(screen.getByTestId('pathname').textContent).toBe('/current')
+  })
+
+  it('prefetches more of the list when navigating near the end', () => {
+    renderSwipeNav('2')
+    swipe(300, 100)
+    // Navigated to article 3 (last loaded) — within the near-end threshold
+    expect(mockExtendList).toHaveBeenCalled()
   })
 })
