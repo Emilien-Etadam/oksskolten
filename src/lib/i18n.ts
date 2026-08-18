@@ -300,6 +300,15 @@ const dict = {
   },
   'settings.autoSummarizeOn': { ja: 'オン', en: 'On', zh: '开'},
   'settings.autoSummarizeOff': { ja: 'オフ', en: 'Off', zh: '关'},
+  'settings.githubReleaseTypes': { ja: 'GitHub リリース', en: 'GitHub Releases', zh: 'GitHub 发布'},
+  'settings.githubReleaseTypesDesc': {
+    ja: 'スター済みリポジトリのフィードに何を含めるか（GITHUB_TOKEN が必要）',
+    en: 'What to include in a starred-repositories feed (requires GITHUB_TOKEN)',
+    zh: '已加星标仓库订阅源包含的内容（需要 GITHUB_TOKEN）'
+  },
+  'settings.githubReleaseTypesStable': { ja: '正式リリースのみ', en: 'Stable releases only', zh: '仅正式发布'},
+  'settings.githubReleaseTypesPrerelease': { ja: 'プレリリースも含む', en: 'Include pre-releases', zh: '包含预发布'},
+  'settings.githubReleaseTypesTags': { ja: 'タグも含む', en: 'Include tags', zh: '包含标签'},
   'settings.unreadIndicator': { ja: '未読インジケーター', en: 'Unread Indicator', zh: '未读指示器'},
   'settings.unreadIndicatorDescDot': {
     ja: '記事リストに未読マーク（ドット）を表示しますか？',

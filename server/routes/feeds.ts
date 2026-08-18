@@ -25,6 +25,7 @@ import { requireJson } from '../auth.js'
 import { fetchSingleFeed, discoverRssUrl } from '../fetcher.js'
 import { queryRssBridge, inferCssSelectorBridge } from '../rss-bridge.js'
 import { resolveSocialSearchFeed } from '../fetcher/social-search.js'
+import { resolveGithubStarsFeed } from '../fetcher/github-releases.js'
 import { parseOpml, generateOpml } from '../opml.js'
 import { NumericIdParams, parseOrBadRequest } from '../lib/validation.js'
 
@@ -106,9 +107,11 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
         let discoveredTitle: string | null = null
         let requiresJsChallenge = false
 
-        // Bluesky searches and Mastodon hashtag timelines resolve to a feed
-        // without the discovery/bridge pipeline.
-        const socialFeedUrl = body.discovered_rss_url || body.force_page_selector
+        // GitHub stars pages, Bluesky searches and Mastodon hashtag timelines
+        // resolve to a feed without the discovery/bridge pipeline.
+        const skipResolvers = !!(body.discovered_rss_url || body.force_page_selector)
+        const githubStarsFeed = skipResolvers ? null : resolveGithubStarsFeed(body.url)
+        const socialFeedUrl = skipResolvers || githubStarsFeed
           ? null
           : await resolveSocialSearchFeed(body.url)
 
@@ -126,6 +129,13 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
           send({ type: 'step', step: 'css-selector', status: 'running' })
           rssBridgeUrl = await inferCssSelectorBridge(body.url)
           send({ type: 'step', step: 'css-selector', status: 'done', found: !!rssBridgeUrl })
+        } else if (githubStarsFeed) {
+          // Stars page: the feed is the account's star list, read via GraphQL
+          rssUrl = githubStarsFeed.feedUrl
+          discoveredTitle = githubStarsFeed.title
+          send({ type: 'step', step: 'rss-discovery', status: 'done', found: true })
+          send({ type: 'step', step: 'rss-bridge', status: 'skipped' })
+          send({ type: 'step', step: 'css-selector', status: 'skipped' })
         } else if (socialFeedUrl) {
           // Social search/hashtag URL: the feed is known without discovery
           rssUrl = socialFeedUrl

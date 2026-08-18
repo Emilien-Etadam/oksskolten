@@ -15,6 +15,7 @@ import {
   fixGenericTitlesAndEnrichExcerpts,
 } from './css-bridge.js'
 import { isBlueskyApiUrl, isBlueskyFeedUrl, fetchBlueskySearch, fetchBlueskyFeed } from './social-search.js'
+import { isGithubStarsUrl, fetchGithubStarredReleases } from './github-releases.js'
 
 export interface RssItem {
   title: string
@@ -129,11 +130,14 @@ export async function fetchAndParseRss(feed: Feed, opts?: { skipCache?: boolean 
   const rssUrl = feed.rss_url || feed.rss_bridge_url
   if (!rssUrl) throw new Error('No RSS URL')
 
-  // Bluesky searches and custom feeds have no RSS endpoint — query the API
-  if (isBlueskyApiUrl(rssUrl)) {
-    const items = isBlueskyFeedUrl(rssUrl)
-      ? await fetchBlueskyFeed(rssUrl)
-      : await fetchBlueskySearch(rssUrl)
+  // Bluesky searches and custom feeds, and GitHub stars, have no RSS endpoint
+  // — query the API
+  if (isBlueskyApiUrl(rssUrl) || isGithubStarsUrl(rssUrl)) {
+    const items = isGithubStarsUrl(rssUrl)
+      ? await fetchGithubStarredReleases(rssUrl)
+      : isBlueskyFeedUrl(rssUrl)
+        ? await fetchBlueskyFeed(rssUrl)
+        : await fetchBlueskySearch(rssUrl)
     return {
       items: cleanItems(items),
       notModified: false,

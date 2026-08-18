@@ -178,6 +178,20 @@ that define a criterion.
   equivalents (`tailwind.config.ts`), and the font import was removed from
   `src/index.css`.
 
+## GitHub starred releases as a feed
+
+`server/fetcher/github-releases.ts` — pasting `https://github.com/stars/<user>` (or
+`https://github.com/<user>?tab=stars`) creates one feed carrying the releases of
+every repository that account has starred. GitHub publishes a release feed per
+repository but none spanning a user's stars, and the star list keeps moving, so
+it is re-read on every cycle.
+
+One GraphQL query returns 100 starred repositories together with their latest
+releases, which is why this uses GraphQL rather than REST: over REST a 200-star
+account would cost 200 requests per cycle. Requires `GITHUB_TOKEN`. Whether
+pre-releases and tags count is set in Settings → Reading
+(`github.release_types`). See `docs/spec/86_feature_github_releases.md`.
+
 ## Extraction debugging + over-broad cleaner pattern
 
 `scripts/debug-extract.ts` — replays the fetch/clean/extract phases for one URL
@@ -207,6 +221,12 @@ Both changes are upstream bugs, not fork-specific behaviour.
 | `tailwind.config.ts` + `src/index.css` | logo font swapped to local Palatino stack |
 | `server/lib/cleaner/selectors.ts` | `'next-'` partial pattern narrowed to the next/prev link spellings |
 | `server/lib/cleaner/index.ts` | `postClean()` rolls back a pass that empties the body |
+| `server/fetcher/rss.ts` | +2 lines (import + GitHub stars branch in the API-feed dispatch) |
+| `server/routes/feeds.ts` | +1 import, GitHub stars resolver branch before RSS discovery |
+| `server/routes/settings.ts` | +1 preference key (`github.release_types`) |
+| `src/hooks/use-settings.ts` | `github.release_types` threaded through the settings hook |
+| `src/pages/settings/sections/reading-section.tsx` | GitHub release-types radio group |
+| `src/lib/i18n.ts` | +5 keys (`settings.githubReleaseTypes*`) |
 
 `src/app.tsx` additionally has 2 lines adjusted and a small effect added (sidebar
 auto-open respects the persisted collapse state).
