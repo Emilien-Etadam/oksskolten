@@ -6,6 +6,7 @@ import { useDateMode } from './use-date-mode'
 import { useAutoMarkRead } from './use-auto-mark-read'
 import { useAutoTranslate } from './use-auto-translate'
 import { useAutoSummarize } from './use-auto-summarize'
+import { useGithubReleaseTypes, type GithubReleaseTypes } from './use-github-release-types'
 import { useUnreadIndicator } from './use-unread-indicator'
 import { useInternalLinks } from './use-internal-links'
 import { useShowThumbnails } from './use-show-thumbnails'
@@ -56,6 +57,7 @@ interface Prefs {
   'translate.max_tokens': string | null
   'translate.target_lang': string | null
   'custom_themes': string | null
+  'github.release_types': string | null
 }
 
 export function useSettings() {
@@ -71,6 +73,7 @@ export function useSettings() {
   const { autoMarkRead, setAutoMarkRead } = useAutoMarkRead()
   const { autoTranslate, setAutoTranslate } = useAutoTranslate()
   const { autoSummarize, setAutoSummarize } = useAutoSummarize()
+  const { githubReleaseTypes, setGithubReleaseTypes } = useGithubReleaseTypes()
   const { showUnreadIndicator, setShowUnreadIndicator } = useUnreadIndicator()
   const { internalLinks, setInternalLinks } = useInternalLinks()
   const currentTheme = themes.find(t => t.name === themeName) ?? themes[0]
@@ -120,6 +123,8 @@ export function useSettings() {
   autoTranslateRef.current = autoTranslate
   const autoSummarizeRef = useRef(autoSummarize)
   autoSummarizeRef.current = autoSummarize
+  const githubReleaseTypesRef = useRef(githubReleaseTypes)
+  githubReleaseTypesRef.current = githubReleaseTypes
   const showUnreadIndicatorRef = useRef(showUnreadIndicator)
   showUnreadIndicatorRef.current = showUnreadIndicator
   const internalLinksRef = useRef(internalLinks)
@@ -162,6 +167,8 @@ export function useSettings() {
         validate: v => v === 'on' || v === 'off' },
       { key: 'reading.auto_summarize', setter: setAutoSummarize, backfillRef: autoSummarizeRef,
         validate: v => v === 'on' || v === 'off' },
+      { key: 'github.release_types', setter: setGithubReleaseTypes, backfillRef: githubReleaseTypesRef,
+        validate: v => v === 'stable' || v === 'prerelease' || v === 'tags' },
       { key: 'reading.unread_indicator', setter: setShowUnreadIndicator, backfillRef: showUnreadIndicatorRef,
         validate: v => v === 'on' || v === 'off' },
       { key: 'reading.internal_links', setter: setInternalLinks, backfillRef: internalLinksRef,
@@ -212,7 +219,7 @@ export function useSettings() {
     if (Object.keys(backfill).length > 0) {
       apiPatch('/api/settings/preferences', backfill).catch(() => {})
     }
-  }, [prefs, setTheme, setDateMode, setAutoMarkRead, setAutoTranslate, setAutoSummarize, setShowUnreadIndicator, setInternalLinks, setShowThumbnails, setShowFeedActivity, setChatPosition, setArticleOpenMode, setCategoryUnreadOnly, setLayout, setMascot, setHighlightTheme, setArticleFont, setKeyboardNavigation, setKeybindings])
+  }, [prefs, setTheme, setDateMode, setAutoMarkRead, setAutoTranslate, setAutoSummarize, setGithubReleaseTypes, setShowUnreadIndicator, setInternalLinks, setShowThumbnails, setShowFeedActivity, setChatPosition, setArticleOpenMode, setCategoryUnreadOnly, setLayout, setMascot, setHighlightTheme, setArticleFont, setKeyboardNavigation, setKeybindings])
 
   // Hydrate custom themes from DB
   useEffect(() => {
@@ -320,6 +327,7 @@ export function useSettings() {
     syncedSetAutoMarkRead,
     syncedSetAutoTranslate,
     syncedSetAutoSummarize,
+    syncedSetGithubReleaseTypes,
     syncedSetShowUnreadIndicator,
     syncedSetInternalLinks,
     syncedSetShowThumbnails,
@@ -354,6 +362,7 @@ export function useSettings() {
       syncedSetAutoMarkRead: make<'on' | 'off'>('reading.auto_mark_read', setAutoMarkRead),
       syncedSetAutoTranslate: make<'on' | 'off'>('reading.auto_translate', setAutoTranslate),
       syncedSetAutoSummarize: make<'on' | 'off'>('reading.auto_summarize', setAutoSummarize),
+      syncedSetGithubReleaseTypes: make<GithubReleaseTypes>('github.release_types', setGithubReleaseTypes),
       syncedSetShowUnreadIndicator: make<'on' | 'off'>('reading.unread_indicator', setShowUnreadIndicator),
       syncedSetInternalLinks: make<'on' | 'off'>('reading.internal_links', setInternalLinks),
       syncedSetShowThumbnails: make<'on' | 'off'>('reading.show_thumbnails', setShowThumbnails),
@@ -383,7 +392,7 @@ export function useSettings() {
     }
     // scheduleSave and dirtyKeysRef are stable refs; remaining setters are useState/useCallback-stable
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setDateMode, setAutoMarkRead, setAutoTranslate, setAutoSummarize, setShowUnreadIndicator, setInternalLinks, setShowThumbnails, setShowFeedActivity, setChatPosition, setArticleOpenMode, setCategoryUnreadOnly, setLayout, setArticleFont, setMascot])
+  }, [setDateMode, setAutoMarkRead, setAutoTranslate, setAutoSummarize, setGithubReleaseTypes, setShowUnreadIndicator, setInternalLinks, setShowThumbnails, setShowFeedActivity, setChatPosition, setArticleOpenMode, setCategoryUnreadOnly, setLayout, setArticleFont, setMascot])
 
   // Special: theme setter updates 2 keys + resets highlight
   const syncedSetTheme = useCallback((name: string) => {
@@ -432,6 +441,8 @@ export function useSettings() {
     setAutoTranslate: syncedSetAutoTranslate,
     autoSummarize,
     setAutoSummarize: syncedSetAutoSummarize,
+    githubReleaseTypes,
+    setGithubReleaseTypes: syncedSetGithubReleaseTypes,
     showUnreadIndicator,
     setShowUnreadIndicator: syncedSetShowUnreadIndicator,
     internalLinks,

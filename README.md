@@ -65,6 +65,7 @@ Because Oksskolten always has the complete text, AI summarization and translatio
 - **Multi-Auth** — Password, Passkey (WebAuthn), and GitHub OAuth — each independently configurable
 - **Smart Feed Management** — Auto-discovery, CSS selector-based feeds (via RSS Bridge), bot bypass (FlareSolverr), and automatic disabling of dead feeds
 - **Article Clipping** — Save any URL as an article, with full content extraction
+- **GitHub Starred Releases** — Get one feed of the releases published across every repository you starred. Set it up in Settings → Integration: token, stars URL, and the release/pre-release/tag mix. See [86_feature_github_releases.md](docs/spec/86_feature_github_releases.md)
 - **Theming** — 14 built-in color themes + custom theme import via JSON, 9 article fonts, 8 code highlighting styles
 - **Single Container** — API, SPA, and cron scheduler all run in one Docker container
 

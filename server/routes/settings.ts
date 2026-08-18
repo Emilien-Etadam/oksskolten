@@ -12,6 +12,7 @@ import { requireJson, getAuthUser } from '../auth.js'
 import { getAllModelValues, getModelValues } from '../../shared/models.js'
 import { assertSafeUrl } from '../fetcher/ssrf.js'
 import { extractByDotPath } from '../fetcher/article-images.js'
+import { RELEASE_TYPE_VALUES } from '../fetcher/github-releases.js'
 import { getMonthlyUsage } from '../providers/translate/google-translate.js'
 import { getDeeplMonthlyUsage } from '../providers/translate/deepl.js'
 import { parseOrBadRequest } from '../lib/validation.js'
@@ -61,6 +62,7 @@ const PREF_KEYS = [
   'retention.enabled',
   'retention.read_days',
   'retention.unread_days',
+  'github.release_types',
 ] as const
 type PrefKey = typeof PREF_KEYS[number]
 
@@ -100,6 +102,7 @@ const PREF_ALLOWED: Record<PrefKey, string[] | null> = {
   'retention.enabled': ['on', 'off'],
   'retention.read_days': null,
   'retention.unread_days': null,
+  'github.release_types': RELEASE_TYPE_VALUES,
 }
 
 const PROVIDER_MODEL_PAIRS: Array<{ providerKey: PrefKey; modelKey: PrefKey }> = [
@@ -586,6 +589,7 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
     vllm: 'api_key.vllm',
     'google-translate': 'api_key.google_translate',
     deepl: 'api_key.deepl',
+    github: 'github.token',
   }
 
   api.get('/api/settings/api-keys/:provider', async (request, reply) => {
