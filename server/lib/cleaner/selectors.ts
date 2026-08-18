@@ -455,7 +455,16 @@ export const PARTIAL_SELECTORS: string[] = [
   'nav-',
   'nav_',
   'navigation-post',
-  'next-',
+  // Next/prev article links. Spelled out rather than a bare 'next-' prefix:
+  // that matched any site namespacing its markup with "next", which cost
+  // next.ink its entire body (id="next-single-post"). Mirrors the 'prev-post'
+  // / 'prevnext' entries below.
+  'next-post',
+  'next-article',
+  'next-story',
+  'nextprev',
+  'next_prev',
+  'next-prev',
   'newsgallery',
   'news-story-title',
   'newsletter_',
