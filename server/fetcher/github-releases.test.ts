@@ -11,8 +11,17 @@ import {
   isGithubStarsUrl,
   resolveGithubStarsFeed,
   getReleaseTypes,
+  getGithubToken,
   fetchGithubStarredReleases,
 } from './github-releases.js'
+
+/** `getSetting()` mock backed by a plain map, so each key can differ. */
+const settingsStore = new Map<string, string>()
+
+function setSetting(key: string, value: string | undefined) {
+  if (value === undefined) settingsStore.delete(key)
+  else settingsStore.set(key, value)
+}
 
 const mockFetch = vi.fn()
 
@@ -59,7 +68,9 @@ function page(nodes: unknown[], pageInfo: Record<string, unknown> = {}) {
 beforeEach(() => {
   mockFetch.mockReset()
   mockGetSetting.mockReset()
-  mockGetSetting.mockReturnValue('stable')
+  settingsStore.clear()
+  mockGetSetting.mockImplementation((key: string) => settingsStore.get(key))
+  setSetting('github.release_types', 'stable')
   vi.stubGlobal('fetch', mockFetch)
   process.env.GITHUB_TOKEN = 'ghp_test'
 })
@@ -128,18 +139,34 @@ describe('resolveGithubStarsFeed', () => {
 
 describe('getReleaseTypes', () => {
   it('defaults to stable when unset', () => {
-    mockGetSetting.mockReturnValue(undefined)
+    setSetting('github.release_types', undefined)
     expect(getReleaseTypes()).toBe('stable')
   })
 
   it('defaults to stable when the stored value is unknown', () => {
-    mockGetSetting.mockReturnValue('everything')
+    setSetting('github.release_types', 'everything')
     expect(getReleaseTypes()).toBe('stable')
   })
 
   it('honours a valid stored value', () => {
-    mockGetSetting.mockReturnValue('tags')
+    setSetting('github.release_types', 'tags')
     expect(getReleaseTypes()).toBe('tags')
+  })
+})
+
+describe('getGithubToken', () => {
+  it('falls back to GITHUB_TOKEN when no setting is stored', () => {
+    expect(getGithubToken()).toBe('ghp_test')
+  })
+
+  it('prefers the stored setting over the environment variable', () => {
+    setSetting('github.token', 'ghp_from_settings')
+    expect(getGithubToken()).toBe('ghp_from_settings')
+  })
+
+  it('returns null when neither is configured', () => {
+    delete process.env.GITHUB_TOKEN
+    expect(getGithubToken()).toBeNull()
   })
 })
 
@@ -169,8 +196,16 @@ describe('fetchGithubStarredReleases', () => {
   it('fails loudly when no token is configured', async () => {
     delete process.env.GITHUB_TOKEN
     await expect(fetchGithubStarredReleases('https://github.com/stars/octocat'))
-      .rejects.toThrow(/GITHUB_TOKEN/)
+      .rejects.toThrow(/GitHub token/)
     expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('uses a token stored in settings over the environment variable', async () => {
+    setSetting('github.token', 'ghp_from_settings')
+    mockFetch.mockResolvedValue(page([]))
+    await fetchGithubStarredReleases('https://github.com/stars/octocat')
+    const [, init] = mockFetch.mock.calls[0]
+    expect(init.headers.Authorization).toBe('Bearer ghp_from_settings')
   })
 
   it('drops drafts', async () => {
@@ -188,7 +223,7 @@ describe('fetchGithubStarredReleases', () => {
   })
 
   it('keeps pre-releases under the prerelease setting', async () => {
-    mockGetSetting.mockReturnValue('prerelease')
+    setSetting('github.release_types', 'prerelease')
     mockFetch.mockResolvedValue(page([
       repo({ releases: { nodes: [release({ isPrerelease: true })] } }),
     ]))
@@ -197,7 +232,7 @@ describe('fetchGithubStarredReleases', () => {
   })
 
   it('uses tags only for repositories that publish no releases', async () => {
-    mockGetSetting.mockReturnValue('tags')
+    setSetting('github.release_types', 'tags')
     mockFetch.mockResolvedValue(page([
       // Publishes releases: its tags would duplicate them, so they are ignored.
       repo({
@@ -217,7 +252,7 @@ describe('fetchGithubStarredReleases', () => {
   })
 
   it('reads the commit date through an annotated tag', async () => {
-    mockGetSetting.mockReturnValue('tags')
+    setSetting('github.release_types', 'tags')
     mockFetch.mockResolvedValue(page([
       repo({
         releases: { nodes: [] },
@@ -234,7 +269,7 @@ describe('fetchGithubStarredReleases', () => {
     expect(JSON.parse(mockFetch.mock.calls[0][1].body).query).not.toContain('refs(')
 
     mockFetch.mockReset()
-    mockGetSetting.mockReturnValue('tags')
+    setSetting('github.release_types', 'tags')
     mockFetch.mockResolvedValue(page([]))
     await fetchGithubStarredReleases('https://github.com/stars/octocat')
     expect(JSON.parse(mockFetch.mock.calls[0][1].body).query).toContain('refs(')

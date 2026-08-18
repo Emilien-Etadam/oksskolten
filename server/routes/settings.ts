@@ -589,6 +589,7 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
     vllm: 'api_key.vllm',
     'google-translate': 'api_key.google_translate',
     deepl: 'api_key.deepl',
+    github: 'github.token',
   }
 
   api.get('/api/settings/api-keys/:provider', async (request, reply) => {

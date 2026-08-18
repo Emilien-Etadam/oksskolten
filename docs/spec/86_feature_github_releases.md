@@ -22,7 +22,7 @@ Releases of *starred* repositories only. Watched repositories, releases from an 
 
 `resolveGithubStarsFeed()` in `server/fetcher/github-releases.ts` recognises the two forms GitHub itself produces and collapses both to the canonical `https://github.com/stars/<user>`. Storing one spelling means the same star list cannot be subscribed to twice, and the stored URL stays a page the reader can open.
 
-`server/routes/feeds.ts` calls the resolver before RSS discovery, alongside the social-search resolver. A match short-circuits the discovery / RSS Bridge / CSS-selector pipeline and names the feed `GitHub Releases (<user>)`, since there is no upstream feed title to discover.
+`server/routes/feeds.ts` calls the resolver before RSS discovery, alongside the social-search resolver. A match short-circuits the discovery / RSS Bridge / CSS-selector pipeline and names the feed `GitHub Releases (<user>)`, since there is no upstream feed title to discover. This makes `POST /api/feeds` (the same endpoint the Add Feed dialog uses) resolve a stars URL immediately, with no discovery steps — so it also serves as the create-feed call the Settings section below makes directly.
 
 ### Fetching
 
@@ -36,11 +36,21 @@ One GraphQL query returns a page of starred repositories *together with* their l
 
 ### Authentication
 
-`GITHUB_TOKEN` is required — the GraphQL API rejects unauthenticated requests outright. A classic personal access token with no scopes reads public stars; `repo` is needed for stars on private repositories. A missing token fails the fetch with a message naming the variable, which surfaces in `feeds.last_error`.
+A token is required — the GraphQL API rejects unauthenticated requests outright. A classic personal access token with no scopes reads public stars; `repo` is needed for stars on private repositories. A missing token fails the fetch with a message that surfaces in `feeds.last_error`.
+
+`getGithubToken()` in `server/fetcher/github-releases.ts` checks the `github.token` DB setting first, falling back to the `GITHUB_TOKEN` environment variable. The setting is what Settings → Integration writes to, through the same `/api/settings/api-keys/:provider` route the LLM and translation provider keys use (`PROVIDER_KEY_MAP['github']` in `server/routes/settings.ts`) — a token entered there takes effect on the next fetch cycle with no restart. The environment variable remains for deployments that prefer configuring it outside the app.
+
+### Settings → Integration
+
+The GitHub section (`src/pages/settings/sections/github-section.tsx`) is the one place all three pieces of setup live:
+
+- **Token** — save/delete through the shared API-key endpoint described above.
+- **Stars URL** — pasting a stars URL and clicking "Create feed" calls `POST /api/feeds` directly, the same call the Add Feed dialog makes. This exists so setting the feed up does not depend on knowing that a stars URL works there; the Add Feed dialog keeps working unchanged as a second path to the same result.
+- **Release types** — the choice described below.
 
 ### Release Types
 
-The `github.release_types` setting (Settings → Reading) decides what counts as an entry:
+The `github.release_types` setting decides what counts as an entry:
 
 | Value | Includes |
 |---|---|
@@ -60,9 +70,9 @@ Each entry becomes an `RssItem`: the title is `<owner>/<repo> <release name>`, t
 
 | File | Description |
 |---|---|
-| `server/fetcher/github-releases.ts` | URL parsing, GraphQL query, release/tag filtering |
+| `server/fetcher/github-releases.ts` | URL parsing, token resolution, GraphQL query, release/tag filtering |
 | `server/fetcher/rss.ts` | Routes stars URLs to the GraphQL fetcher |
 | `server/routes/feeds.ts` | Resolves a pasted stars URL before RSS discovery |
-| `server/routes/settings.ts` | `github.release_types` preference key |
-| `src/hooks/use-github-release-types.ts` | Client-side setting state |
-| `src/pages/settings/sections/reading-section.tsx` | Settings control |
+| `server/routes/settings.ts` | `github.release_types` preference key, `github` entry in `PROVIDER_KEY_MAP` |
+| `src/hooks/use-github-release-types.ts` | Client-side release-types setting state |
+| `src/pages/settings/sections/github-section.tsx` | Settings → Integration section: token, stars URL, release types |

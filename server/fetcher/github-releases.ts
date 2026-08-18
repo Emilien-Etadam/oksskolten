@@ -58,6 +58,16 @@ export function getReleaseTypes(): ReleaseTypes {
 }
 
 /**
+ * Token used for the GraphQL request. The `github.token` DB setting (Settings
+ * → Integration) takes precedence over `GITHUB_TOKEN` so a token entered in
+ * the UI does not require a container restart to take effect; the env var
+ * remains for deployments that prefer configuring it outside the app.
+ */
+export function getGithubToken(): string | null {
+  return getSetting('github.token') || process.env.GITHUB_TOKEN || null
+}
+
+/**
  * Parse a GitHub stars URL and return the account whose stars it lists.
  *
  * Accepts the two forms GitHub itself produces: the stars page
@@ -285,9 +295,11 @@ export async function fetchGithubStarredReleases(feedUrl: string): Promise<RssIt
   const login = parseGithubStarsUrl(feedUrl)
   if (!login) throw new Error(`Not a GitHub stars URL: ${feedUrl}`)
 
-  const token = process.env.GITHUB_TOKEN
+  const token = getGithubToken()
   if (!token) {
-    throw new Error('GITHUB_TOKEN is not set — required to read starred repositories')
+    throw new Error(
+      'No GitHub token configured — set one in Settings → Integration, or GITHUB_TOKEN',
+    )
   }
 
   const types = getReleaseTypes()

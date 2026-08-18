@@ -11,7 +11,6 @@ export function ReadingSection() {
     autoMarkRead, setAutoMarkRead,
     autoTranslate, setAutoTranslate,
     autoSummarize, setAutoSummarize,
-    githubReleaseTypes, setGithubReleaseTypes,
     keyboardNavigation, setKeyboardNavigation,
     keybindings, setKeybindings,
     showUnreadIndicator, setShowUnreadIndicator,
@@ -381,21 +380,6 @@ export function ReadingSection() {
           ]}
           value={autoSummarize}
           onChange={setAutoSummarize}
-        />
-      </div>
-
-      <div className="mt-6">
-        <p className="text-sm text-text mb-1">{t('settings.githubReleaseTypes')}</p>
-        <p className="text-xs text-muted mb-3">{t('settings.githubReleaseTypesDesc')}</p>
-        <RadioGroup
-          name="githubReleaseTypes"
-          options={[
-            { value: 'stable' as const, label: t('settings.githubReleaseTypesStable') },
-            { value: 'prerelease' as const, label: t('settings.githubReleaseTypesPrerelease') },
-            { value: 'tags' as const, label: t('settings.githubReleaseTypesTags') },
-          ]}
-          value={githubReleaseTypes}
-          onChange={setGithubReleaseTypes}
         />
       </div>
 
