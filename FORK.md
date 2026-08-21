@@ -75,9 +75,20 @@ translated in the background through the local vLLM provider (bounded concurrenc
 (ISO 639-3 → 639-1 mapped, `unknown` for short/undetectable text) instead of the
 upstream ja/en heuristic. French is available as a translation target language.
 
-Key files: `server/fetcher/translate-queue.ts` (queue), `server/fetcher/ai.ts`
-(franc detection + provider override), `migrations/0009_auto_translate.sql`,
-`src/hooks/use-auto-translate.ts`.
+A second setting, `reading.auto_translate_scope` (Settings → Reading, right below
+the toggle), chooses what gets translated: `full` (default) translates the body
+and the title, same as before; `titles` translates only the title — cheaper,
+faster, and the only option that still helps once an article's body has failed
+to extract. Completion is tracked per scope (`translated_lang` combined with
+either `full_text_translated` or `title_translated`, depending which scope is
+active when the check runs), so switching scope later picks up exactly the
+missing piece rather than skipping it or redoing finished work.
+
+Key files: `server/fetcher/ai-queue.ts` (queue, `getAutoTranslateScope()`,
+`processTranslate()`), `server/fetcher/ai.ts` (franc detection + provider
+override), `migrations/0009_auto_translate.sql`, `migrations/0010_ai_pipeline.sql`
+(`title_translated`), `src/hooks/use-auto-translate.ts`,
+`src/hooks/use-auto-translate-scope.ts`.
 
 ## Front page (La Une)
 
@@ -228,10 +239,11 @@ Both changes are upstream bugs, not fork-specific behaviour.
 | `server/lib/cleaner/index.ts` | `postClean()` rolls back a pass that empties the body |
 | `server/fetcher/rss.ts` | +2 lines (import + GitHub stars branch in the API-feed dispatch) |
 | `server/routes/feeds.ts` | +1 import, GitHub stars resolver branch before RSS discovery |
-| `server/routes/settings.ts` | +1 preference key (`github.release_types`), `github` entry in `PROVIDER_KEY_MAP` |
-| `src/hooks/use-settings.ts` | `github.release_types` threaded through the settings hook |
+| `server/routes/settings.ts` | +2 preference keys (`github.release_types`, `reading.auto_translate_scope`), `github` entry in `PROVIDER_KEY_MAP` |
+| `src/hooks/use-settings.ts` | `github.release_types` and `reading.auto_translate_scope` threaded through the settings hook |
 | `src/pages/settings/integration-tab.tsx` | +2 lines (import + `<GithubSection />`) |
-| `src/lib/i18n.ts` | +15 keys (`github.*`) |
+| `src/pages/settings/sections/reading-section.tsx` | Translation Scope radio group, shown when Auto-Translation is on |
+| `src/lib/i18n.ts` | +15 keys (`github.*`), +4 keys (`settings.autoTranslateScope*`) |
 
 `src/app.tsx` additionally has 2 lines adjusted and a small effect added (sidebar
 auto-open respects the persisted collapse state).

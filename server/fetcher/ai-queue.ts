@@ -6,6 +6,7 @@ import { translateArticle, translateTitle, summarizeArticle, evaluateArticleRele
 import { Semaphore } from './util.js'
 import { logger } from '../logger.js'
 import { DEFAULT_LANGUAGE } from '../../shared/lang.js'
+import type { ArticleDetail } from '../../shared/types.js'
 
 const log = logger.child('ai-queue')
 
@@ -44,6 +45,17 @@ function getConcurrency(): number {
   const raw = Number(getSetting('reading.auto_translate_concurrency'))
   if (isNaN(raw) || raw < 1) return 1
   return Math.min(raw, 5)
+}
+
+export type AutoTranslateScope = 'full' | 'titles'
+
+/**
+ * Whether auto-translate does the full body ('full', the original behavior)
+ * or only the title ('titles') — cheaper and faster, and the only option
+ * that still helps once an article's body has failed to extract.
+ */
+export function getAutoTranslateScope(): AutoTranslateScope {
+  return getSetting('reading.auto_translate_scope') === 'titles' ? 'titles' : 'full'
 }
 
 function ensureSemaphore(): Semaphore {
@@ -91,12 +103,48 @@ async function processFilter(item: QueueItem): Promise<void> {
   }
 }
 
+/**
+ * Translate only the title. Used when the scope setting is 'titles', and
+ * whichever branch of processTranslate() runs, the completion state it
+ * leaves behind (translated_lang + title_translated, full_text_translated
+ * untouched) is what lets a later switch to 'full' scope detect the body
+ * still needs translating, and a later switch back to 'titles' detect the
+ * title is already done.
+ */
+async function translateTitleOnly(item: QueueItem, article: ArticleDetail): Promise<void> {
+  const t = await translateTitle(article.title, { provider: 'vllm' })
+  if (!t.titleTranslated.trim()) {
+    log.warn(`auto-translate (title) returned empty text for article ${item.articleId}, will retry later`)
+    markPending('translate', item.articleId, nowIso())
+    return
+  }
+
+  updateArticleContent(item.articleId, {
+    title_translated: t.titleTranslated,
+    translated_lang: item.targetLang,
+    translate_pending_at: null,
+  })
+  updateScore(item.articleId)
+  log.info(`auto-translate (title only) complete for article ${item.articleId} (${item.targetLang})`)
+}
+
 async function processTranslate(item: QueueItem): Promise<void> {
   const article = getArticleById(item.articleId)
-  if (!article?.full_text
-    || (article.translated_lang === item.targetLang && article.full_text_translated)
-    || article.lang === item.targetLang) {
+  if (!article?.full_text || article.lang === item.targetLang) {
     markPending('translate', item.articleId, null)
+    return
+  }
+
+  const scope = getAutoTranslateScope()
+  const alreadyDone = article.translated_lang === item.targetLang
+    && (scope === 'titles' ? !!article.title_translated : !!article.full_text_translated)
+  if (alreadyDone) {
+    markPending('translate', item.articleId, null)
+    return
+  }
+
+  if (scope === 'titles') {
+    await translateTitleOnly(item, article)
     return
   }
 
