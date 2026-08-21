@@ -463,6 +463,45 @@ describe('POST /api/feeds/:id/re-detect', () => {
     // Falls through to bridge step
     expect(res.statusCode).toBe(200)
   })
+
+  it('does not run generic discovery on a GitHub stars feed', async () => {
+    // Regression test: generic discovery finds no <link> on a stars page and
+    // used to overwrite rss_url with that nothing, permanently breaking the
+    // feed. resolveGithubStarsFeed() must short-circuit before that happens.
+    const feed = seedFeed({
+      url: 'https://github.com/stars/octocat',
+      rss_url: 'https://github.com/stars/octocat',
+    })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/feeds/${feed.id}/re-detect`,
+    })
+
+    expect(res.statusCode).toBe(200)
+    const done = parseSSE(res.body).find(e => e.type === 'done')
+    expect(done?.rss_url).toBe('https://github.com/stars/octocat')
+    expect(mockDiscoverRssUrl).not.toHaveBeenCalled()
+    expect(mockQueryRssBridge).not.toHaveBeenCalled()
+    expect(mockInferCssSelectorBridge).not.toHaveBeenCalled()
+  })
+
+  it('recovers a GitHub stars feed whose rss_url was previously nulled out', async () => {
+    // The exact broken state the bug above produced: rss_url wiped to null,
+    // feed.url still the stars page. Re-detect must restore it, not re-break it.
+    const feed = seedFeed({
+      url: 'https://github.com/stars/octocat',
+      rss_url: null,
+    })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/feeds/${feed.id}/re-detect`,
+    })
+
+    const done = parseSSE(res.body).find(e => e.type === 'done')
+    expect(done?.rss_url).toBe('https://github.com/stars/octocat')
+  })
 })
 
 // ---------------------------------------------------------------------------

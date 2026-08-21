@@ -319,28 +319,43 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
       let rssUrl: string | null = null
       let rssBridgeUrl: string | null = null
 
-      // Step 1: RSS auto-discovery
-      sse.send({ type: 'stage', stage: 'discovery' })
-      try {
-        const result = await discoverRssUrl(feed.url)
-        rssUrl = result.rssUrl
-      } catch {
-        // Discovery failed
-      }
-      sse.send({ type: 'stage-done', stage: 'discovery', found: !!rssUrl })
+      // GitHub stars pages and social search/hashtag URLs have no on-page RSS
+      // link to discover — they resolve directly, the same way feed creation
+      // does. Skipping this check here (unlike the create-feed route) used to
+      // send these straight through generic discovery, which correctly finds
+      // nothing on e.g. a GitHub stars page and then overwrites rss_url with
+      // that nothing — permanently breaking an otherwise-working feed.
+      const githubStarsFeed = resolveGithubStarsFeed(feed.url)
+      const socialFeedUrl = githubStarsFeed ? null : await resolveSocialSearchFeed(feed.url)
 
-      // Step 2: RSS Bridge fallback
-      if (!rssUrl) {
-        sse.send({ type: 'stage', stage: 'bridge' })
-        rssBridgeUrl = await queryRssBridge(feed.url)
-        sse.send({ type: 'stage-done', stage: 'bridge', found: !!rssBridgeUrl })
-      }
+      if (githubStarsFeed || socialFeedUrl) {
+        rssUrl = githubStarsFeed ? githubStarsFeed.feedUrl : socialFeedUrl
+        sse.send({ type: 'stage', stage: 'discovery' })
+        sse.send({ type: 'stage-done', stage: 'discovery', found: true })
+      } else {
+        // Step 1: RSS auto-discovery
+        sse.send({ type: 'stage', stage: 'discovery' })
+        try {
+          const result = await discoverRssUrl(feed.url)
+          rssUrl = result.rssUrl
+        } catch {
+          // Discovery failed
+        }
+        sse.send({ type: 'stage-done', stage: 'discovery', found: !!rssUrl })
 
-      // Step 3: CssSelectorBridge via LLM
-      if (!rssUrl && !rssBridgeUrl) {
-        sse.send({ type: 'stage', stage: 'bridge-llm' })
-        rssBridgeUrl = await inferCssSelectorBridge(feed.url)
-        sse.send({ type: 'stage-done', stage: 'bridge-llm', found: !!rssBridgeUrl })
+        // Step 2: RSS Bridge fallback
+        if (!rssUrl) {
+          sse.send({ type: 'stage', stage: 'bridge' })
+          rssBridgeUrl = await queryRssBridge(feed.url)
+          sse.send({ type: 'stage-done', stage: 'bridge', found: !!rssBridgeUrl })
+        }
+
+        // Step 3: CssSelectorBridge via LLM
+        if (!rssUrl && !rssBridgeUrl) {
+          sse.send({ type: 'stage', stage: 'bridge-llm' })
+          rssBridgeUrl = await inferCssSelectorBridge(feed.url)
+          sse.send({ type: 'stage-done', stage: 'bridge-llm', found: !!rssBridgeUrl })
+        }
       }
 
       // Update feed with new URLs

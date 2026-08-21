@@ -208,6 +208,15 @@ click "Create feed" to call the same feed-creation endpoint the Add Feed
 dialog uses — and the release/pre-release/tag mix (`github.release_types`).
 See `docs/spec/86_feature_github_releases.md`.
 
+`POST /api/feeds/:id/re-detect` (`server/routes/feeds.ts`) checks
+`resolveGithubStarsFeed()` (and `resolveSocialSearchFeed()`) before falling
+back to generic discovery, the same order feed creation already used. Without
+this, re-detecting a GitHub-stars (or Bluesky/Mastodon) feed ran generic
+discovery, correctly found no `<link>` on a stars page, and overwrote
+`rss_url` with that nothing — permanently breaking an otherwise-working feed.
+A feed already stuck this way self-heals the next time "Re-detect RSS" is
+clicked on it.
+
 ## Extraction debugging + over-broad cleaner pattern
 
 `scripts/debug-extract.ts` — replays the fetch/clean/extract phases for one URL
@@ -238,7 +247,8 @@ Both changes are upstream bugs, not fork-specific behaviour.
 | `server/lib/cleaner/selectors.ts` | `'next-'` partial pattern narrowed to the next/prev link spellings |
 | `server/lib/cleaner/index.ts` | `postClean()` rolls back a pass that empties the body |
 | `server/fetcher/rss.ts` | +2 lines (import + GitHub stars branch in the API-feed dispatch) |
-| `server/routes/feeds.ts` | +1 import, GitHub stars resolver branch before RSS discovery |
+| `server/routes/feeds.ts` | +1 import, GitHub stars resolver branch before RSS discovery; same resolver check added to `/re-detect` |
+| `server/routes/feeds.test.ts` | +2 tests: `/re-detect` on a GitHub stars feed |
 | `server/routes/settings.ts` | +2 preference keys (`github.release_types`, `reading.auto_translate_scope`), `github` entry in `PROVIDER_KEY_MAP` |
 | `src/hooks/use-settings.ts` | `github.release_types` and `reading.auto_translate_scope` threaded through the settings hook |
 | `src/pages/settings/integration-tab.tsx` | +2 lines (import + `<GithubSection />`) |
