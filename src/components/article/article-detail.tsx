@@ -181,6 +181,11 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
   }
 
   const hasTranslation = !!fullTextTranslated
+  // Titles-only auto-translate never produces a body translation, so there's no
+  // "original vs. translated" body to toggle between — the title should stay
+  // translated regardless of viewMode. When a body translation does exist, keep
+  // following the toggle as before.
+  const showTranslatedTitle = !isUserLang && !!article.title_translated && (viewMode === 'translated' || !hasTranslation)
 
   return (
     <>
@@ -193,9 +198,8 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
         />
       )}
       <article ref={articleRef} className="article-card max-w-2xl mx-auto px-6 md:px-10 py-8">
-      {/* Title — translated when reading the translated view */}
       <h1 className="mb-1.5 text-[28px] font-bold leading-[1.3] break-words [overflow-wrap:anywhere]">
-        {viewMode === 'translated' && !isUserLang && article.title_translated ? article.title_translated : article.title}
+        {showTranslatedTitle ? article.title_translated : article.title}
       </h1>
 
       {/* Date */}

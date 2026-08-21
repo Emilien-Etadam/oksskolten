@@ -84,11 +84,20 @@ either `full_text_translated` or `title_translated`, depending which scope is
 active when the check runs), so switching scope later picks up exactly the
 missing piece rather than skipping it or redoing finished work.
 
+The article list already showed `title_translated` unconditionally when present.
+The reading view's title only followed the body's original/translated toggle
+(`viewMode`), which never leaves `'original'` in `titles` scope since there's no
+body translation to switch to — so the title silently stayed untranslated when
+opening the article. `ArticleDetail` now shows the translated title whenever one
+exists and no body translation is available to toggle against, and otherwise
+keeps following `viewMode` exactly as before.
+
 Key files: `server/fetcher/ai-queue.ts` (queue, `getAutoTranslateScope()`,
 `processTranslate()`), `server/fetcher/ai.ts` (franc detection + provider
 override), `migrations/0009_auto_translate.sql`, `migrations/0010_ai_pipeline.sql`
 (`title_translated`), `src/hooks/use-auto-translate.ts`,
-`src/hooks/use-auto-translate-scope.ts`.
+`src/hooks/use-auto-translate-scope.ts`, `src/components/article/article-detail.tsx`
+(`showTranslatedTitle`).
 
 ## Front page (La Une)
 
