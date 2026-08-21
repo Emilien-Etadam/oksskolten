@@ -10,6 +10,7 @@ export function ReadingSection() {
   const {
     autoMarkRead, setAutoMarkRead,
     autoTranslate, setAutoTranslate,
+    autoTranslateScope, setAutoTranslateScope,
     autoSummarize, setAutoSummarize,
     keyboardNavigation, setKeyboardNavigation,
     keybindings, setKeybindings,
@@ -368,6 +369,22 @@ export function ReadingSection() {
           onChange={setAutoTranslate}
         />
       </div>
+
+      {autoTranslate === 'on' && (
+        <div className="mt-6">
+          <p className="text-sm text-text mb-1">{t('settings.autoTranslateScope')}</p>
+          <p className="text-xs text-muted mb-3">{t('settings.autoTranslateScopeDesc')}</p>
+          <RadioGroup
+            name="autoTranslateScope"
+            options={[
+              { value: 'full' as const, label: t('settings.autoTranslateScopeFull') },
+              { value: 'titles' as const, label: t('settings.autoTranslateScopeTitles') },
+            ]}
+            value={autoTranslateScope}
+            onChange={setAutoTranslateScope}
+          />
+        </div>
+      )}
 
       <div className="mt-6">
         <p className="text-sm text-text mb-1">{t('settings.autoSummarize')}</p>

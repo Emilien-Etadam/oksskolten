@@ -219,6 +219,99 @@ describe('ai-queue', () => {
     expect(mockTranslateArticle).toHaveBeenCalledTimes(1)
   })
 
+  describe('auto-translate scope', () => {
+    it('titles scope translates only the title, not the body', async () => {
+      settings({
+        'reading.auto_translate': 'on',
+        'translate.target_lang': 'fr',
+        'reading.auto_translate_scope': 'titles',
+      })
+      enqueueAutoTranslate(1, 'Full english text')
+      await flushQueue()
+
+      expect(mockTranslateArticle).not.toHaveBeenCalled()
+      expect(mockTranslateTitle).toHaveBeenCalledWith('Original title', { provider: 'vllm' })
+      const merged = updatesFor(1)
+      expect(merged.title_translated).toBe('Titre traduit')
+      expect(merged.translated_lang).toBe('fr')
+      expect(merged.full_text_translated).toBeUndefined()
+      expect(merged.translate_pending_at).toBeNull()
+    })
+
+    it('titles scope retries later when the translated title is empty', async () => {
+      settings({
+        'reading.auto_translate': 'on',
+        'translate.target_lang': 'fr',
+        'reading.auto_translate_scope': 'titles',
+      })
+      mockTranslateTitle.mockResolvedValue({ titleTranslated: '' })
+      enqueueAutoTranslate(1, 'Full english text')
+      await flushQueue()
+
+      expect(updatesFor(1).title_translated).toBeUndefined()
+      expect(updatesFor(1).translate_pending_at).toBeTruthy()
+    })
+
+    it('titles scope skips an article whose title is already translated for the target language', async () => {
+      settings({
+        'reading.auto_translate': 'on',
+        'translate.target_lang': 'fr',
+        'reading.auto_translate_scope': 'titles',
+      })
+      mockGetArticleById.mockReturnValue({
+        id: 1, title: 'Original title', title_translated: 'Titre traduit',
+        full_text: 'Full english text', full_text_translated: null,
+        translated_lang: 'fr', summary: null, lang: 'en',
+      })
+      enqueueAutoTranslate(1, 'Full english text')
+      await flushQueue()
+
+      expect(mockTranslateTitle).not.toHaveBeenCalled()
+      expect(updatesFor(1).translate_pending_at).toBeNull()
+    })
+
+    it('switching to full scope still translates the body after a titles-only pass', async () => {
+      // title_translated/translated_lang already set by an earlier titles-only
+      // run; full_text_translated is not, so full scope must not treat this as done.
+      settings({
+        'reading.auto_translate': 'on',
+        'translate.target_lang': 'fr',
+        'reading.auto_translate_scope': 'full',
+      })
+      mockGetArticleById.mockReturnValue({
+        id: 1, title: 'Original title', title_translated: 'Titre traduit',
+        full_text: 'Full english text', full_text_translated: null,
+        translated_lang: 'fr', summary: null, lang: 'en',
+      })
+      enqueueAutoTranslate(1, 'Full english text')
+      await flushQueue()
+
+      expect(mockTranslateArticle).toHaveBeenCalledWith('Full english text', { provider: 'vllm' })
+      expect(updatesFor(1).full_text_translated).toBe('Texte traduit')
+    })
+
+    it('switching to titles scope skips an article whose full translation already covers the title', async () => {
+      // full_text_translated/title_translated/translated_lang already set by an
+      // earlier full-scope run — titles scope must recognize the title as done.
+      settings({
+        'reading.auto_translate': 'on',
+        'translate.target_lang': 'fr',
+        'reading.auto_translate_scope': 'titles',
+      })
+      mockGetArticleById.mockReturnValue({
+        id: 1, title: 'Original title', title_translated: 'Titre traduit',
+        full_text: 'Full english text', full_text_translated: 'Texte traduit',
+        translated_lang: 'fr', summary: null, lang: 'en',
+      })
+      enqueueAutoTranslate(1, 'Full english text')
+      await flushQueue()
+
+      expect(mockTranslateArticle).not.toHaveBeenCalled()
+      expect(mockTranslateTitle).not.toHaveBeenCalled()
+      expect(updatesFor(1).translate_pending_at).toBeNull()
+    })
+  })
+
   describe('ai filter', () => {
     beforeEach(() => {
       mockGetArticleById.mockReturnValue({

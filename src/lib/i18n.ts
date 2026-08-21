@@ -292,6 +292,14 @@ const dict = {
   },
   'settings.autoTranslateOn': { ja: 'オン', en: 'On', zh: '开'},
   'settings.autoTranslateOff': { ja: 'オフ', en: 'Off', zh: '关'},
+  'settings.autoTranslateScope': { ja: '翻訳範囲', en: 'Translation Scope', zh: '翻译范围'},
+  'settings.autoTranslateScopeDesc': {
+    ja: '記事全体を翻訳するか、タイトルのみにするか（タイトルのみは高速で、本文取得に失敗した記事にも使えます）',
+    en: 'Translate the whole article, or just the title (faster, and still works when the body failed to extract)',
+    zh: '翻译整篇文章，还是仅翻译标题（更快，且在正文提取失败时依然可用）'
+  },
+  'settings.autoTranslateScopeFull': { ja: '記事全体', en: 'Whole article', zh: '整篇文章'},
+  'settings.autoTranslateScopeTitles': { ja: 'タイトルのみ', en: 'Titles only', zh: '仅标题'},
   'settings.autoSummarize': { ja: '自動要約', en: 'Auto-Summarize', zh: '自动摘要'},
   'settings.autoSummarizeDesc': {
     ja: '記事を取得時に自動的に要約します（vLLMローカルサーバーが必要）',
