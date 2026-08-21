@@ -20,9 +20,12 @@ Users subscribing to multiple feeds covering the same topics (e.g., tech news) s
 **Two-stage: Meilisearch title search + Bigram Dice Coefficient**
 
 1. After a new article is inserted, search Meilisearch using the article's title as query
-2. Filter candidates: different feed (`feed_id != X`), within ±3 days of `published_at`
-3. Compute bigram Dice coefficient between the new article's title and each candidate's title
-4. Accept matches with score >= 0.4
+2. Filter candidates: within ±3 days of `published_at`, OR with no `published_at` at all (see note below)
+3. Exclude same-feed candidates (`feed_id != X`) in application code
+4. Compute bigram Dice coefficient between the new article's title and each candidate's title
+5. Accept matches with score >= 0.4
+
+> `buildMeiliDoc()` indexes a missing `published_at` as `0` (1970) so Meilisearch's filterable attribute stays numeric. A plain ±3-day range filter would then permanently exclude every undated article from ever matching, since epoch 0 never falls inside a real window — the filter explicitly ORs in `published_at = 0` to let those candidates through.
 
 ```
 Dice(A, B) = 2 × |bigrams(A) ∩ bigrams(B)| / (|bigrams(A)| + |bigrams(B)|)

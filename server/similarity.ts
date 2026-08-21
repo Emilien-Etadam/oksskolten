@@ -1,4 +1,4 @@
-import { meiliSearch, buildMeiliFilter } from './search/client.js'
+import { meiliSearch } from './search/client.js'
 import { isSearchReady } from './search/sync.js'
 import { getArticlesByIds, markArticleSeen } from './db.js'
 import { insertSimilarity } from './db/similarities.js'
@@ -53,12 +53,15 @@ export async function detectAndStoreSimilarArticles(
   try {
     if (!isSearchReady()) return
 
-    // Build time window filter: ±3 days around published_at
+    // Build time window filter: ±3 days around published_at. Also let through
+    // candidates with no published_at at all — buildMeiliDoc() indexes those
+    // as 0 (1970), which would otherwise never fall inside a real ±3-day
+    // window and silently block undated articles from ever being matched.
     const refDate = publishedAt ? new Date(publishedAt) : new Date()
-    const since = new Date(refDate.getTime() - TIME_WINDOW_DAYS * 86_400_000).toISOString()
-    const until = new Date(refDate.getTime() + TIME_WINDOW_DAYS * 86_400_000).toISOString()
+    const sinceTs = Math.floor((refDate.getTime() - TIME_WINDOW_DAYS * 86_400_000) / 1000)
+    const untilTs = Math.floor((refDate.getTime() + TIME_WINDOW_DAYS * 86_400_000) / 1000)
+    const filter = `(published_at >= ${sinceTs} AND published_at <= ${untilTs}) OR published_at = 0`
 
-    const filter = buildMeiliFilter({ since, until })
     const { hits } = await meiliSearch(title, {
       limit: MAX_CANDIDATES + 1,
       filter,

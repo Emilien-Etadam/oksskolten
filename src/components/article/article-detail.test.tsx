@@ -51,14 +51,14 @@ vi.mock('../../hooks/use-summarize', () => ({
 }))
 
 const mockUseTranslate = vi.fn((_article?: { id: number; full_text_translated: string | null }, _metrics?: unknown) => ({
-  viewMode: 'original' as const,
+  viewMode: 'original' as 'original' | 'translated',
   setViewMode: vi.fn(),
   translating: false,
   translatingText: '',
-  fullTextTranslated: null,
+  fullTextTranslated: null as string | null,
   handleTranslate: vi.fn(),
   translatingHtml: '',
-  error: null,
+  error: null as string | null,
 }))
 
 vi.mock('../../hooks/use-translate', () => ({
@@ -374,5 +374,110 @@ describe('ArticleDetail stale translation filtering', () => {
     expect(mockUseTranslate).toHaveBeenCalled()
     const firstArg = mockUseTranslate.mock.calls[0]![0]
     expect(firstArg).toEqual({ id: 1, full_text_translated: null })
+  })
+})
+
+describe('ArticleDetail title translation', () => {
+  const articleUrl = 'https://example.com/posts/1'
+  const articleKey = `/api/articles/by-url?url=${encodeURIComponent(articleUrl)}`
+
+  const baseArticle = {
+    id: 1,
+    feed_id: 2,
+    feed_name: 'Example Feed',
+    title: 'Original Title',
+    title_translated: 'Titre traduit',
+    url: articleUrl,
+    published_at: '2026-03-04T00:00:00.000Z',
+    lang: 'en',
+    summary: null,
+    full_text: 'Body',
+    full_text_translated: null as string | null,
+    translated_lang: null as string | null,
+    seen_at: '2026-03-04T00:00:00.000Z',
+    read_at: '2026-03-04T00:00:00.000Z',
+    bookmarked_at: null,
+    liked_at: null,
+  }
+
+  beforeEach(() => {
+    mockApiPatch.mockReset()
+    mockApiPost.mockReset()
+    mockApiPost.mockResolvedValue(undefined)
+    mockTrackRead.mockReset()
+    mockQueueSeenIds.mockClear()
+    mockUseTranslate.mockClear()
+  })
+
+  function renderWithArticle(article: typeof baseArticle) {
+    render(
+      <MemoryRouter>
+        <LocaleContext.Provider value={{ locale: 'ja', setLocale: vi.fn() }}>
+          <TooltipProvider>
+            <SWRConfig value={{ provider: () => new Map(), fallback: { [articleKey]: article } }}>
+              <Routes>
+                <Route element={<OutletWrapper />}>
+                  <Route path="*" element={<ArticleDetail articleUrl={articleUrl} />} />
+                </Route>
+              </Routes>
+            </SWRConfig>
+          </TooltipProvider>
+        </LocaleContext.Provider>
+      </MemoryRouter>,
+    )
+  }
+
+  it('shows the translated title when only the title was auto-translated (no body translation)', () => {
+    mockUseTranslate.mockReturnValue({
+      viewMode: 'original',
+      setViewMode: vi.fn(),
+      translating: false,
+      translatingText: '',
+      fullTextTranslated: null,
+      handleTranslate: vi.fn(),
+      translatingHtml: '',
+      error: null,
+    })
+
+    renderWithArticle(baseArticle)
+
+    expect(screen.getByText('Titre traduit')).toBeTruthy()
+    expect(screen.queryByText('Original Title')).toBeNull()
+  })
+
+  it('shows the original title when viewing the original body of a fully-translated article', () => {
+    mockUseTranslate.mockReturnValue({
+      viewMode: 'original',
+      setViewMode: vi.fn(),
+      translating: false,
+      translatingText: '',
+      fullTextTranslated: 'Corps traduit',
+      handleTranslate: vi.fn(),
+      translatingHtml: '',
+      error: null,
+    })
+
+    renderWithArticle({ ...baseArticle, full_text_translated: 'Corps traduit', translated_lang: 'ja' })
+
+    expect(screen.getByText('Original Title')).toBeTruthy()
+    expect(screen.queryByText('Titre traduit')).toBeNull()
+  })
+
+  it('shows the translated title when viewing the translated body of a fully-translated article', () => {
+    mockUseTranslate.mockReturnValue({
+      viewMode: 'translated',
+      setViewMode: vi.fn(),
+      translating: false,
+      translatingText: '',
+      fullTextTranslated: 'Corps traduit',
+      handleTranslate: vi.fn(),
+      translatingHtml: '',
+      error: null,
+    })
+
+    renderWithArticle({ ...baseArticle, full_text_translated: 'Corps traduit', translated_lang: 'ja' })
+
+    expect(screen.getByText('Titre traduit')).toBeTruthy()
+    expect(screen.queryByText('Original Title')).toBeNull()
   })
 })
