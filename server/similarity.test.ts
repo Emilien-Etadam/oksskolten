@@ -1,5 +1,33 @@
-import { describe, it, expect } from 'vitest'
-import { computeTitleSimilarity } from './similarity.js'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { computeTitleSimilarity, detectAndStoreSimilarArticles } from './similarity.js'
+
+const {
+  mockMeiliSearch,
+  mockIsSearchReady,
+  mockGetArticlesByIds,
+  mockMarkArticleSeen,
+  mockInsertSimilarity,
+} = vi.hoisted(() => ({
+  mockMeiliSearch: vi.fn(),
+  mockIsSearchReady: vi.fn(),
+  mockGetArticlesByIds: vi.fn(),
+  mockMarkArticleSeen: vi.fn(),
+  mockInsertSimilarity: vi.fn(),
+}))
+
+vi.mock('./search/client.js', () => ({
+  meiliSearch: mockMeiliSearch,
+}))
+vi.mock('./search/sync.js', () => ({
+  isSearchReady: mockIsSearchReady,
+}))
+vi.mock('./db.js', () => ({
+  getArticlesByIds: mockGetArticlesByIds,
+  markArticleSeen: mockMarkArticleSeen,
+}))
+vi.mock('./db/similarities.js', () => ({
+  insertSimilarity: mockInsertSimilarity,
+}))
 
 describe('computeTitleSimilarity', () => {
   it('returns 1.0 for identical titles', () => {
@@ -60,5 +88,69 @@ describe('computeTitleSimilarity', () => {
       'Apple、iPhone 17を正式発表',
     )
     expect(score).toBeGreaterThan(0.4)
+  })
+})
+
+describe('detectAndStoreSimilarArticles', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockIsSearchReady.mockReturnValue(true)
+    mockMeiliSearch.mockResolvedValue({ hits: [], estimatedTotalHits: 0 })
+    mockGetArticlesByIds.mockReturnValue([])
+  })
+
+  it('does nothing when search is not ready', async () => {
+    mockIsSearchReady.mockReturnValue(false)
+    await detectAndStoreSimilarArticles(1, 'Some title', 10, '2026-01-01T00:00:00Z')
+    expect(mockMeiliSearch).not.toHaveBeenCalled()
+  })
+
+  it('lets undated candidates through the search filter', async () => {
+    await detectAndStoreSimilarArticles(1, 'Some title', 10, '2026-01-01T00:00:00Z')
+    expect(mockMeiliSearch).toHaveBeenCalledWith('Some title', expect.objectContaining({
+      filter: expect.stringContaining('OR published_at = 0'),
+    }))
+  })
+
+  it('matches a candidate that has no published_at at all', async () => {
+    mockMeiliSearch.mockResolvedValue({ hits: [{ id: 2 }], estimatedTotalHits: 1 })
+    mockGetArticlesByIds.mockReturnValue([
+      { id: 2, feed_id: 20, title: 'Some title', published_at: null, read_at: null },
+    ])
+    await detectAndStoreSimilarArticles(1, 'Some title', 10, '2026-01-01T00:00:00Z')
+    expect(mockInsertSimilarity).toHaveBeenCalledWith(1, 2, 1)
+  })
+
+  it('skips same-feed candidates', async () => {
+    mockMeiliSearch.mockResolvedValue({ hits: [{ id: 2 }], estimatedTotalHits: 1 })
+    mockGetArticlesByIds.mockReturnValue([
+      { id: 2, feed_id: 10, title: 'Some title', published_at: null, read_at: null },
+    ])
+    await detectAndStoreSimilarArticles(1, 'Some title', 10, '2026-01-01T00:00:00Z')
+    expect(mockInsertSimilarity).not.toHaveBeenCalled()
+  })
+
+  it('skips candidates below the similarity threshold', async () => {
+    mockMeiliSearch.mockResolvedValue({ hits: [{ id: 2 }], estimatedTotalHits: 1 })
+    mockGetArticlesByIds.mockReturnValue([
+      { id: 2, feed_id: 20, title: 'Completely unrelated text here', published_at: null, read_at: null },
+    ])
+    await detectAndStoreSimilarArticles(1, 'Some title', 10, '2026-01-01T00:00:00Z')
+    expect(mockInsertSimilarity).not.toHaveBeenCalled()
+  })
+
+  it('marks the new article as seen when a similar article was already read', async () => {
+    mockMeiliSearch.mockResolvedValue({ hits: [{ id: 2 }], estimatedTotalHits: 1 })
+    mockGetArticlesByIds.mockReturnValue([
+      { id: 2, feed_id: 20, title: 'Some title', published_at: null, read_at: '2026-01-01T00:00:00Z' },
+    ])
+    await detectAndStoreSimilarArticles(1, 'Some title', 10, '2026-01-01T00:00:00Z')
+    expect(mockMarkArticleSeen).toHaveBeenCalledWith(1, true)
+  })
+
+  it('excludes the article itself from the candidates, short-circuiting when none remain', async () => {
+    mockMeiliSearch.mockResolvedValue({ hits: [{ id: 1 }], estimatedTotalHits: 1 })
+    await detectAndStoreSimilarArticles(1, 'Some title', 10, '2026-01-01T00:00:00Z')
+    expect(mockGetArticlesByIds).not.toHaveBeenCalled()
   })
 })
