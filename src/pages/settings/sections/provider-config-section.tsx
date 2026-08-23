@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import useSWR from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import { fetcher, apiPost, apiPatch } from '../../../lib/fetcher'
 import { PROVIDER_LABELS, LLM_API_PROVIDERS, TRANSLATE_SERVICE_PROVIDERS } from '../../../data/aiModels'
 import { Input } from '@/components/ui/input'
@@ -270,6 +270,7 @@ function ClaudeCodeCard({ t }: { t: TFunc }) {
 }
 
 function OllamaCard({ t }: { t: TFunc }) {
+  const { mutate: globalMutate } = useSWRConfig()
   const { data: prefs, mutate: mutatePrefs } = useSWR<Record<string, string | null>>(
     '/api/settings/preferences',
     fetcher,
@@ -322,13 +323,16 @@ function OllamaCard({ t }: { t: TFunc }) {
         'ollama.custom_headers': headersToJson(headers),
       })
       void mutatePrefs()
+      // The task model pickers cache this list and never revalidate on focus,
+      // so without this they keep showing "cannot connect" until a page reload.
+      void globalMutate('/api/settings/ollama/models')
       showMessage(t('ollama.baseUrlSaved'), 'success')
     } catch (err: unknown) {
       showMessage(err instanceof Error ? err.message : 'Save failed', 'error')
     } finally {
       setSaving(false)
     }
-  }, [saving, baseUrlInput, headers, mutatePrefs, t])
+  }, [saving, baseUrlInput, headers, mutatePrefs, globalMutate, t])
 
   const handleTest = useCallback(async () => {
     if (testing) return
@@ -337,12 +341,14 @@ function OllamaCard({ t }: { t: TFunc }) {
     try {
       const res = await fetcher('/api/settings/ollama/status') as { ok: boolean; version?: string; model_count?: number; error?: string }
       setTestResult(res)
+      // A reachable server means the cached model list is worth refetching.
+      if (res.ok) void globalMutate('/api/settings/ollama/models')
     } catch {
       setTestResult({ ok: false, error: 'Request failed' })
     } finally {
       setTesting(false)
     }
-  }, [testing])
+  }, [testing, globalMutate])
 
   const removeHeader = useCallback((index: number) => {
     setHeaders(prev => prev.filter((_, i) => i !== index))
@@ -447,6 +453,7 @@ function OllamaCard({ t }: { t: TFunc }) {
 }
 
 function VllmCard({ t }: { t: TFunc }) {
+  const { mutate: globalMutate } = useSWRConfig()
   const { data: prefs, mutate: mutatePrefs } = useSWR<Record<string, string | null>>(
     '/api/settings/preferences',
     fetcher,
@@ -494,6 +501,9 @@ function VllmCard({ t }: { t: TFunc }) {
       await Promise.all(promises)
       void mutatePrefs()
       void mutateKeyStatus()
+      // The task model pickers cache this list and never revalidate on focus,
+      // so without this they keep showing "cannot connect" until a page reload.
+      void globalMutate('/api/settings/vllm/models')
       setApiKeyInput('')
       showMessage(t('vllm.baseUrlSaved'), 'success')
     } catch (err: unknown) {
@@ -501,7 +511,7 @@ function VllmCard({ t }: { t: TFunc }) {
     } finally {
       setSaving(false)
     }
-  }, [saving, baseUrlInput, apiKeyInput, mutatePrefs, mutateKeyStatus, t])
+  }, [saving, baseUrlInput, apiKeyInput, mutatePrefs, mutateKeyStatus, globalMutate, t])
 
   const handleDeleteKey = useCallback(async () => {
     if (saving) return
@@ -524,12 +534,14 @@ function VllmCard({ t }: { t: TFunc }) {
     try {
       const res = await fetcher('/api/settings/vllm/status') as { ok: boolean; model_count?: number; error?: string }
       setTestResult(res)
+      // A reachable server means the cached model list is worth refetching.
+      if (res.ok) void globalMutate('/api/settings/vllm/models')
     } catch {
       setTestResult({ ok: false, error: 'Request failed' })
     } finally {
       setTesting(false)
     }
-  }, [testing])
+  }, [testing, globalMutate])
 
   const hasChanges = baseUrlInput !== savedBaseUrl || !!apiKeyInput
 
