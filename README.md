@@ -21,6 +21,12 @@
   <strong>Oksskolten</strong> <em>(pronounced "ooks-SKOL-ten")</em> — every article, full text, by default.
 </p>
 
+<p align="center">
+  <strong>English</strong> · <a href="README.fr.md">Français</a>
+</p>
+
+> This is a fork of [babarot/oksskolten](https://github.com/babarot/oksskolten). Everything below describes the upstream project; [Fork additions](#fork-additions) lists what this fork adds on top, and [`FORK.md`](FORK.md) documents each addition in detail.
+
 ## Why Oksskolten?
 
 Most RSS readers show what the feed gives you — a title and maybe a summary. Some (like Miniflux and FreshRSS) can fetch full article text, but it's opt-in per feed and requires configuration. Oksskolten does it for every article automatically: it fetches the original article, extracts the full text using Mozilla's Readability + 500 noise-removal patterns, converts it to clean Markdown, and stores it locally. No per-feed toggles, no manual CSS selectors — it just works.
@@ -65,11 +71,51 @@ Because Oksskolten always has the complete text, AI summarization and translatio
 - **Multi-Auth** — Password, Passkey (WebAuthn), and GitHub OAuth — each independently configurable
 - **Smart Feed Management** — Auto-discovery, CSS selector-based feeds (via RSS Bridge), bot bypass (FlareSolverr), and automatic disabling of dead feeds
 - **Article Clipping** — Save any URL as an article, with full content extraction
-- **Feed Management Table** — Settings → Feeds lists every subscription with its article, unread, and activity counts. Search, sort, filter by category or status, and move, fetch, mark read, re-enable, or delete feeds in bulk
-- **Feed Diagnostics** — The same tab opens with the feeds that are failing or disabled: what stage of the pipeline broke, the likely cause in plain words, the raw error, and one-click re-detect, retry, or re-enable
-- **GitHub Starred Releases** — Get one feed of the releases published across every repository you starred. Set it up in Settings → Integration: token, stars URL, and the release/pre-release/tag mix. See [86_feature_github_releases.md](docs/spec/86_feature_github_releases.md)
 - **Theming** — 14 built-in color themes + custom theme import via JSON, 9 article fonts, 8 code highlighting styles
 - **Single Container** — API, SPA, and cron scheduler all run in one Docker container
+
+## Fork additions
+
+Additions live in new files, with only small insertion points in upstream ones, so syncing with upstream stays cheap. [`FORK.md`](FORK.md) covers each item in detail, down to the upstream files touched.
+
+### Reading experience
+
+- **Front page (La Une)** — `/` is a newspaper-style front page: a hero article picked by score, then the top unread articles of each category. The chat-first home screen it replaces is still there, at `/chat`
+- **Category tabs** — a horizontal section bar above article lists (Inbox plus one tab per category, with per-category unread counts)
+- **Bottom tab bar** — newspaper-app-style bottom navigation (Inbox, Search, Read Later, Chat, Menu), shown when the sidebar is closed. The sidebar's collapsed state now persists across reloads
+- **Swipe between articles** — swipe left/right, or press the arrow keys, to move through the list you came from
+- **Mark as read without opening** — a check button on every unread card, in all five layouts. On touch devices, swiping a card to the right does the same
+- **Le Monde theme** — an importable custom theme inspired by the newspaper's app (`custom-themes/le-monde.json`)
+
+### AI pipeline on a local model
+
+Upstream runs AI on demand, one article at a time. This fork adds a persistent background queue (`server/fetcher/ai-queue.ts`) that survives restarts: pending work is marked in the database, resumed at the start of every fetch cycle with a 10-minute backoff, and processed in bounded batches against a local vLLM endpoint.
+
+- **Auto-translation on fetch** — every article whose detected language differs from your target language is translated in the background. The scope is configurable: body and title, or titles only — cheaper, and the only option that still helps once an article's body has failed to extract. Detection uses franc-min, and French is available as a target language
+- **Auto-summarize on fetch** — summaries are generated as articles arrive rather than on click
+- **Per-feed AI relevance filter** — give a feed a criterion in your own words and every new article is judged against it. Rejected articles are hidden, never deleted, so a bad criterion is reversible
+
+### More kinds of feeds
+
+- **GitHub starred releases** — paste `https://github.com/stars/<user>` for a single feed carrying the releases of every repository that account has starred. One GraphQL query per 100 repositories, with a configurable release / pre-release / tag mix. See [`86_feature_github_releases.md`](docs/spec/86_feature_github_releases.md)
+- **Social searches as feeds** — Bluesky custom feeds, profiles and searches, plus Mastodon hashtags, each become a feed. Bluesky search needs an app password; the rest work without an account
+- **Reddit posts, properly** — the body comes from the post's own JSON, including the embedded parent of a crosspost, and the top comments are rendered below the article with an on-demand translate button. Fetches escalate through five access strategies, because Reddit blocks anonymous requests from many residential IPs
+
+### Feed management and diagnostics
+
+**Settings → Feeds**, an empty "under development" placeholder upstream, now holds two sections:
+
+- **Diagnostics** — the feeds that are failing or disabled, each with the pipeline stage that broke, the likely cause in plain words, the raw error one click away, and re-detect / retry / re-enable buttons. `Retry all` re-enables and re-fetches the whole list
+- **Management table** — every subscription with its article, unread and per-week counts, last article date and status. Search, sort on any column, filter by category or status, and select feeds (Shift+Click for ranges) to move, fetch, mark read, re-enable or delete them in bulk
+
+### Tooling and fixes
+
+- **E2E smoke tests** (`npm run test:e2e`) — Playwright builds the app, boots the real server against a scratch database, and checks the front page, the inbox → reader flow, and the mobile bottom bar
+- **Database backup** (`scripts/backup-db.sh`) — WAL-safe snapshots through SQLite's online backup API, with gzip and rotation
+- **Extraction debugger** (`scripts/debug-extract.ts`) — replays fetch, clean and extract for one URL, then re-runs the parse with each cleaning stage disabled so the stage that lost the text names itself
+- **Upstream fixes** — CSP hashes for the inline bootstrap scripts, a Firefox-safe logo font stack, an over-broad `next-` cleaning pattern that deleted whole article bodies, a re-detect path that permanently broke GitHub-stars and social feeds, and an i18n placeholder that printed a literal `{{code}}` instead of the HTTP status
+
+Fork-specific environment variables (Reddit, Bluesky, vLLM) are documented in [`.env.example`](.env.example).
 
 ## Tech Stack
 
@@ -197,6 +243,8 @@ Pre-built multi-architecture Docker images (amd64/arm64) are published to GHCR o
 ```bash
 docker pull ghcr.io/babarot/oksskolten:latest
 ```
+
+> The published image is upstream's and contains none of the [fork additions](#fork-additions). To run this fork, build locally.
 
 To use the pre-built image instead of building locally, edit `compose.prod.yaml` and swap the `build` directive for the commented-out `image` line, then:
 
