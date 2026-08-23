@@ -16,7 +16,7 @@
 /feeds/:feedId                 → Articles by feed (clip feeds also use this route)
 /categories/:categoryId        → Articles by category
 /settings                      → Redirect to /settings/general
-/settings/:tab                 → Settings page (general / appearance / ai / security / plugins / viewer / about)
+/settings/:tab                 → Settings page (general / appearance / integration / plugins / security / data / viewer / about)
 /chat                          → Chat page (new conversation)
 /chat/:conversationId          → Chat page (conversation detail)
 /*                             → Article detail (catch-all, original article URL with scheme removed)
@@ -213,3 +213,27 @@ Supported bulk actions:
 | Mark All Read | Calls `POST /api/feeds/:id/mark-all-seen` for each feed |
 | Fetch | Fetches each selected enabled feed sequentially |
 | Delete | Requires confirmation dialog. Deletes each feed via `DELETE /api/feeds/:id` |
+
+### Settings — Feed Management
+
+The `viewer` settings tab (labelled **Feeds**) renders `FeedManagementSection`, a table of every subscribed feed. It reuses the `/api/feeds` SWR cache, so no extra endpoint is involved.
+
+| Item | Detail |
+|---|---|
+| Rows | One per feed. Clip feeds are excluded |
+| Columns | Feed (name + domain), category, article count, unread count, articles per week, last article (relative time), status |
+| Status | `error` (last fetch failed), `disabled` (auto-disabled after 5 consecutive failures), `inactive` (no article for 90 days, same rule as the sidebar), `ok`. Hovering a status shows `last_error` |
+| Sorting | Any column header. Count and date columns sort descending on first click, text columns ascending |
+| Filtering | Free-text search over name and URL, plus category and status dropdowns |
+| Selection | Per-row checkbox toggles; Shift + Click selects a range; the header checkbox toggles every row matching the current filters |
+| Scope | Bulk actions apply only to selected feeds that the current filters keep visible — a selection hidden by a filter is never acted on |
+
+Bulk actions reuse `useFeedBulkActions` (shared with the sidebar multi-select):
+
+| Action | Behavior |
+|---|---|
+| Move to Category | `POST /api/feeds/bulk-move` |
+| Mark All Read | `POST /api/feeds/:id/mark-all-seen` per feed |
+| Fetch | Fetches each selected enabled feed sequentially, one toast per feed |
+| Re-enable | `PATCH /api/feeds/:id` with `disabled: 0` for each selected disabled feed. Shown only when the selection contains a disabled feed |
+| Delete | Requires confirmation dialog. `DELETE /api/feeds/:id` per feed |
