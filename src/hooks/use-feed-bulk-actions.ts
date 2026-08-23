@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { apiPost, apiDelete } from '../lib/fetcher'
+import { apiPost, apiPatch, apiDelete } from '../lib/fetcher'
 import type { FeedWithCounts } from '../../shared/types'
 import type { KeyedMutator } from 'swr'
 import type { FetchResult } from './use-fetch-progress'
@@ -68,6 +68,23 @@ export function useFeedBulkActions({
     }
   }, [getSelectedFeeds, clearSelection, startFeedFetch, onFetchComplete])
 
+  const handleBulkEnable = useCallback(async () => {
+    const disabled = getSelectedFeeds().filter(f => f.disabled)
+    if (disabled.length === 0) return
+    const ids = disabled.map(f => f.id)
+    void mutateFeeds(
+      prev => prev ? { ...prev, feeds: prev.feeds.map(f => ids.includes(f.id) ? { ...f, disabled: 0, error_count: 0, last_error: null } : f) } : prev,
+      { revalidate: false },
+    )
+    clearSelection()
+    try {
+      await Promise.all(ids.map(id => apiPatch(`/api/feeds/${id}`, { disabled: 0 })))
+    } catch {
+      // partial failure
+    }
+    void mutateFeeds()
+  }, [getSelectedFeeds, mutateFeeds, clearSelection])
+
   const handleBulkDelete = useCallback(() => {
     setBulkDeleteConfirm(true)
   }, [])
@@ -96,6 +113,7 @@ export function useFeedBulkActions({
     handleBulkMoveToCategory,
     handleBulkMarkAllRead,
     handleBulkFetch,
+    handleBulkEnable,
     handleBulkDelete,
     handleBulkDeleteConfirm,
   }

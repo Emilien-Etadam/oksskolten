@@ -96,9 +96,9 @@ const dict = {
     zh: '此站点受机器人检测（如 Cloudflare）保护，绕过失败。请稍等片刻后尝试「重试获取」。'
   },
   'feedError.httpError': {
-    ja: 'サーバーからHTTPエラー（{{code}}）が返されました。サイトが一時的にダウンしているか、URLが変更された可能性があります。',
-    en: 'The server returned HTTP error ({{code}}). The site may be temporarily down or the URL may have changed.',
-    zh: '服务器返回 HTTP 错误（{{code}}）。站点可能暂时不可用或 URL 已更改。'
+    ja: 'サーバーからHTTPエラー（${code}）が返されました。サイトが一時的にダウンしているか、URLが変更された可能性があります。',
+    en: 'The server returned HTTP error (${code}). The site may be temporarily down or the URL may have changed.',
+    zh: '服务器返回 HTTP 错误（${code}）。站点可能暂时不可用或 URL 已更改。'
   },
   'feedError.parseFailed': {
     ja: 'フィードのXMLを解析できませんでした。フィードの形式が壊れているか、RSS/Atom形式でない可能性があります。「RSSを再検出」で別のフィードソースを探すことができます。',
@@ -416,6 +416,43 @@ const dict = {
   'settings.retentionPurgeResult': { ja: '{count} 件の記事を削除しました', en: 'Deleted {count} articles', zh: '已删除 {count} 篇文章'},
   'settings.retentionEligible': { ja: '既読: {read} 件 ／ 未読: {unread} 件が対象', en: '{read} read / {unread} unread articles eligible', zh: '已读 {read} 篇 / 未读 {unread} 篇符合条件'},
   'settings.retentionPurging': { ja: 'クリーンアップ中...', en: 'Cleaning up...', zh: '清理中...'},
+
+  // Feed management (Settings -> Feeds)
+  'settings.feedsManage': { ja: 'フィード管理', en: 'Feed Management', zh: '订阅源管理'},
+  'settings.feedsManageDesc': { ja: '登録済みのフィードを検索・並び替え・一括操作できます', en: 'Search, sort, and act on every subscribed feed in one place', zh: '在一个页面中搜索、排序并批量操作所有订阅源'},
+  'settings.feedsSummary': { ja: '${count} フィード ／ 未読 ${unread} 件 ／ 要対応 ${errors} 件', en: '${count} feeds · ${unread} unread · ${errors} need attention', zh: '${count} 个订阅源 · ${unread} 未读 · ${errors} 需处理'},
+  'settings.feedsSearchPlaceholder': { ja: 'フィード名・URL で検索', en: 'Search by name or URL', zh: '按名称或 URL 搜索'},
+  'settings.feedsAllCategories': { ja: 'すべてのカテゴリ', en: 'All categories', zh: '全部分类'},
+  'settings.feedsAllStatuses': { ja: 'すべての状態', en: 'All statuses', zh: '全部状态'},
+  'settings.feedsNoCategory': { ja: 'カテゴリなし', en: 'Uncategorized', zh: '未分类'},
+  'settings.feedsStatusOk': { ja: '正常', en: 'OK', zh: '正常'},
+  'settings.feedsStatusError': { ja: 'エラー', en: 'Error', zh: '错误'},
+  'settings.feedsStatusDisabled': { ja: '無効', en: 'Disabled', zh: '已禁用'},
+  'settings.feedsStatusInactive': { ja: '更新停止', en: 'Inactive', zh: '未活跃'},
+  'settings.feedsColName': { ja: 'フィード', en: 'Feed', zh: '订阅源'},
+  'settings.feedsColCategory': { ja: 'カテゴリ', en: 'Category', zh: '分类'},
+  'settings.feedsColArticles': { ja: '記事', en: 'Articles', zh: '文章'},
+  'settings.feedsColUnread': { ja: '未読', en: 'Unread', zh: '未读'},
+  'settings.feedsColPerWeek': { ja: '週あたり', en: 'Per week', zh: '每周'},
+  'settings.feedsColLatest': { ja: '最終記事', en: 'Last article', zh: '最新文章'},
+  'settings.feedsColStatus': { ja: '状態', en: 'Status', zh: '状态'},
+  'settings.feedsDiagnostics': { ja: '要対応のフィード', en: 'Needs attention', zh: '需要处理'},
+  'settings.feedsDiagnosticsDesc': { ja: '取得に失敗しているフィードと、その原因・対処方法です', en: 'Feeds that failed to fetch, with the likely cause and how to fix it', zh: '获取失败的订阅源，及其可能原因与修复方式'},
+  'settings.feedsAllHealthy': { ja: 'すべてのフィードが正常に取得できています', en: 'Every feed is fetching normally', zh: '所有订阅源均正常获取'},
+  'settings.feedsDisabledNoError': { ja: 'このフィードは無効化されており、取得されません', en: 'This feed is disabled and will not be fetched', zh: '此订阅源已禁用，不会被获取'},
+  'settings.feedsShowAll': { ja: '${count} 件すべて表示', en: 'Show all ${count}', zh: '显示全部 ${count} 个'},
+  'settings.feedsRetryAll': { ja: 'すべて再試行', en: 'Retry all', zh: '全部重试'},
+  'settings.feedsRetryAllResult': { ja: '${total} 件中 ${recovered} 件が復旧しました', en: '${recovered} of ${total} feeds recovered', zh: '${total} 个中有 ${recovered} 个已恢复'},
+  'settings.feedsFailureCount': { ja: '連続 ${count} 回失敗', en: '${count} consecutive failures', zh: '连续失败 ${count} 次'},
+  'settings.feedsNoArticleYet': { ja: '記事なし', en: 'none yet', zh: '暂无'},
+  'settings.feedsViaBridge': { ja: 'RSS Bridge 経由', en: 'via RSS Bridge', zh: '经由 RSS Bridge'},
+  'settings.feedsJsChallenge': { ja: 'Bot 対策あり', en: 'bot protection', zh: '有机器人验证'},
+  'settings.feedsRawError': { ja: 'エラー詳細', en: 'Raw error', zh: '错误详情'},
+  'settings.feedsDetecting': { ja: '検出中…', en: 'Detecting…', zh: '检测中…'},
+  'settings.feedsFetching': { ja: '取得中…', en: 'Fetching…', zh: '获取中…'},
+  'settings.feedsClearSelection': { ja: '選択を解除', en: 'Clear selection', zh: '取消选择'},
+  'settings.feedsEmpty': { ja: 'フィードがまだありません', en: 'No feeds yet', zh: '还没有订阅源'},
+  'settings.feedsNoMatch': { ja: '条件に一致するフィードがありません', en: 'No feeds match these filters', zh: '没有符合条件的订阅源'},
 
   // Categories
   'category.add': { ja: 'カテゴリを追加', en: 'Add category', zh: '添加分类'},

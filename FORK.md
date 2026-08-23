@@ -197,6 +197,9 @@ that define a criterion.
   Firefox's font sanitizer. The `font-logo` stack now uses local Palatino
   equivalents (`tailwind.config.ts`), and the font import was removed from
   `src/index.css`.
+- **HTTP error message**: `feedError.httpError` used `{{code}}` placeholders
+  while `t()` interpolates `${code}`, so the feed error banner rendered a
+  literal `{{code}}` instead of the status. Fixed in all three locales.
 
 ## GitHub starred releases as a feed
 
@@ -239,6 +242,42 @@ spelled out as `next-post` / `next-article` / `next-story` / `nextprev`, and
 `postClean()` rolls itself back when a pass leaves under 200 characters behind.
 Both changes are upstream bugs, not fork-specific behaviour.
 
+## Feed management table (Settings -> Feeds)
+
+`src/pages/settings/feeds-tab.tsx` +
+`src/pages/settings/sections/feed-management-section.tsx` — the settings tab
+upstream ships as an empty "under development" placeholder (internal key
+`viewer`, labelled *Feeds*) now holds a table of every subscription: article,
+unread and per-week counts, last article date, and a status derived from the
+data already returned by `GET /api/feeds` (`error`, `disabled`, `inactive` after
+90 quiet days, `ok`). Rows are searchable by name or URL and filterable by
+category and status; every column sorts.
+
+Selection is checkbox-based with Shift + Click ranges, and the bulk bar reuses
+`useFeedBulkActions` — the same hook behind the sidebar's multi-select — so move
+to category, mark all read, fetch and delete behave identically in both places.
+Two things are specific to the table: a *Re-enable* action (`PATCH
+/api/feeds/:id` with `disabled: 0`, added to the shared hook as
+`handleBulkEnable`) that only appears when the selection contains a disabled
+feed, and the rule that bulk actions never touch a selected feed the current
+filters hide. No new endpoint — the tab is frontend-only.
+
+## Feed diagnostics panel (Settings -> Feeds)
+
+`src/pages/settings/sections/feed-diagnostics-section.tsx` — above the table, a
+"Needs attention" panel for feeds that are disabled or carrying a `last_error`.
+Each card names the pipeline stage that failed, explains the cause in plain
+words, shows the consecutive failure count, whether the feed goes through RSS
+Bridge or sits behind bot protection, and keeps the raw error string one click
+away. The remedies offered are the ones the classification suggests: re-detect
+RSS (SSE, then a fetch), retry the fetch, and re-enable when disabled.
+
+The classification and the re-detect SSE helper were lifted out of
+`src/components/feed/feed-error-banner.tsx` into `src/lib/feed-error.ts` so the
+panel and the article-list banner explain a failure the same way. `Retry all`
+re-enables and re-fetches every listed feed but never re-detects — re-detection
+can rewrite a feed's RSS URL, which is not a bulk operation.
+
 ## Upstream files touched
 
 | File | Change |
@@ -263,6 +302,10 @@ Both changes are upstream bugs, not fork-specific behaviour.
 | `src/pages/settings/integration-tab.tsx` | +2 lines (import + `<GithubSection />`) |
 | `src/pages/settings/sections/reading-section.tsx` | Translation Scope radio group, shown when Auto-Translation is on |
 | `src/lib/i18n.ts` | +15 keys (`github.*`), +4 keys (`settings.autoTranslateScope*`) |
+| `src/pages/settings-page.tsx` | placeholder for the `viewer` tab swapped for a lazy `<FeedsTab />` |
+| `src/hooks/use-feed-bulk-actions.ts` | +`handleBulkEnable` (bulk re-enable of disabled feeds) |
+| `src/components/feed/feed-error-banner.tsx` | `classifyError` / `reDetectSSE` moved to `src/lib/feed-error.ts` and imported back |
+| `src/lib/i18n.ts` | +35 keys (`settings.feeds*`), `feedError.httpError` placeholder fixed |
 
 `src/app.tsx` additionally has 2 lines adjusted and a small effect added (sidebar
 auto-open respects the persisted collapse state).

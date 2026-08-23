@@ -1,49 +1,13 @@
 import { useState } from 'react'
 import { CheckCircle2, XCircle, Circle, ChevronRight, Search, RefreshCw, Loader2 } from 'lucide-react'
 import { useI18n } from '../../lib/i18n'
-import { authHeaders } from '../../lib/fetcher'
-
-type Stage = 'discovery' | 'bridge' | 'fetch' | 'parse'
-
-const STAGES: Stage[] = ['discovery', 'bridge', 'fetch', 'parse']
+import { STAGES, classifyError, reDetectSSE } from '../../lib/feed-error'
 
 /**
  * Processing phase — drives the animated pipeline visualization.
  * detecting-0/1 correspond to discovery/bridge stages being active.
  */
 type Phase = 'idle' | 'detecting-0' | 'detecting-1' | 'fetching' | 'processing'
-
-interface Classification {
-  failedStage: Stage
-  i18nKey: string
-  i18nParams?: Record<string, string>
-  actions: Array<'reDetect' | 'fetch'>
-}
-
-function classifyError(lastError: string): Classification {
-  if (lastError === 'No RSS URL') {
-    return { failedStage: 'discovery', i18nKey: 'feedError.noRssUrl', actions: ['reDetect'] }
-  }
-
-  if (lastError.includes('CssSelectorBridge')) {
-    return { failedStage: 'bridge', i18nKey: 'feedError.cssBridgeFailed', actions: ['reDetect', 'fetch'] }
-  }
-
-  if (lastError === 'FlareSolverr failed') {
-    return { failedStage: 'fetch', i18nKey: 'feedError.flareSolverrFailed', actions: ['fetch', 'reDetect'] }
-  }
-
-  const httpMatch = lastError.match(/HTTP (\d{3})/)
-  if (httpMatch) {
-    return { failedStage: 'fetch', i18nKey: 'feedError.httpError', i18nParams: { code: httpMatch[1] }, actions: ['fetch'] }
-  }
-
-  if (lastError.includes('Could not parse')) {
-    return { failedStage: 'parse', i18nKey: 'feedError.parseFailed', actions: ['reDetect'] }
-  }
-
-  return { failedStage: 'fetch', i18nKey: 'feedError.unknown', actions: ['fetch'] }
-}
 
 type StageStatus = 'passed' | 'failed' | 'active' | 'pending'
 
@@ -72,50 +36,6 @@ function getStageStatus(stageIndex: number, failedIndex: number, phase: Phase): 
   if (stageIndex < failedIndex) return 'passed'
   if (stageIndex === failedIndex) return 'failed'
   return 'pending'
-}
-
-/**
- * Call POST /api/feeds/:id/re-detect as SSE stream.
- * Invokes `onStage` when the server reports each detection stage.
- */
-function reDetectSSE(
-  feedId: number,
-  onStage: (stage: string) => void,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const headers = authHeaders()
-    fetch(`/api/feeds/${feedId}/re-detect`, {
-      method: 'POST',
-      headers: { ...headers },
-      signal: AbortSignal.timeout(60_000),
-    })
-      .then(async (res) => {
-        if (!res.ok || !res.body) {
-          reject(new Error(`HTTP ${res.status}`))
-          return
-        }
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let buf = ''
-        for (;;) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buf += decoder.decode(value, { stream: true })
-          // Parse SSE lines
-          const lines = buf.split('\n')
-          buf = lines.pop()! // keep incomplete line
-          for (const line of lines) {
-            if (!line.startsWith('data: ')) continue
-            try {
-              const data = JSON.parse(line.slice(6))
-              if (data.type === 'stage') onStage(data.stage)
-            } catch { /* skip malformed SSE JSON lines — non-critical progress updates */ }
-          }
-        }
-        resolve()
-      })
-      .catch(reject)
-  })
 }
 
 interface FeedErrorBannerProps {
@@ -208,7 +128,7 @@ export function FeedErrorBanner({ lastError, feedId, onMutate, onFetch, override
       )}
       {!busy && (
         <p className="text-muted text-sm leading-relaxed text-center mb-6">
-          {t(i18nKey as Parameters<typeof t>[0], i18nParams)}
+          {t(i18nKey, i18nParams)}
         </p>
       )}
 
