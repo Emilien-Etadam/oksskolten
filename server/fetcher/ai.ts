@@ -183,7 +183,9 @@ const translateTitleConfig: AiTaskConfig = {
 /** Remove wrapping quotes a model may add around a translated title. */
 function unquoteTitle(text: string): string {
   const trimmed = text.trim()
-  const pairs: Array<[string, string]> = [['"', '"'], ['«', '»'], ['“', '”'], ['「', '」']]
+  // U+300C / U+300D are the CJK corner brackets, written as escapes so this
+  // file stays covered by scripts/lint-no-japanese.ts instead of allowlisted.
+  const pairs: Array<[string, string]> = [['"', '"'], ['«', '»'], ['“', '”'], ['\u300C', '\u300D']]
   for (const [open, close] of pairs) {
     if (trimmed.startsWith(open) && trimmed.endsWith(close) && trimmed.length > open.length + close.length) {
       return trimmed.slice(open.length, -close.length).trim()
