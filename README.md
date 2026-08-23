@@ -66,6 +66,7 @@ Because Oksskolten always has the complete text, AI summarization and translatio
 - **Smart Feed Management** — Auto-discovery, CSS selector-based feeds (via RSS Bridge), bot bypass (FlareSolverr), and automatic disabling of dead feeds
 - **Article Clipping** — Save any URL as an article, with full content extraction
 - **Feed Management Table** — Settings → Feeds lists every subscription with its article, unread, and activity counts. Search, sort, filter by category or status, and move, fetch, mark read, re-enable, or delete feeds in bulk
+- **Feed Diagnostics** — The same tab opens with the feeds that are failing or disabled: what stage of the pipeline broke, the likely cause in plain words, the raw error, and one-click re-detect, retry, or re-enable
 - **GitHub Starred Releases** — Get one feed of the releases published across every repository you starred. Set it up in Settings → Integration: token, stars URL, and the release/pre-release/tag mix. See [86_feature_github_releases.md](docs/spec/86_feature_github_releases.md)
 - **Theming** — 14 built-in color themes + custom theme import via JSON, 9 article fonts, 8 code highlighting styles
 - **Single Container** — API, SPA, and cron scheduler all run in one Docker container

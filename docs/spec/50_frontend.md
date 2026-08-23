@@ -216,7 +216,22 @@ Supported bulk actions:
 
 ### Settings — Feed Management
 
-The `viewer` settings tab (labelled **Feeds**) renders `FeedManagementSection`, a table of every subscribed feed. It reuses the `/api/feeds` SWR cache, so no extra endpoint is involved.
+The `viewer` settings tab (labelled **Feeds**) holds two sections, both reading the `/api/feeds` SWR cache — no extra endpoint is involved.
+
+**Needs attention panel** (`FeedDiagnosticsSection`)
+
+Lists the feeds with `disabled = 1` or a non-null `last_error`, disabled first, then by consecutive failure count.
+
+| Item | Detail |
+|---|---|
+| Cause | `classifyError()` in `src/lib/feed-error.ts` maps `last_error` to the pipeline stage that failed (discovery / bridge / fetch / parse) and to an explanation. Shared with the article-list error banner |
+| Detail | Failed stage, consecutive failure count, last article date, and chips for feeds served through RSS Bridge or behind bot protection. The raw `last_error` string sits behind a disclosure |
+| Actions | The remedies the classification suggests — `Re-detect RSS` (`POST /api/feeds/:id/re-detect` as SSE, followed by a fetch) and `Retry Fetch` (`POST /api/feeds/:id/fetch`) — plus `Enable` for disabled feeds (`PATCH /api/feeds/:id` with `disabled: 0`) |
+| Retry all | Re-enables and re-fetches every listed feed sequentially, then reports how many recovered. Re-detection is deliberately excluded: it can rewrite a feed's RSS URL |
+| Collapse | Past 5 feeds the list collapses behind a "show all" button |
+| Healthy | With nothing failing, the panel is a single confirmation line |
+
+**Feed table** (`FeedManagementSection`)
 
 | Item | Detail |
 |---|---|
