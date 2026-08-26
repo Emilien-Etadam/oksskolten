@@ -70,6 +70,11 @@ const dict = {
     zh: '此文章已保存在剪藏中'
   },
   'modal.clipMoveToClips': { ja: 'クリップに移動', en: 'Move to Clips', zh: '移至剪藏'},
+  'modal.clipContentPending': {
+    ja: '記事を追加しました。本文は取得中です',
+    en: 'Article added — its content is still loading',
+    zh: '已添加文章 — 正在获取正文'
+  },
 
   // ArticleList
   'articles.dayToday': { ja: '今日', en: 'Today', zh: '今天'},

@@ -4,6 +4,21 @@ import { startSSE } from '../lib/sse.js'
 import { logger } from '../logger.js'
 
 const log = logger.child('search')
+const clipLog = logger.child('clip')
+
+/**
+ * How long the clip endpoint waits for the content pipeline before answering.
+ *
+ * The browser aborts the request after 30s (DEFAULT_TIMEOUT_MS in
+ * src/lib/fetcher.ts), while the pipeline can legitimately run far longer:
+ * a page timeout, then a browser-UA retry, then the anti-bot solver's own
+ * budget. Racing it to the end shows the user a timeout for a clip that
+ * lands anyway a minute later — and greets their next attempt with an
+ * "already exists" conflict. Stay well under the browser's patience.
+ */
+function clipFetchBudgetMs(): number {
+  return Number(process.env.CLIP_FETCH_BUDGET_MS) || 20_000
+}
 import {
   getArticles,
   getArticleByUrl,
@@ -357,20 +372,71 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
         return
       }
 
-      // Fetch content (same pipeline as RSS feeds)
-      const content = await fetchArticleContent(body.url)
+      // Fetch content (same pipeline as RSS feeds), but only for as long as
+      // the browser is still listening — see clipFetchBudgetMs. This promise
+      // is written to never reject, so the background continuation below
+      // cannot raise an unhandled rejection after the reply is sent.
+      const settled = fetchArticleContent(body.url).then(
+        content => ({ content, error: null as string | null }),
+        (err: unknown) => ({ content: null, error: err instanceof Error ? err.message : String(err) }),
+      )
+      let budgetTimer: NodeJS.Timeout | undefined
+      const budget = new Promise<null>(resolve => {
+        budgetTimer = setTimeout(() => resolve(null), clipFetchBudgetMs())
+      })
+      const early = await Promise.race([settled, budget])
+      clearTimeout(budgetTimer)
 
-      const title = body.title || content.title || new URL(body.url).hostname
+      if (!early) {
+        // Still fetching. Save the article now so the clip is not lost, and
+        // let the same in-flight fetch fill the body in when it finishes —
+        // no work is thrown away and nothing is fetched twice. last_error is
+        // set so the retry pass picks the row up if the server dies first.
+        const articleId = insertArticle({
+          feed_id: clipFeed.id,
+          title: body.title || new URL(body.url).hostname,
+          url: body.url,
+          published_at: new Date().toISOString(),
+          lang: null,
+          full_text: null,
+          excerpt: null,
+          og_image: null,
+          last_error: 'content fetch still running when the clip was saved',
+        })
+        clipLog.info({ url: body.url, articleId }, 'clip saved before its content arrived; filling in the background')
+        void settled.then(({ content, error }) => {
+          if (!content) {
+            updateArticleContent(articleId, { last_error: error })
+            return
+          }
+          updateArticleContent(articleId, {
+            // The placeholder title was the hostname: take the real one once
+            // the page hands it over, unless the caller supplied their own.
+            title: !body.title && content.title ? content.title : undefined,
+            lang: content.lang,
+            full_text: content.fullText,
+            excerpt: content.excerpt,
+            og_image: content.ogImage,
+            last_error: content.lastError,
+          })
+          clipLog.info({ url: body.url, articleId, chars: content.fullText?.length ?? 0 }, 'background clip fetch finished')
+        })
+        reply.status(201).send({ article: getArticleById(articleId), created: true, content_pending: true })
+        return
+      }
+
+      const { content, error } = early
+      const title = body.title || content?.title || new URL(body.url).hostname
       const articleId = insertArticle({
         feed_id: clipFeed.id,
         title,
         url: body.url,
         published_at: new Date().toISOString(),
-        lang: content.lang,
-        full_text: content.fullText,
-        excerpt: content.excerpt,
-        og_image: content.ogImage,
-        last_error: content.lastError,
+        lang: content?.lang ?? null,
+        full_text: content?.fullText ?? null,
+        excerpt: content?.excerpt ?? null,
+        og_image: content?.ogImage ?? null,
+        last_error: content ? content.lastError : error,
       })
 
       const article = getArticleById(articleId)

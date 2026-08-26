@@ -422,6 +422,7 @@ export function markArticleRefreshAttempted(articleId: number, when: string): vo
 export function updateArticleContent(
   articleId: number,
   data: {
+    title?: string
     lang?: string | null
     full_text?: string | null
     full_text_translated?: string | null

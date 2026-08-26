@@ -52,11 +52,34 @@ POST /api/articles/from-url
     ├─ 2. getArticleByUrl() → 409 if already exists
     ├─ 3. fetchArticleContent(url) → Shared fetch pipeline (see below)
     │     On failure: record in last_error and continue with full_text = NULL (graceful degradation)
+    │     If it outruns CLIP_FETCH_BUDGET_MS: save now, fill in later (see below)
     ├─ 4. Title resolution: request.title > fetchedTitle > hostname
     └─ 5. insertArticle() → 201
 ```
 
 After saving, the article supports summary, translation, bookmark, like, and chat — just like regular RSS articles.
+
+#### Pages that outlive the request
+
+The browser aborts this request after 30s (`DEFAULT_TIMEOUT_MS`, `src/lib/fetcher.ts`), while the
+pipeline can legitimately run far longer: a 15s page timeout, then a browser-UA retry, then the
+anti-bot solver's own `FLARESOLVERR_TIMEOUT_MS` budget. Waiting for the end would show the user a
+timeout for a clip that lands anyway a minute later — and greet their next attempt with an
+"already exists" conflict.
+
+So the endpoint waits `CLIP_FETCH_BUDGET_MS` (default 20s, deliberately under the browser's
+patience) and, if the page has not answered by then:
+
+1. saves the article immediately, titled after the host, with `last_error` set so the retry pass
+   adopts the row should the server die before the fetch returns;
+2. replies `201 { created: true, content_pending: true }` — the client says so rather than closing
+   on a silently empty article;
+3. lets the **same in-flight fetch** finish and fill the row (body, excerpt, image, language, and
+   the real title unless the caller supplied one). Nothing is fetched twice and no work is thrown
+   away.
+
+The reader picks the body up on its own: `ArticleDetail` refetches once when its cached copy has no
+`full_text` (see [Frontend spec](./50_frontend.md#cache-invalidation)).
 
 ### Shared Fetch Pipeline with RSS Feeds
 

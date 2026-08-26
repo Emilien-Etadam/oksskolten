@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { apiPost, ApiError } from '../../lib/fetcher'
 import { useI18n } from '../../lib/i18n'
 import { articleUrlToPath } from '../../lib/url'
@@ -29,7 +30,11 @@ export function ArticleStep({ onClose, onCreated, onArticleCreated }: ArticleSte
     setConflict(null)
     setLoading(true)
     try {
-      await apiPost('/api/articles/from-url', { url: url.trim(), force })
+      const result = await apiPost('/api/articles/from-url', { url: url.trim(), force }) as
+        { content_pending?: boolean } | undefined
+      // Slow pages outlive the request: the clip is saved, its body arrives
+      // after. Say so rather than closing on a silent, empty article.
+      if (result?.content_pending) toast.info(t('modal.clipContentPending'))
       onArticleCreated?.()
       onCreated()
       onClose()
