@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
-import { ArrowDown, ArrowUp, CheckCheck, FolderInput, Power, RefreshCw, Search, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, CheckCheck, FolderInput, Plus, Power, RefreshCw, Search, Trash2 } from 'lucide-react'
 import { fetcher } from '../../../lib/fetcher'
 import { useI18n } from '../../../lib/i18n'
 import { formatRelativeDate } from '../../../lib/dateFormat'
@@ -10,6 +10,7 @@ import { extractDomain } from '../../../lib/url'
 import { useFetchProgressContext } from '../../../contexts/fetch-progress-context'
 import { useFeedSelection } from '../../../hooks/use-feed-selection'
 import { useFeedBulkActions } from '../../../hooks/use-feed-bulk-actions'
+import { FeedModal } from '../../../components/feed/feed-modal'
 import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
@@ -119,7 +120,7 @@ export function FeedManagementSection() {
   const { mutate: globalMutate } = useSWRConfig()
   const { data, mutate: mutateFeeds, isLoading } = useSWR<FeedsData>('/api/feeds', fetcher)
   const { data: categoriesData } = useSWR<{ categories: Category[] }>('/api/categories', fetcher)
-  const { startFeedFetch } = useFetchProgressContext()
+  const { startFeedFetch, subscribeFeedFetch } = useFetchProgressContext()
 
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
@@ -127,6 +128,7 @@ export function FeedManagementSection() {
   const [sortKey, setSortKey] = useState<SortKey>('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [busy, setBusy] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
 
   const categories = useMemo(() => categoriesData?.categories ?? [], [categoriesData])
   const feeds = useMemo(() => (data?.feeds ?? []).filter(f => f.type !== 'clip'), [data])
@@ -224,7 +226,17 @@ export function FeedManagementSection() {
 
   return (
     <section>
-      <h2 className="text-base font-semibold text-text mb-1">{t('settings.feedsManage')}</h2>
+      <div className="flex items-center justify-between gap-3 mb-1">
+        <h2 className="text-base font-semibold text-text">{t('settings.feedsManage')}</h2>
+        <button
+          type="button"
+          onClick={() => setAddOpen(true)}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border border-border text-text hover:bg-hover transition-colors"
+        >
+          <Plus size={14} />
+          {t('modal.addFeed')}
+        </button>
+      </div>
       <p className="text-xs text-muted mb-4">{t('settings.feedsManageDesc')}</p>
 
       <p className="text-xs text-muted mb-3 tabular-nums">
@@ -440,6 +452,16 @@ export function FeedManagementSection() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {addOpen && (
+        <FeedModal
+          initialStep="feed"
+          onClose={() => setAddOpen(false)}
+          onCreated={() => void mutateFeeds()}
+          onFetchStarted={feedId => void subscribeFeedFetch(feedId)}
+          categories={categories}
+        />
       )}
 
       {bulkDeleteConfirm && (
