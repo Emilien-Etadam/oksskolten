@@ -90,6 +90,14 @@ Pull-to-refresh calls `startFeedFetch(feedId)` on individual feed pages to fetch
 | Update feed (`PATCH /api/feeds/:id`) | `/api/feeds` |
 | Seen/read update (`PATCH .../seen`, `POST .../read`) | `/api/feeds` (to update unread_count) |
 
+Revalidation is disabled app-wide (`revalidateIfStale`, `revalidateOnFocus` and
+`revalidateOnReconnect` are all `false`), so a cached response survives until a full
+page reload. One case must not: an article whose `full_text` is empty is an unfinished
+answer, since the server fills the body in later (retry pass, anti-bot solver, a
+re-clip). `ArticleDetail` therefore refetches its own key once per article when the
+cached copy has no body — otherwise a clip read too early stays blank for the rest of
+the session while the list, keyed separately, already shows the recovered text.
+
 
 ### Feed Metrics
 
