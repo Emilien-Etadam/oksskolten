@@ -151,7 +151,7 @@ Four layout options are available for the article list. Independent from the the
 
 | Layout | Key | Description |
 |---|---|---|
-| List | `list` | Classic single-column list. Shows excerpt, domain, and thumbnail. Default |
+| List | `list` | Classic single-column list. An 80px thumbnail on the left, then the full title (wrapped, never truncated), a one-line excerpt and the domain. Default |
 | Card | `card` | 2-column grid. Large thumbnail (aspect-video) placed at the top. Visual-oriented |
 | Magazine | `magazine` | Mixed layout with the first article as a hero (large card) and the rest as smaller cards |
 | Compact | `compact` | High-density list with title and date only. No thumbnails |
@@ -162,6 +162,7 @@ Four layout options are available for the article list. Independent from the the
 - Layout definitions: `src/data/layouts.ts`
 - Hook: `src/hooks/useLayout.ts` (based on `createLocalStorageHook`)
 - Skeleton UI: Dedicated skeletons corresponding to each layout
+- Thumbnail fallback: articles with no `og_image` show the site favicon filling the thumbnail box (`object-contain`, 6px inset) rather than a small icon centred in an empty frame
 
 ### Day Separators
 

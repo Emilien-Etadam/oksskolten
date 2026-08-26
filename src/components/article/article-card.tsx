@@ -45,13 +45,14 @@ function Thumbnail({ src, articleUrl, className }: { src: string | null; article
   const domain = extractDomain(articleUrl)
   if (domain) {
     return (
-      <div className={`${sizeClass} rounded shrink-0 border border-border bg-bg-subtle flex items-center justify-center`}>
+      <div className={`${sizeClass} rounded shrink-0 border border-border bg-bg-subtle flex items-center justify-center p-1.5`}>
+        {/* Fills the box rather than sitting in the middle of it: most feed
+            icons are all the thumbnail an article has */}
         <img
-          src={`https://www.google.com/s2/favicons?sz=32&domain=${domain}`}
+          src={`https://www.google.com/s2/favicons?sz=64&domain=${domain}`}
           alt=""
           loading="lazy"
-          width={24}
-          height={24}
+          className="w-full h-full object-contain"
         />
       </div>
     )
@@ -183,15 +184,16 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, show
           : ''
       }`}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         {indicatorStyle === 'dot' && (
           <div className="flex items-center w-3 shrink-0">
             <span className={`w-1.5 h-1.5 rounded-full bg-accent transition-opacity duration-500 ${showIndicator ? 'opacity-100' : 'opacity-0'}`} />
           </div>
         )}
+        {showThumbnails && <Thumbnail src={article.og_image} articleUrl={article.url} className="w-20 h-20" />}
         <div className="flex-1 min-w-0">
           <span
-            className={`text-[15px] truncate transition-colors duration-500 block ${
+            className={`text-[15px] transition-colors duration-500 block ${
               isUnread ? 'font-semibold text-text' : 'font-normal text-muted'
             }`}
           >
@@ -204,7 +206,6 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, show
           )}
           <CardMeta domain={domain} dateText={dateText} article={article} isUnread={isUnread} groupCount={groupCount} className="mt-1" />
         </div>
-        {showThumbnails && <Thumbnail src={article.og_image} articleUrl={article.url} />}
         {isUnread && onMarkRead && <MarkReadButton onClick={() => onMarkRead(article.id)} />}
       </div>
     </a>
