@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
-import { ArrowDown, ArrowUp, CheckCheck, FolderInput, Plus, Power, RefreshCw, Search, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, CheckCheck, FolderInput, Loader2, Plus, Power, RefreshCw, Search, Trash2 } from 'lucide-react'
 import { fetcher } from '../../../lib/fetcher'
+import { fetchAllFeeds } from '../../../lib/feed-refresh'
 import { useI18n } from '../../../lib/i18n'
 import { formatRelativeDate } from '../../../lib/dateFormat'
 import { extractDomain } from '../../../lib/url'
@@ -129,6 +130,7 @@ export function FeedManagementSection() {
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [busy, setBusy] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
+  const [fetchingAll, setFetchingAll] = useState(false)
 
   const categories = useMemo(() => categoriesData?.categories ?? [], [categoriesData])
   const feeds = useMemo(() => (data?.feeds ?? []).filter(f => f.type !== 'clip'), [data])
@@ -192,6 +194,22 @@ export function FeedManagementSection() {
     onDeleted: revalidateArticles,
   })
 
+  /** One server-side run over every enabled feed, rather than a request per row. */
+  async function handleFetchAll() {
+    if (fetchingAll) return
+    setFetchingAll(true)
+    try {
+      const { totalNew } = await fetchAllFeeds()
+      if (totalNew > 0) toast.success(t('refresh.done', { count: String(totalNew) }))
+      else toast(t('refresh.upToDate'))
+    } catch {
+      toast.error(t('refresh.failed'))
+    } finally {
+      setFetchingAll(false)
+      void mutateFeeds()
+    }
+  }
+
   async function runBulk(action: () => Promise<void>) {
     if (busy) return
     setBusy(true)
@@ -228,14 +246,25 @@ export function FeedManagementSection() {
     <section>
       <div className="flex items-center justify-between gap-3 mb-1">
         <h2 className="text-base font-semibold text-text">{t('settings.feedsManage')}</h2>
-        <button
-          type="button"
-          onClick={() => setAddOpen(true)}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border border-border text-text hover:bg-hover transition-colors"
-        >
-          <Plus size={14} />
-          {t('modal.addFeed')}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleFetchAll()}
+            disabled={fetchingAll}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border border-border text-text hover:bg-hover transition-colors disabled:opacity-50"
+          >
+            {fetchingAll ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            {t('category.fetchAll')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border border-border text-text hover:bg-hover transition-colors"
+          >
+            <Plus size={14} />
+            {t('modal.addFeed')}
+          </button>
+        </div>
       </div>
       <p className="text-xs text-muted mb-4">{t('settings.feedsManageDesc')}</p>
 

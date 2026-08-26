@@ -164,6 +164,21 @@ Four layout options are available for the article list. Independent from the the
 - Skeleton UI: Dedicated skeletons corresponding to each layout
 - Thumbnail fallback: articles with no `og_image` show the site favicon filling the thumbnail box (`object-contain`, 6px inset) rather than a small icon centred in an empty frame
 
+### Refreshing
+
+Fetching was reachable only through the sidebar context menus, which nothing
+advertises, plus pull-to-refresh on touch devices.
+
+| Control | Where | Scope |
+|---|---|---|
+| Refresh icon | List header (`Header`'s `rightSlot`, filled by `RefreshButton`) | Follows the route: the feed on `/feeds/:id`, a category's enabled feeds on `/categories/:id`, every enabled feed anywhere else |
+| `Fetch all feeds` | Settings → Feeds, next to `Add Feed` | Every enabled feed |
+
+Both report the number of new articles, or that there were none, as a toast.
+The "every feed" path calls `POST /api/admin/fetch-all` — one request, server-side
+concurrency — instead of firing one per feed; `fetchAllFeeds()` in
+`src/lib/feed-refresh.ts` reads its SSE stream and sums the per-feed counts.
+
 ### Day Separators
 
 Article lists are grouped by publication day, each group headed by its date.

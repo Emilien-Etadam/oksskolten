@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useI18n } from '../../lib/i18n'
 import { IconButton } from '../ui/icon-button'
 
@@ -10,9 +11,11 @@ interface HeaderProps {
   detailTitle?: string | null
   isScrolled?: boolean
   sidebarOpen?: boolean
+  /** Rendered on the right of the list header, in place of its spacer */
+  rightSlot?: ReactNode
 }
 
-export function Header({ mode, onMenuClick, onBack, feedName, detailTitle, isScrolled, sidebarOpen }: HeaderProps) {
+export function Header({ mode, onMenuClick, onBack, feedName, detailTitle, isScrolled, sidebarOpen, rightSlot }: HeaderProps) {
   const { t } = useI18n()
 
   return (
@@ -46,7 +49,7 @@ export function Header({ mode, onMenuClick, onBack, feedName, detailTitle, isScr
               </span>
             )}
           </div>
-          <span className="w-8" />
+          {rightSlot ?? <span className="w-8" />}
         </>
       ) : (
         <>
