@@ -163,6 +163,21 @@ Four layout options are available for the article list. Independent from the the
 - Hook: `src/hooks/useLayout.ts` (based on `createLocalStorageHook`)
 - Skeleton UI: Dedicated skeletons corresponding to each layout
 
+### Day Separators
+
+Article lists mark the start of each publication day.
+
+| Item | Detail |
+|---|---|
+| Placement | Between two articles whose local calendar day differs. Never above the first article — a separator marks a change, not a heading |
+| Label | `Today`, `Yesterday`, then the weekday and date via `Intl.DateTimeFormat` (year added outside the current one). Articles with no `published_at` group under `Undated` |
+| Excluded lists | `/likes` and `/history`, ordered by `liked_at` / `read_at`: publication days would not run in order there |
+| Layouts | In grid layouts the separator spans the full row |
+
+Paging through articles in the reader (arrow keys or swipe) shows the same day as a
+full-screen divider when navigation crosses into it — see
+[84_feature_keyboard_navigation.md](./84_feature_keyboard_navigation.md).
+
 ### PWA Support
 
 Progressive Web App support via `vite-plugin-pwa`.

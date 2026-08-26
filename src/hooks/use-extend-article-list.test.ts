@@ -63,6 +63,7 @@ describe('useExtendArticleList', () => {
         '2': 'https://example.com/2',
         '3': 'https://example.com/3',
       },
+      dates: { '3': null },
     })
   })
 

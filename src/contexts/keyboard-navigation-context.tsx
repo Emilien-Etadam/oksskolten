@@ -7,6 +7,9 @@ interface KeyboardNavigationValue {
   setArticleIds: (ids: string[]) => void
   articleUrls: Record<string, string>
   setArticleUrls: (urls: Record<string, string>) => void
+  /** published_at per article id, for the day divider shown while paging through the reader */
+  articleDates: Record<string, string | null>
+  setArticleDates: (dates: Record<string, string | null>) => void
   lastListUrl: string | null
   setLastListUrl: (url: string | null) => void
 }
@@ -30,6 +33,12 @@ export function KeyboardNavigationProvider({ children }: { children: ReactNode }
       return saved ? JSON.parse(saved) : {}
     } catch { return {} }
   })
+  const [articleDates, setArticleDates] = useState<Record<string, string | null>>(() => {
+    try {
+      const saved = sessionStorage.getItem('kb_article_dates')
+      return saved ? JSON.parse(saved) : {}
+    } catch { return {} }
+  })
 
   const setLastListUrl = useCallback((url: string | null) => {
     setLastListUrlState(url)
@@ -47,6 +56,11 @@ export function KeyboardNavigationProvider({ children }: { children: ReactNode }
     sessionStorage.setItem('kb_article_urls', JSON.stringify(urls))
   }, [])
 
+  const updateArticleDates = useCallback((dates: Record<string, string | null>) => {
+    setArticleDates(dates)
+    sessionStorage.setItem('kb_article_dates', JSON.stringify(dates))
+  }, [])
+
   return (
     <KeyboardNavigationContext.Provider
       value={{
@@ -56,6 +70,8 @@ export function KeyboardNavigationProvider({ children }: { children: ReactNode }
         setArticleIds: updateArticleIds,
         articleUrls,
         setArticleUrls: updateArticleUrls,
+        articleDates,
+        setArticleDates: updateArticleDates,
         lastListUrl,
         setLastListUrl,
       }}

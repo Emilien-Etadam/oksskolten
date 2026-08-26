@@ -104,6 +104,79 @@ describe('ArticleSwipeNavigation', () => {
     expect(screen.getByTestId('pathname').textContent).toBe(`/articles/${encodeURIComponent('https://c.com/three')}`)
   })
 
+  describe('day divider', () => {
+    // 2 and 3 are published on different days, 1 and 2 on the same one
+    beforeEach(() => {
+      sessionStorage.setItem('kb_article_dates', JSON.stringify({
+        '1': '2026-08-23T20:00:00Z',
+        '2': '2026-08-23T09:00:00Z',
+        '3': '2026-08-22T23:00:00Z',
+      }))
+    })
+
+    function pressArrow(key: 'ArrowRight' | 'ArrowLeft') {
+      act(() => {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
+      })
+    }
+
+    it('stops on a divider instead of crossing into another day', () => {
+      renderSwipeNav('2')
+      pressArrow('ArrowRight')
+      expect(screen.getByRole('separator')).toBeTruthy()
+      expect(screen.getByTestId('pathname').textContent).toBe('/current')
+    })
+
+    it('continues to the article when the same direction repeats', () => {
+      renderSwipeNav('2')
+      pressArrow('ArrowRight')
+      pressArrow('ArrowRight')
+      expect(screen.queryByRole('separator')).toBeNull()
+      expect(screen.getByTestId('pathname').textContent).toBe(`/articles/${encodeURIComponent('https://c.com/three')}`)
+    })
+
+    it('backs out of the divider on the opposite direction', () => {
+      renderSwipeNav('2')
+      pressArrow('ArrowRight')
+      pressArrow('ArrowLeft')
+      expect(screen.queryByRole('separator')).toBeNull()
+      expect(screen.getByTestId('pathname').textContent).toBe('/current')
+    })
+
+    it('dismisses the divider on Escape', () => {
+      renderSwipeNav('2')
+      pressArrow('ArrowRight')
+      act(() => {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      })
+      expect(screen.queryByRole('separator')).toBeNull()
+      expect(screen.getByTestId('pathname').textContent).toBe('/current')
+    })
+
+    it('crosses within the same day without a divider', () => {
+      renderSwipeNav('2')
+      pressArrow('ArrowLeft')
+      expect(screen.queryByRole('separator')).toBeNull()
+      expect(screen.getByTestId('pathname').textContent).toBe(`/articles/${encodeURIComponent('https://a.com/one')}`)
+    })
+
+    it('raises no divider when a publication date is missing', () => {
+      sessionStorage.setItem('kb_article_dates', JSON.stringify({ '2': '2026-08-23T09:00:00Z', '3': null }))
+      renderSwipeNav('2')
+      pressArrow('ArrowRight')
+      expect(screen.queryByRole('separator')).toBeNull()
+      expect(screen.getByTestId('pathname').textContent).toBe(`/articles/${encodeURIComponent('https://c.com/three')}`)
+    })
+
+    it('continues on a swipe in the same direction', () => {
+      renderSwipeNav('2')
+      swipe(300, 100)
+      expect(screen.getByRole('separator')).toBeTruthy()
+      swipe(300, 100)
+      expect(screen.getByTestId('pathname').textContent).toBe(`/articles/${encodeURIComponent('https://c.com/three')}`)
+    })
+  })
+
   it('does nothing when the current article is not in the list', () => {
     renderSwipeNav('99')
     swipe(300, 100)
@@ -118,6 +191,12 @@ describe('ArticleSwipeNavigation', () => {
         '2': 'https://b.com/two',
         '3': 'https://c.com/three',
         '4': 'https://d.com/four',
+      },
+      dates: {
+        '1': '2026-08-23T09:00:00Z',
+        '2': '2026-08-23T08:00:00Z',
+        '3': '2026-08-23T07:00:00Z',
+        '4': '2026-08-23T06:00:00Z',
       },
     })
     renderSwipeNav('3')
