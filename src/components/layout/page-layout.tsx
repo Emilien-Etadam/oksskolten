@@ -4,6 +4,7 @@ import { MD_BREAKPOINT } from '../../lib/breakpoints'
 import { FeedList } from '../feed/feed-list'
 import { Header } from './header'
 import { BottomNav } from './bottom-nav'
+import { RefreshButton } from '../feed/refresh-button'
 
 interface PageLayoutProps {
   /** Header mode */
@@ -52,7 +53,7 @@ export function PageLayout({ mode = 'list', feedName, onBack, detailTitle, feedL
         {mode === 'detail' ? (
           <Header mode="detail" onBack={onBack} detailTitle={detailTitle} isScrolled={isScrolled} sidebarOpen={drawerOpen} />
         ) : (
-          <Header mode="list" onMenuClick={() => setDrawerOpen(true)} feedName={feedName} isScrolled={isScrolled} sidebarOpen={drawerOpen} />
+          <Header mode="list" onMenuClick={() => setDrawerOpen(true)} feedName={feedName} isScrolled={isScrolled} sidebarOpen={drawerOpen} rightSlot={<RefreshButton />} />
         )}
         <div ref={sentinelRef} className="h-0" />
         {children}

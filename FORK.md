@@ -65,6 +65,22 @@ now remembers its state across reloads (localStorage). Collapsed on desktop, the
 bottom tab bar takes over navigation; the Menu tab reopens the sidebar on demand.
 Wired via small insertions in `src/app.tsx`.
 
+## A visible refresh
+
+Nothing in the interface offered a fetch: it lived in the sidebar context menus
+(right-click a feed or a category) and in pull-to-refresh, which only exists on
+touch devices. `POST /api/admin/fetch-all` had been implemented server-side and
+never called from the client.
+
+`src/components/feed/refresh-button.tsx` puts an icon in the list header, in the
+spacer `Header` already reserved on the right (new `rightSlot` prop, mounted from
+`page-layout.tsx`). Its scope follows the route: one feed on `/feeds/:id`, a
+category's enabled feeds on `/categories/:id`, and everywhere else the whole
+lot through the admin endpoint — one request with server-side concurrency rather
+than one per feed. Settings -> Feeds gets the same "all feeds" action as a
+button next to `Add Feed`. `src/lib/feed-refresh.ts` reads the SSE stream and
+sums how many new articles the run found.
+
 ## Denser list cards
 
 `src/components/article/article-card.tsx` — in the list layout the title was
@@ -350,7 +366,8 @@ can rewrite a feed's RSS URL, which is not a bulk operation.
 |---|---|
 | `src/app.tsx` | +2 lines (import + `<CategoryTabs />`) |
 | `src/components/article/article-detail.tsx` | +2 lines (import + `<ArticleSwipeNavigation />`) |
-| `src/components/layout/page-layout.tsx` | +2 lines (import + `<BottomNav />`) |
+| `src/components/layout/page-layout.tsx` | +2 lines (import + `<BottomNav />`), +`rightSlot={<RefreshButton />}` on the list header |
+| `src/components/layout/header.tsx` | +`rightSlot` prop, rendered in place of the list header's right spacer |
 | `src/lib/i18n.ts` | +1 key (`article.markAsRead`) |
 
 | `src/components/article/article-card.tsx` | `onMarkRead` prop + button in the 5 card variants; list-card title wraps, larger thumbnail and fallback favicon |
