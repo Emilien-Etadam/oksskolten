@@ -34,6 +34,19 @@ export function redditJsonUrl(articleUrl: string): string | null {
   return `https://www.reddit.com${path}.json?raw_json=1&sort=top&limit=50&depth=2`
 }
 
+/**
+ * Titles Reddit serves in RSS for posts it removed or whose author deleted them.
+ * The entry stays in the feed with a placeholder title and a body explaining the
+ * removal, so there is nothing left to read.
+ */
+const REMOVED_TITLE_RE = /^\[\s*(removed by reddit|deleted by user|removed|deleted)\s*\]$/i
+
+/** True when an RSS item is a Reddit post with no content left behind it. */
+export function isRemovedRedditPost(url: string, title: string): boolean {
+  if (!redditJsonUrl(url)) return false
+  return REMOVED_TITLE_RE.test(title.trim())
+}
+
 function decodeHtmlEntities(text: string): string {
   return text
     .replace(/&quot;/g, '"')

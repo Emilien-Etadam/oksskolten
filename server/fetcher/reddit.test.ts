@@ -6,7 +6,7 @@ vi.mock('./flaresolverr.js', () => ({
   fetchViaFlareSolverr: (url: string) => mockFlareSolverr(url),
 }))
 
-import { fetchRedditPostContent, fetchRedditJson, redditJsonUrl, _resetRedditOauthForTests } from './reddit.js'
+import { fetchRedditPostContent, fetchRedditJson, redditJsonUrl, isRemovedRedditPost, _resetRedditOauthForTests } from './reddit.js'
 
 const mockFetch = vi.fn()
 
@@ -195,5 +195,27 @@ describe('fetchRedditJson via OAuth', () => {
 
     const payload = await fetchRedditJson(jsonUrl)
     expect(payload).toEqual([{ data: { children: [] } }])
+  })
+})
+
+describe('isRemovedRedditPost', () => {
+  const postUrl = 'https://www.reddit.com/r/LocalLLaMA/comments/abc123/some_post/'
+
+  it('spots the placeholders Reddit leaves behind', () => {
+    expect(isRemovedRedditPost(postUrl, '[ Removed by Reddit ]')).toBe(true)
+    expect(isRemovedRedditPost(postUrl, '[removed by reddit]')).toBe(true)
+    expect(isRemovedRedditPost(postUrl, '[deleted by user]')).toBe(true)
+    expect(isRemovedRedditPost(postUrl, '[deleted]')).toBe(true)
+  })
+
+  it('keeps real posts, including ones that merely mention removal', () => {
+    expect(isRemovedRedditPost(postUrl, 'My post was [removed] by a mod, why?')).toBe(false)
+    expect(isRemovedRedditPost(postUrl, 'Removed by Reddit')).toBe(false)
+    expect(isRemovedRedditPost(postUrl, 'DeepSeek V4 Pro is out')).toBe(false)
+  })
+
+  it('only applies to Reddit post URLs', () => {
+    expect(isRemovedRedditPost('https://example.com/blog/post', '[ Removed by Reddit ]')).toBe(false)
+    expect(isRemovedRedditPost('https://www.reddit.com/r/LocalLLaMA/', '[ Removed by Reddit ]')).toBe(false)
   })
 })
