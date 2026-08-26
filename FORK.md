@@ -185,6 +185,10 @@ blocked by network security"), so fetches escalate through a ladder, first match
 4. **Anonymous ladder** — default UA, browser UA, then `old.reddit.com`.
 5. **Anti-bot solver** — FlareSolverr or the API-compatible
    [Byparr](https://github.com/ThePhaseless/Byparr) via `FLARESOLVERR_URL`.
+   Its per-page budget is `FLARESOLVERR_TIMEOUT_MS` (default 60s): a
+   browser-based solver on a site that stalls it can outlast a fixed minute,
+   and the request used to be cut off before any answer came back. Every
+   failure path now logs its cause instead of returning a silent null.
 
 ## Crossposts are grouped inside an aggregator feed
 

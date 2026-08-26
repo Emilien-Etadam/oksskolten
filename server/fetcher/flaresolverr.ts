@@ -5,6 +5,13 @@ const log = logger.child('flaresolverr')
 
 const FLARESOLVERR_URL = process.env.FLARESOLVERR_URL
 const FLARESOLVERR_CONCURRENCY = Number(process.env.FLARESOLVERR_CONCURRENCY) || 0
+/**
+ * How long the solver may spend on one page. FlareSolverr answers a simple
+ * page in seconds, but a browser-based solver on a site that stalls it can sit
+ * far longer — Byparr on Medium outlasts a minute — and the fixed 60s cut the
+ * request off before any answer, good or bad, came back.
+ */
+const SOLVER_TIMEOUT_MS = Number(process.env.FLARESOLVERR_TIMEOUT_MS) || 60_000
 const flaresolverrSemaphore = FLARESOLVERR_CONCURRENCY > 0 ? new Semaphore(FLARESOLVERR_CONCURRENCY) : null
 
 export type FlareSolverrResult = { body: string; contentType: string; url: string }
@@ -91,7 +98,7 @@ export async function fetchViaFlareSolverr(url: string, options?: FlareSolverrOp
 
 async function doFetch(url: string, options?: FlareSolverrOptions): Promise<FlareSolverrResult | null> {
   try {
-    const payload: Record<string, unknown> = { cmd: 'request.get', url, maxTimeout: 60_000 }
+    const payload: Record<string, unknown> = { cmd: 'request.get', url, maxTimeout: SOLVER_TIMEOUT_MS }
     if (options?.waitForSelector) {
       payload.waitForSelector = options.waitForSelector
     }
@@ -99,7 +106,8 @@ async function doFetch(url: string, options?: FlareSolverrOptions): Promise<Flar
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(65_000),
+      // Leave the solver a margin to answer after its own deadline
+      signal: AbortSignal.timeout(SOLVER_TIMEOUT_MS + 10_000),
     })
     if (!res.ok) {
       log.warn(`Solver answered HTTP ${res.status} for ${url}`)

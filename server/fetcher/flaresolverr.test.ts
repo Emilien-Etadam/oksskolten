@@ -290,3 +290,20 @@ describe('fetchViaFlareSolverr diagnostics', () => {
     expect(mockWarn).toHaveBeenCalledWith(expect.stringContaining('403'))
   })
 })
+
+describe('solver timeout budget', () => {
+  it('asks for the configured budget instead of a fixed minute', async () => {
+    vi.stubEnv('FLARESOLVERR_TIMEOUT_MS', '150000')
+    vi.resetModules()
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: 'ok', solution: { url: 'https://slow.example', status: 200, response: '<html>ok</html>', headers: {} } }),
+    })
+    const { fetchViaFlareSolverr } = await import('./flaresolverr.js')
+
+    await fetchViaFlareSolverr('https://slow.example/article')
+
+    const [, init] = mockFetch.mock.calls[0]
+    expect(JSON.parse((init as { body: string }).body).maxTimeout).toBe(150000)
+  })
+})
