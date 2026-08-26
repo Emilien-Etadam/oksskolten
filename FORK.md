@@ -65,6 +65,17 @@ now remembers its state across reloads (localStorage). Collapsed on desktop, the
 bottom tab bar takes over navigation; the Menu tab reopens the sidebar on demand.
 Wired via small insertions in `src/app.tsx`.
 
+## Denser list cards
+
+`src/components/article/article-card.tsx` — in the list layout the title was
+truncated to one line, which cut most Reddit and forum titles mid-sentence. It
+now wraps in full. The thumbnail moves to the left of the text, goes from 64px
+to 80px, and its fallback (the
+site favicon, all most articles have) fills the box instead of sitting small in
+the middle of it — the favicon is requested at `sz=64` and rendered with
+`object-contain` inside a 6px inset, so an 80px box shows a 66px icon instead of
+a 24px one.
+
 ## Mark-as-read button
 
 `src/components/article/mark-read-button.tsx` — a small check button on every unread
@@ -342,7 +353,7 @@ can rewrite a feed's RSS URL, which is not a bulk operation.
 | `src/components/layout/page-layout.tsx` | +2 lines (import + `<BottomNav />`) |
 | `src/lib/i18n.ts` | +1 key (`article.markAsRead`) |
 
-| `src/components/article/article-card.tsx` | `onMarkRead` prop + button in the 5 card variants |
+| `src/components/article/article-card.tsx` | `onMarkRead` prop + button in the 5 card variants; list-card title wraps, larger thumbnail and fallback favicon |
 | `src/components/article/swipeable-article-card.tsx` | `onMarkRead` pass-through |
 | `src/components/article/article-list.tsx` | +1 line (`onMarkRead: markRead` in card props) |
 | `server/index.ts` | CSP script-src hashes for inline bootstrap scripts |
