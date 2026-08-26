@@ -165,14 +165,20 @@ Four layout options are available for the article list. Independent from the the
 
 ### Day Separators
 
-Article lists mark the start of each publication day.
+Article lists are grouped by publication day, each group headed by its date.
 
 | Item | Detail |
 |---|---|
-| Placement | Between two articles whose local calendar day differs. Never above the first article — a separator marks a change, not a heading |
+| Structure | One `<section>` per day, headed by `DaySeparator`. The header sticks below the app header and the category tabs (which publish their height as `--category-tabs-height`), so the day stays visible while scrolling through it. Sections are what let a header unstick: without them every day's header would pile up at the same offset |
 | Label | `Today`, `Yesterday`, then the weekday and date via `Intl.DateTimeFormat` (year added outside the current one). Articles with no `published_at` group under `Undated` |
 | Excluded lists | `/likes` and `/history`, ordered by `liked_at` / `read_at`: publication days would not run in order there |
-| Layouts | In grid layouts the separator spans the full row |
+| Grid layouts | Kept flat — sections would break the column flow — with a non-sticky separator spanning the row |
+
+Card timestamps use the same calendar-day count as the separators
+(`calendarDaysAgo` in `src/lib/dateFormat.ts`): minutes and hours within today,
+whole days beyond it. Counting rolling 24-hour windows instead would put two
+articles of the same afternoon in different buckets and contradict the header
+above them.
 
 Paging through articles in the reader (arrow keys or swipe) shows the same day as a
 full-screen divider when navigation crosses into it — see

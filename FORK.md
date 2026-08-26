@@ -31,11 +31,22 @@ article's `published_at` for it, alongside the ids and URLs it already held, and
 
 ## Day separators in article lists
 
-`src/components/article/day-separator.tsx` — article lists show a dated rule between
-publication days (`Today`, `Yesterday`, then the spelled-out day). Rendered from
-`article-list.tsx` between two articles of different days, never above the first one.
+`src/components/article/day-separator.tsx` — article lists are grouped by
+publication day, one `<section>` per day headed by its date (`Today`, `Yesterday`,
+then the spelled-out day). The header sticks below the app header and the category
+tabs, which now publish their height as `--category-tabs-height`; at 200+ articles a
+day a rule that only appears at the rupture is never on screen, while a sticky header
+tells you where you are the whole way down. Sections are what let a header unstick —
+flat siblings would pile up at the same offset. Grid layouts stay flat with a
+non-sticky rule, since sections would break the column flow.
+
 `/likes` and `/history` are excluded: they are ordered by `liked_at` / `read_at`, so
 publication days would not run in order there.
+
+`formatRelativeDate` was counting rolling 24-hour windows, so two articles three
+minutes apart could read `12 days ago` and `13 days ago` and straddle a separator
+that (correctly) was not there. It now counts calendar days beyond today, sharing
+`calendarDaysAgo` with the separators, and keeps minutes and hours within today.
 
 The same module backs the reader's day divider, so a day is named identically in the
 list and while paging through articles.
@@ -327,7 +338,8 @@ can rewrite a feed's RSS URL, which is not a bulk operation.
 | `src/hooks/use-feed-bulk-actions.ts` | +`handleBulkEnable` (bulk re-enable of disabled feeds) |
 | `src/components/feed/feed-error-banner.tsx` | `classifyError` / `reDetectSSE` moved to `src/lib/feed-error.ts` and imported back |
 | `src/components/feed/feed-modal.tsx` | +`initialStep` prop (opens on a given step, hides the back arrow) |
-| `src/components/article/article-list.tsx` | day separators in the render loop, publishes `articleDates` to the nav context |
+| `src/components/article/article-list.tsx` | per-day sections in the render loop, publishes `articleDates` to the nav context |
+| `src/lib/dateFormat.ts` | `formatRelativeDate` counts calendar days; +`calendarDaysAgo` |
 | `src/contexts/keyboard-navigation-context.tsx` | +`articleDates` (sessionStorage-backed, like ids and URLs) |
 | `src/hooks/use-extend-article-list.ts` | carries `dates` through the extension payload |
 | `src/lib/i18n.ts` | +35 keys (`settings.feeds*`), `feedError.httpError` placeholder fixed |

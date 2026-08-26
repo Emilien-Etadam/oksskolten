@@ -271,6 +271,54 @@ describe('ArticleList', () => {
     expect(screen.getByText('Second Article')).toBeTruthy()
   })
 
+  it('heads each publication day with its own section', () => {
+    swrInfiniteReturn = {
+      data: [{
+        articles: [
+          makeArticle({ id: 1, title: 'Late on day one', published_at: '2026-01-02T20:00:00Z' }),
+          makeArticle({ id: 2, title: 'Early on day one', published_at: '2026-01-02T06:00:00Z' }),
+          makeArticle({ id: 3, title: 'Day two', published_at: '2026-01-01T22:00:00Z' }),
+        ],
+        total: 3,
+        has_more: false,
+      }],
+      error: undefined,
+      size: 1,
+      setSize: vi.fn(),
+      isLoading: false,
+      isValidating: false,
+      mutate: vi.fn(),
+    }
+    const { container } = renderArticleList()
+
+    // Two days, two sections — the two articles of the same day share one
+    const sections = container.querySelectorAll('section')
+    expect(sections.length).toBe(2)
+    expect(sections[0].querySelectorAll('[data-article-id]').length).toBe(2)
+    expect(sections[1].querySelectorAll('[data-article-id]').length).toBe(1)
+  })
+
+  it('leaves the read list ungrouped, since it is not ordered by publication', () => {
+    swrInfiniteReturn = {
+      data: [{
+        articles: [
+          makeArticle({ id: 1, title: 'Read first', published_at: '2026-01-02T20:00:00Z' }),
+          makeArticle({ id: 2, title: 'Read second', published_at: '2026-01-01T06:00:00Z' }),
+        ],
+        total: 2,
+        has_more: false,
+      }],
+      error: undefined,
+      size: 1,
+      setSize: vi.fn(),
+      isLoading: false,
+      isValidating: false,
+      mutate: vi.fn(),
+    }
+    const { container } = renderArticleList('/history')
+    expect(container.querySelectorAll('section').length).toBe(0)
+  })
+
   it('groups similar articles behind the first one with a badge', () => {
     swrInfiniteReturn = {
       data: [{

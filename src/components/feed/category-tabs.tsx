@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import useSWR from 'swr'
 import { NavLink } from 'react-router-dom'
 import { fetcher } from '../../lib/fetcher'
@@ -36,7 +37,28 @@ export function CategoryTabs() {
   const { data } = useSWR<CategoriesResponse>('/api/categories', fetcher)
   const { data: feedsData } = useSWR<FeedsResponse>('/api/feeds', fetcher)
 
-  if (!data?.categories.length) return null
+  const hasCategories = !!data?.categories.length
+
+  // The bar is sticky under the header; publishing its height lets the day
+  // headers stick right below it instead of hiding underneath. Re-runs when the
+  // bar appears, since it renders nothing until categories have loaded.
+  const navRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const nav = navRef.current
+    if (!nav) return
+    const publish = () => {
+      document.documentElement.style.setProperty('--category-tabs-height', `${nav.offsetHeight}px`)
+    }
+    publish()
+    const observer = new ResizeObserver(publish)
+    observer.observe(nav)
+    return () => {
+      observer.disconnect()
+      document.documentElement.style.removeProperty('--category-tabs-height')
+    }
+  }, [hasCategories])
+
+  if (!hasCategories) return null
 
   const unreadByCategory = new Map<number, number>()
   let totalUnread = 0
@@ -49,6 +71,7 @@ export function CategoryTabs() {
 
   return (
     <nav
+      ref={navRef}
       className="sticky z-20 border-b border-border select-none"
       style={{ top: 'var(--header-height)', backgroundColor: 'rgb(var(--color-bg-header-rgb) / 0.95)' }}
     >

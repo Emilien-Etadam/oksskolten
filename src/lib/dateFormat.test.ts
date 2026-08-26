@@ -82,6 +82,27 @@ describe('formatRelativeDate', () => {
     expect(result).toContain('day')
   })
 
+  it('counts calendar days, not rolling 24-hour windows', () => {
+    // 13:47 and 13:50 on the same afternoon, twelve days and a few minutes back:
+    // a rolling count would split them across "12 days" and "13 days"
+    const early = new Date('2025-05-20T13:47:00Z').toISOString()
+    const late = new Date('2025-05-20T13:50:00Z').toISOString()
+    expect(formatRelativeDate(early, 'en')).toBe(formatRelativeDate(late, 'en'))
+    expect(formatRelativeDate(early, 'en')).toContain('12')
+  })
+
+  it('says yesterday for last evening rather than counting hours', () => {
+    const lastEvening = new Date('2025-05-31T22:00:00Z').toISOString()
+    expect(formatRelativeDate(lastEvening, 'en')).toBe('yesterday')
+  })
+
+  it('keeps hours within the current day', () => {
+    const thisMorning = new Date('2025-06-01T06:00:00Z').toISOString()
+    const result = formatRelativeDate(thisMorning, 'en')
+    expect(result).toContain('6')
+    expect(result).toContain('hour')
+  })
+
   it('falls back to absolute date for old timestamps', () => {
     const oldDate = new Date(Date.now() - 60 * 86400_000).toISOString()
     const result = formatRelativeDate(oldDate, 'en')
