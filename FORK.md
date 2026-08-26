@@ -275,6 +275,11 @@ that define a criterion.
   real server against a scratch DB (`.e2e-data/`), and checks the front page,
   the inbox → reader flow, and the mobile bottom bar. Set `PW_CHROMIUM_PATH` to
   reuse a preinstalled Chromium.
+- **Google News diagnosis**: `scripts/debug-google-news.ts <url>` walks the
+  resolution strategies one at a time and prints what each saw — whether the
+  token decodes, what the redirect returns, whether the shell carries the RPC
+  signature — plus a slice of Google's HTML (`--dump-html` for all of it) to
+  adjust the patterns against when a link stops resolving.
 - **DB backup**: `scripts/backup-db.sh` snapshots the SQLite database with the
   online backup API (WAL-safe), gzip + rotation. See the header for a cron line.
 - **CI**: the upstream `test.yaml` workflow uses no secrets and runs on push to
