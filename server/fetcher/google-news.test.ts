@@ -49,6 +49,12 @@ describe('decodeGoogleNewsToken', () => {
     expect(decodeGoogleNewsToken(`https://news.google.com/rss/articles/${opaque}`)).toBeNull()
   })
 
+  it('returns null for a real post-2024 token', () => {
+    // Straight from a Google News feed: the payload is an opaque AU_yqL... id
+    const real = 'CBMi0AFBVV95cUxNc2dnQ01wUFRaQndLZzV6Ui1wNDFUeTBiQzlaeEZoZmdzek9remFQVUM4NDdDZFY0MFhBT29sSjdPbWRwTkZVdmxZSVdSMXR1RnlqbUJkSm1Ba1FkSmN6emJlLXFLNnlsNVljTTFTNHRuTnQtd3RzVS12eHktVVNFX1EwbzdtTE9IdVRLOWhMSnV5SUdHX0taT0RxNU5idm85WUtYNzdIZG9sOU5hX0NYWjhPT1ViXzQydE5rU3NVME9OUHJYWXBLamt0OVFtMm1V'
+    expect(decodeGoogleNewsToken(`https://news.google.com/rss/articles/${real}?oc=5`)).toBeNull()
+  })
+
   it('refuses a payload that points back at Google', () => {
     expect(decodeGoogleNewsToken(`https://news.google.com/rss/articles/${legacyToken('https://news.google.com/foo')}`)).toBeNull()
   })
@@ -107,6 +113,37 @@ describe('resolveGoogleNewsUrl', () => {
       text: () => Promise.resolve(`<c-wiz data-n-au="${ARTICLE}"></c-wiz>`),
     })
     expect(await resolveGoogleNewsUrl('https://news.google.com/rss/articles/AU_yqLopaque')).toBe(ARTICLE)
+  })
+
+  it('replays the RPC when the shell only holds a signed token', async () => {
+    const shell = '<c-wiz data-n-a-id="AU_yqLtoken" data-n-a-sg="signature123" data-n-a-ts="1756231000"></c-wiz>'
+    mockSafeFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        url: 'https://news.google.com/rss/articles/AU_yqLtoken',
+        text: () => Promise.resolve(shell),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve(`)]}'\n\n[["wrb.fr","Fbv4je","[\\"garturlres\\",\\"${ARTICLE}\\"]"]]`),
+      })
+
+    expect(await resolveGoogleNewsUrl('https://news.google.com/rss/articles/AU_yqLtoken')).toBe(ARTICLE)
+
+    const [rpcUrl, init] = mockSafeFetch.mock.calls[1]
+    expect(rpcUrl).toContain('batchexecute')
+    expect((init as { body: string }).body).toContain('signature123')
+    expect(mockFlareSolverr).not.toHaveBeenCalled()
+  })
+
+  it('skips the RPC when the shell carries no signature', async () => {
+    mockSafeFetch.mockResolvedValue({
+      ok: true,
+      url: 'https://news.google.com/rss/articles/AU_yqLtoken',
+      text: () => Promise.resolve('<html><body>consent</body></html>'),
+    })
+    await resolveGoogleNewsUrl('https://news.google.com/rss/articles/AU_yqLtoken')
+    expect(mockSafeFetch).toHaveBeenCalledTimes(1)
   })
 
   it('lets a browser run the redirect when plain fetching fails', async () => {

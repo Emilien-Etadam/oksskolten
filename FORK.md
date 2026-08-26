@@ -205,8 +205,10 @@ A Google News feed links to `news.google.com/rss/articles/<token>`, which holds
 no article text: extraction found nothing and the reader showed the RSS snippet
 alone. `server/fetcher/google-news.ts` resolves the wrapper before extraction —
 decoding the token when it still embeds the URL (pre-2024 links), otherwise
-following the redirect and reading the shell, and finally letting FlareSolverr
-run the page's JavaScript. Failing all three it returns null and the pipeline
+following the redirect and reading the shell, then replaying the signed
+`batchexecute` RPC the shell itself would have made — tokens minted since
+mid-2024 are opaque and only resolve that way — and finally letting FlareSolverr
+run the page's JavaScript. Failing all four it returns null and the pipeline
 behaves exactly as before.
 
 The stored `url` stays the wrapper: it is the RSS item's identity and the
