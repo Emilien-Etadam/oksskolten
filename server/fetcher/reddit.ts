@@ -1,4 +1,4 @@
-import { USER_AGENT } from './http.js'
+import { USER_AGENT, BROWSER_USER_AGENT } from './http.js'
 import { fetchViaFlareSolverr } from './flaresolverr.js'
 import { markdownToExcerpt } from './markdown-utils.js'
 import { logger } from '../logger.js'
@@ -74,7 +74,7 @@ function parseJsonBody(body: string): unknown {
  * Reddit rejects bot-looking user agents on its .json endpoints with 403
  * (while accepting them on .rss), so retries escalate to a browser UA.
  */
-const BROWSER_USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64; rv:132.0) Gecko/20100101 Firefox/132.0'
+
 
 /** Descriptive UA required by Reddit's API guidelines for OAuth clients */
 const OAUTH_USER_AGENT = 'web:oksskolten:v0.5 (self-hosted RSS reader)'

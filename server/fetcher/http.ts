@@ -2,6 +2,24 @@ import { safeFetch } from './ssrf.js'
 import { fetchViaFlareSolverr } from './flaresolverr.js'
 
 export const USER_AGENT = 'Mozilla/5.0 (compatible; RSSReader/1.0)'
+/**
+ * Sent on a second attempt when a site answers the honest reader UA with a
+ * block. Medium, and anything behind a WAF, refuses the identifiable one
+ * outright — a plain retry that looks like a browser is far cheaper than
+ * spinning up FlareSolverr, and often enough.
+ */
+export const BROWSER_USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64; rv:132.0) Gecko/20100101 Firefox/132.0'
+
+/** Statuses that mean "you look like a bot" rather than "this is gone". */
+const BOT_BLOCK_STATUSES = new Set([403, 503])
+
+function browserHeaders(): Record<string, string> {
+  return {
+    'User-Agent': BROWSER_USER_AGENT,
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+  }
+}
 export const DEFAULT_TIMEOUT = 15_000
 export const DISCOVERY_TIMEOUT = 10_000
 export const PROBE_TIMEOUT = 5_000
@@ -103,6 +121,20 @@ export async function fetchHtml(url: string, opts?: {
   }
 
   if (!res.ok) {
+    // Retry once looking like a browser before paying for FlareSolverr
+    if (BOT_BLOCK_STATUSES.has(res.status)) {
+      const retried = await safeFetch(url, {
+        headers: browserHeaders(),
+        signal: AbortSignal.timeout(timeout),
+      }).catch(() => null)
+      if (retried?.ok) {
+        return {
+          html: await decodeResponse(retried),
+          contentType: retried.headers.get('content-type') || '',
+          usedFlareSolverr: false,
+        }
+      }
+    }
     const flare = await fetchViaFlareSolverr(url)
     if (!flare) throw new Error(`HTTP ${res.status}`)
     return { html: flare.body, contentType: flare.contentType, usedFlareSolverr: true }

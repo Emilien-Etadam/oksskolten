@@ -246,6 +246,18 @@ server/lib/cleaner/
 node --import tsx scripts/debug-extract.ts <url>
 ```
 
+### Bot-Block Retry
+
+Article fetches identify themselves as `Mozilla/5.0 (compatible; RSSReader/1.0)`.
+Sites behind a WAF — Medium among them — answer that with `403` regardless of
+the content being public.
+
+On `403` or `503`, `fetchHtml()` retries once with a browser User-Agent and the
+`Accept` / `Accept-Language` headers a browser sends, before falling back to
+FlareSolverr. Other statuses (`404`, `410`, …) are not retried: they are answers,
+not blocks. When both attempts fail the original status is what surfaces as
+`last_error`.
+
 ### Google News Links
 
 Google News feeds link to `news.google.com/rss/articles/<token>`, a wrapper that
