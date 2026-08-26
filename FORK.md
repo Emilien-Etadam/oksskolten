@@ -253,6 +253,10 @@ data already returned by `GET /api/feeds` (`error`, `disabled`, `inactive` after
 90 quiet days, `ok`). Rows are searchable by name or URL and filterable by
 category and status; every column sorts.
 
+An `Add Feed` button in the section header opens the sidebar's own `FeedModal`,
+which gained an `initialStep` prop so it can skip the add-something chooser and
+land straight on feed creation (the back arrow is hidden when it does).
+
 Selection is checkbox-based with Shift + Click ranges, and the bulk bar reuses
 `useFeedBulkActions` — the same hook behind the sidebar's multi-select — so move
 to category, mark all read, fetch and delete behave identically in both places.
@@ -305,6 +309,7 @@ can rewrite a feed's RSS URL, which is not a bulk operation.
 | `src/pages/settings-page.tsx` | placeholder for the `viewer` tab swapped for a lazy `<FeedsTab />` |
 | `src/hooks/use-feed-bulk-actions.ts` | +`handleBulkEnable` (bulk re-enable of disabled feeds) |
 | `src/components/feed/feed-error-banner.tsx` | `classifyError` / `reDetectSSE` moved to `src/lib/feed-error.ts` and imported back |
+| `src/components/feed/feed-modal.tsx` | +`initialStep` prop (opens on a given step, hides the back arrow) |
 | `src/lib/i18n.ts` | +35 keys (`settings.feeds*`), `feedError.httpError` placeholder fixed |
 
 `src/app.tsx` additionally has 2 lines adjusted and a small effect added (sidebar

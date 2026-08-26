@@ -9,6 +9,8 @@ import { FolderStep } from './folder-step'
 import { ArticleStep } from './article-step'
 import type { Category } from '../../../shared/types'
 
+type ModalStep = 'select' | 'feed' | 'folder' | 'article'
+
 interface FeedModalProps {
   onClose: () => void
   onCreated: () => void
@@ -16,9 +18,12 @@ interface FeedModalProps {
   onFetchStarted?: (feedId: number) => void
   onArticleCreated?: () => void
   categories?: Category[]
+  /**
+   * Step to open on. Defaults to the chooser; pass a step to go straight to it,
+   * in which case the back arrow is hidden — there is no chooser to go back to.
+   */
+  initialStep?: ModalStep
 }
-
-type ModalStep = 'select' | 'feed' | 'folder' | 'article'
 
 function BackButton({ onClick }: { onClick: () => void }) {
   return (
@@ -28,9 +33,9 @@ function BackButton({ onClick }: { onClick: () => void }) {
   )
 }
 
-export function FeedModal({ onClose, onCreated, onCategoryCreated, onFetchStarted, onArticleCreated, categories = [] }: FeedModalProps) {
+export function FeedModal({ onClose, onCreated, onCategoryCreated, onFetchStarted, onArticleCreated, categories = [], initialStep = 'select' }: FeedModalProps) {
   const { t } = useI18n()
-  const [step, setStep] = useState<ModalStep>('select')
+  const [step, setStep] = useState<ModalStep>(initialStep)
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
@@ -97,7 +102,7 @@ export function FeedModal({ onClose, onCreated, onCategoryCreated, onFetchStarte
       {step === 'feed' && (
         <>
           <div className="flex items-center gap-2 mb-4">
-            <BackButton onClick={() => setStep('select')} />
+            {initialStep === 'select' && <BackButton onClick={() => setStep('select')} />}
             <h2 className="text-base font-semibold">{t('modal.addFeed')}</h2>
           </div>
           <FeedStep
@@ -112,7 +117,7 @@ export function FeedModal({ onClose, onCreated, onCategoryCreated, onFetchStarte
       {step === 'article' && (
         <>
           <div className="flex items-center gap-2 mb-4">
-            <BackButton onClick={() => setStep('select')} />
+            {initialStep === 'select' && <BackButton onClick={() => setStep('select')} />}
             <h2 className="text-base font-semibold">{t('feeds.clipArticle')}</h2>
           </div>
           <ArticleStep
@@ -126,7 +131,7 @@ export function FeedModal({ onClose, onCreated, onCategoryCreated, onFetchStarte
       {step === 'folder' && (
         <>
           <div className="flex items-center gap-2 mb-4">
-            <BackButton onClick={() => setStep('select')} />
+            {initialStep === 'select' && <BackButton onClick={() => setStep('select')} />}
             <h2 className="text-base font-semibold">{t('modal.addFolder')}</h2>
           </div>
           <FolderStep

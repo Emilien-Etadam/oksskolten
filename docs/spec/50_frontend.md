@@ -240,6 +240,7 @@ Lists the feeds with `disabled = 1` or a non-null `last_error`, disabled first, 
 | Status | `error` (last fetch failed), `disabled` (auto-disabled after 5 consecutive failures), `inactive` (no article for 90 days, same rule as the sidebar), `ok`. Hovering a status shows `last_error` |
 | Sorting | Any column header. Count and date columns sort descending on first click, text columns ascending |
 | Filtering | Free-text search over name and URL, plus category and status dropdowns |
+| Adding | An `Add Feed` button in the section header opens the shared `FeedModal` with `initialStep="feed"`, skipping the add-something chooser. On success the table refreshes from the same SWR cache and the new feed's fetch is subscribed to |
 | Selection | Per-row checkbox toggles; Shift + Click selects a range; the header checkbox toggles every row matching the current filters |
 | Scope | Bulk actions apply only to selected feeds that the current filters keep visible — a selection hidden by a filter is never acted on |
 

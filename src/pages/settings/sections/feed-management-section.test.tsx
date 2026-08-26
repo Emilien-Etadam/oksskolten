@@ -28,6 +28,11 @@ vi.mock('sonner', () => ({
   toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }),
 }))
 
+// The modal has its own test; here only the wiring matters.
+vi.mock('../../../components/feed/feed-modal', () => ({
+  FeedModal: ({ initialStep }: { initialStep?: string }) => <div data-testid="feed-modal">{initialStep}</div>,
+}))
+
 const mutateFeeds = vi.fn()
 
 function createFeed(overrides: Partial<FeedWithCounts> & { id: number; name: string }): FeedWithCounts {
@@ -192,6 +197,16 @@ describe('FeedManagementSection', () => {
     await user.click(screen.getByLabelText('Gamma Dead'))
     await user.keyboard('{/Shift}')
     expect(screen.getByText('3 feeds selected')).toBeTruthy()
+  })
+
+  it('opens the add-feed modal straight on the feed step', async () => {
+    renderSection()
+    expect(screen.queryByTestId('feed-modal')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Add Feed' }))
+
+    const modal = screen.getByTestId('feed-modal')
+    expect(modal.textContent).toBe('feed')
   })
 
   it('selects every visible feed from the header checkbox', async () => {
