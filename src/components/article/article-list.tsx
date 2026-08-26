@@ -453,6 +453,70 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     setFocusedItemId(null)
   }, [feedId, categoryId, setFocusedItemId])
 
+  function renderArticle(article: ArticleListItem, index: number) {
+    const isAutoRead = autoReadIds.has(article.id)
+    const effectiveArticle = isAutoRead
+      ? { ...article, seen_at: article.seen_at ?? new Date().toISOString() }
+      : article
+    const handleOverlayOpen = articleOpenMode === 'overlay' ? (e: React.MouseEvent<HTMLAnchorElement>) => {
+      if (e.metaKey || e.ctrlKey || e.button === 1) return
+      e.preventDefault()
+      setOverlayUrl(article.url)
+    } : undefined
+    const cardProps = {
+      article: effectiveArticle,
+      layout,
+      isFeatured: layout === 'magazine' && index === 0,
+      onClick: handleOverlayOpen,
+      onMarkRead: markReadWithGroup,
+      groupCount: groupCounts.get(article.id),
+      ...displayConfig,
+    }
+    const isKbFocused = focusedItemId === String(article.id)
+    return (
+      <div
+        key={article.id}
+        data-article-id={article.id}
+        data-article-unread={article.seen_at == null && !isAutoRead ? '1' : '0'}
+        aria-selected={isKbFocused || undefined}
+        className={layout === 'magazine' && index === 0 ? 'col-span-full' : ''}
+        style={isKbFocused ? {
+          borderLeft: '2px solid var(--color-accent)',
+          backgroundColor: 'color-mix(in srgb, var(--color-accent) 10%, transparent)',
+        } : undefined}
+        onClick={() => {
+          if (!isGridLayout) {
+            setFocusedItemId(String(article.id))
+          }
+          // Opening a grouped story marks the absorbed duplicates too
+          for (const id of absorbedIdsRef.current.get(article.id) ?? []) {
+            markRead(id)
+          }
+        }}
+      >
+        {isTouchDevice ? (
+          <SwipeableArticleCard {...cardProps} />
+        ) : (
+          <ArticleCard {...cardProps} />
+        )}
+      </div>
+    )
+  }
+
+  // Grid layouts keep the flat list: sections would break the column flow, and
+  // a sticky header has nothing to unstick against there.
+  const dayGroups = useMemo(() => {
+    if (!showDaySeparators || isGridLayout) return null
+    const groups: { key: string; date: string | null; items: { article: ArticleListItem; index: number }[] }[] = []
+    articles.forEach((article, index) => {
+      const key = dayKeyOf(article.published_at)
+      const last = groups[groups.length - 1]
+      if (last && last.key === key) last.items.push({ article, index })
+      else groups.push({ key, date: article.published_at, items: [{ article, index }] })
+    })
+    return groups
+  }, [articles, showDaySeparators, isGridLayout])
+
   return (
     <main ref={listRef} className="max-w-2xl mx-auto" role={!isGridLayout ? 'listbox' : undefined}>
       {isTouchDevice && <PullToRefresh onRefresh={async () => {
@@ -524,65 +588,30 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
       )}
 
       <div className={isGridLayout ? 'grid grid-cols-1 md:grid-cols-2 gap-4 px-4 md:px-6' : ''}>
-        {articles.map((article, index) => {
-          const isAutoRead = autoReadIds.has(article.id)
-          const effectiveArticle = isAutoRead
-            ? { ...article, seen_at: article.seen_at ?? new Date().toISOString() }
-            : article
-          const handleOverlayOpen = articleOpenMode === 'overlay' ? (e: React.MouseEvent<HTMLAnchorElement>) => {
-            if (e.metaKey || e.ctrlKey || e.button === 1) return
-            e.preventDefault()
-            setOverlayUrl(article.url)
-          } : undefined
-          const cardProps = {
-            article: effectiveArticle,
-            layout,
-            isFeatured: layout === 'magazine' && index === 0,
-            onClick: handleOverlayOpen,
-            onMarkRead: markReadWithGroup,
-            groupCount: groupCounts.get(article.id),
-            ...displayConfig,
-          }
-          const isKbFocused = focusedItemId === String(article.id)
-          const previous = index > 0 ? articles[index - 1] : null
-          const startsNewDay = showDaySeparators && previous != null
-            && dayKeyOf(article.published_at) !== dayKeyOf(previous.published_at)
-          const card = (
-            <div
-              key={article.id}
-              data-article-id={article.id}
-              data-article-unread={article.seen_at == null && !isAutoRead ? '1' : '0'}
-              aria-selected={isKbFocused || undefined}
-              className={layout === 'magazine' && index === 0 ? 'col-span-full' : ''}
-              style={isKbFocused ? {
-                borderLeft: '2px solid var(--color-accent)',
-                backgroundColor: 'color-mix(in srgb, var(--color-accent) 10%, transparent)',
-              } : undefined}
-              onClick={() => {
-                if (!isGridLayout) {
-                  setFocusedItemId(String(article.id))
-                }
-                // Opening a grouped story marks the absorbed duplicates too
-                for (const id of absorbedIdsRef.current.get(article.id) ?? []) {
-                  markRead(id)
-                }
-              }}
-            >
-              {isTouchDevice ? (
-                <SwipeableArticleCard {...cardProps} />
-              ) : (
-                <ArticleCard {...cardProps} />
-              )}
-            </div>
-          )
-          if (!startsNewDay) return card
-          return (
-            <Fragment key={`day-${article.id}`}>
-              <DaySeparator date={article.published_at} className={isGridLayout ? 'col-span-full' : ''} />
-              {card}
-            </Fragment>
-          )
-        })}
+        {dayGroups
+          ? dayGroups.map(group => (
+              // One section per publication day: a sticky header only unsticks
+              // when its own section scrolls away, otherwise every day's header
+              // would pile up at the same offset.
+              <section key={group.key}>
+                <DaySeparator date={group.date} />
+                {group.items.map(({ article, index }) => renderArticle(article, index))}
+              </section>
+            ))
+          : articles.map((article, index) => {
+              const previous = index > 0 ? articles[index - 1] : null
+              const startsNewDay = showDaySeparators && (
+                previous == null || dayKeyOf(article.published_at) !== dayKeyOf(previous.published_at)
+              )
+              const card = renderArticle(article, index)
+              if (!startsNewDay) return card
+              return (
+                <Fragment key={`day-${article.id}`}>
+                  <DaySeparator date={article.published_at} sticky={false} className="col-span-full" />
+                  {card}
+                </Fragment>
+              )
+            })}
       </div>
 
       {hasMore && (

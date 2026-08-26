@@ -1,4 +1,5 @@
 import { useI18n } from '../../lib/i18n'
+import { calendarDaysAgo } from '../../lib/dateFormat'
 
 /**
  * Local calendar day of an ISO timestamp, as YYYY-MM-DD. Empty string when the
@@ -12,22 +13,13 @@ export function dayKeyOf(iso: string | null | undefined): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-/** Days between two local calendar days, ignoring the time of day. */
-function daysAgo(iso: string): number {
-  const d = new Date(iso)
-  const then = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  return Math.round((today - then) / (24 * 60 * 60 * 1000))
-}
-
 export function useDayLabel(): (iso: string | null | undefined) => string {
   const { t, locale } = useI18n()
   return (iso) => {
     if (!iso) return t('articles.dayUndated')
     const d = new Date(iso)
     if (Number.isNaN(d.getTime())) return t('articles.dayUndated')
-    const ago = daysAgo(iso)
+    const ago = calendarDaysAgo(iso)
     if (ago === 0) return t('articles.dayToday')
     if (ago === 1) return t('articles.dayYesterday')
     const opts: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long' }
@@ -36,11 +28,24 @@ export function useDayLabel(): (iso: string | null | undefined) => string {
   }
 }
 
-/** Row marking the start of a new publication day inside an article list. */
-export function DaySeparator({ date, className = '' }: { date: string | null | undefined; className?: string }) {
+/**
+ * Header for a publication day inside an article list. It sticks under the app
+ * header (and under the category tabs when those are mounted, which publish
+ * their height as --category-tabs-height), so the day stays legible while
+ * scrolling a long run of articles from it.
+ */
+export function DaySeparator({ date, sticky = true, className = '' }: {
+  date: string | null | undefined
+  /** Grid layouts pass false: sections would break the column flow, so there is nothing to unstick against */
+  sticky?: boolean
+  className?: string
+}) {
   const dayLabel = useDayLabel()
   return (
-    <div className={`flex items-center gap-3 px-4 md:px-6 pt-5 pb-2 select-none ${className}`}>
+    <div
+      className={`flex items-center gap-3 px-4 md:px-6 py-2 bg-bg select-none ${sticky ? 'sticky z-10' : ''} ${className}`}
+      style={sticky ? { top: 'calc(var(--header-height) + var(--category-tabs-height, 0px))' } : undefined}
+    >
       <span className="text-xs font-medium uppercase tracking-wide text-muted shrink-0">{dayLabel(date)}</span>
       <span className="h-px flex-1 bg-border" />
     </div>
