@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef, useMemo } from 'react'
+import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef, useMemo, Fragment } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import useSWR from 'swr'
 import useSWRInfinite from 'swr/infinite'
@@ -13,6 +13,7 @@ import { useAppLayout } from '../../app'
 import { ArticleCard, type ArticleDisplayConfig } from './article-card'
 import { FeedMetricsBar } from '../feed/feed-metrics-bar'
 import { SwipeableArticleCard } from './swipeable-article-card'
+import { DaySeparator, dayKeyOf } from './day-separator'
 import { articleUrlToPath } from '../../lib/url'
 import { ArticleOverlay } from './article-overlay'
 import { PullToRefresh } from '../layout/pull-to-refresh'
@@ -149,8 +150,12 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   // ---------------------------------------------------------------------------
   // Keyboard navigation
   // ---------------------------------------------------------------------------
-  const { focusedItemId, setFocusedItemId, setArticleIds, setArticleUrls, setLastListUrl } = useKeyboardNavigationContext()
+  const { focusedItemId, setFocusedItemId, setArticleIds, setArticleUrls, setArticleDates, setLastListUrl } = useKeyboardNavigationContext()
   const isKeyboardNavEnabled = keyboardNavigation === 'on' && !isGridLayout
+
+  // /likes and /history are ordered by liked_at / read_at, so publication days
+  // would not run in order there — no separators in those two lists.
+  const showDaySeparators = !isLikes && !isHistory
 
   const articleIds = useMemo(() => articles.map(a => String(a.id)), [articles])
   const articleUrls = useMemo(() => {
@@ -158,11 +163,17 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     for (const a of articles) map[String(a.id)] = a.url
     return map
   }, [articles])
+  const articleDates = useMemo(() => {
+    const map: Record<string, string | null> = {}
+    for (const a of articles) map[String(a.id)] = a.published_at
+    return map
+  }, [articles])
 
   useEffect(() => {
     setArticleIds(articleIds)
     setArticleUrls(articleUrls)
-  }, [articleIds, articleUrls, setArticleIds, setArticleUrls])
+    setArticleDates(articleDates)
+  }, [articleIds, articleUrls, articleDates, setArticleIds, setArticleUrls, setArticleDates])
 
   useEffect(() => {
     setLastListUrl(location.pathname)
@@ -533,7 +544,10 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
             ...displayConfig,
           }
           const isKbFocused = focusedItemId === String(article.id)
-          return (
+          const previous = index > 0 ? articles[index - 1] : null
+          const startsNewDay = showDaySeparators && previous != null
+            && dayKeyOf(article.published_at) !== dayKeyOf(previous.published_at)
+          const card = (
             <div
               key={article.id}
               data-article-id={article.id}
@@ -560,6 +574,13 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
                 <ArticleCard {...cardProps} />
               )}
             </div>
+          )
+          if (!startsNewDay) return card
+          return (
+            <Fragment key={`day-${article.id}`}>
+              <DaySeparator date={article.published_at} className={isGridLayout ? 'col-span-full' : ''} />
+              {card}
+            </Fragment>
           )
         })}
       </div>

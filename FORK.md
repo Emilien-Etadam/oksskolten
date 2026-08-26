@@ -23,6 +23,23 @@ of the last visited list. Reuses the existing keyboard-navigation context that p
 j/k zap navigation. Mounted from `src/components/article/article-detail.tsx`
 (2-line insertion).
 
+Crossing into another publication day stops on a full-screen divider naming that day
+instead of landing directly on the article: the same gesture again continues, the
+opposite one (or Escape) backs out. The keyboard-navigation context carries each
+article's `published_at` for it, alongside the ids and URLs it already held, and
+`useExtendArticleList` keeps those dates in step when it appends a window.
+
+## Day separators in article lists
+
+`src/components/article/day-separator.tsx` — article lists show a dated rule between
+publication days (`Today`, `Yesterday`, then the spelled-out day). Rendered from
+`article-list.tsx` between two articles of different days, never above the first one.
+`/likes` and `/history` are excluded: they are ordered by `liked_at` / `read_at`, so
+publication days would not run in order there.
+
+The same module backs the reader's day divider, so a day is named identically in the
+list and while paging through articles.
+
 ## Bottom tab bar
 
 `src/components/layout/bottom-nav.tsx` — newspaper-app-style bottom bar with the main
@@ -310,6 +327,9 @@ can rewrite a feed's RSS URL, which is not a bulk operation.
 | `src/hooks/use-feed-bulk-actions.ts` | +`handleBulkEnable` (bulk re-enable of disabled feeds) |
 | `src/components/feed/feed-error-banner.tsx` | `classifyError` / `reDetectSSE` moved to `src/lib/feed-error.ts` and imported back |
 | `src/components/feed/feed-modal.tsx` | +`initialStep` prop (opens on a given step, hides the back arrow) |
+| `src/components/article/article-list.tsx` | day separators in the render loop, publishes `articleDates` to the nav context |
+| `src/contexts/keyboard-navigation-context.tsx` | +`articleDates` (sessionStorage-backed, like ids and URLs) |
+| `src/hooks/use-extend-article-list.ts` | carries `dates` through the extension payload |
 | `src/lib/i18n.ts` | +35 keys (`settings.feeds*`), `feedError.httpError` placeholder fixed |
 
 `src/app.tsx` additionally has 2 lines adjusted and a small effect added (sidebar

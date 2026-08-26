@@ -72,6 +72,11 @@ const dict = {
   'modal.clipMoveToClips': { ja: 'クリップに移動', en: 'Move to Clips', zh: '移至剪藏'},
 
   // ArticleList
+  'articles.dayToday': { ja: '今日', en: 'Today', zh: '今天'},
+  'articles.dayYesterday': { ja: '昨日', en: 'Yesterday', zh: '昨天'},
+  'articles.dayUndated': { ja: '日付なし', en: 'Undated', zh: '无日期'},
+  'articles.dayContinue': { ja: '→ で続ける', en: 'Press → to continue', zh: '按 → 继续'},
+  'articles.dayContinueTouch': { ja: 'スワイプして続ける', en: 'Swipe to continue', zh: '滑动继续'},
   'articles.loadError': { ja: '読み込みに失敗しました', en: 'Failed to load', zh: '加载失败'},
   'articles.retry': { ja: '再試行', en: 'Retry', zh: '重试'},
   'articles.empty': { ja: '記事がありません', en: 'No articles', zh: '暂无文章'},

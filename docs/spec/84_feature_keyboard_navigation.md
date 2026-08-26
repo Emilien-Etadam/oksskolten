@@ -123,6 +123,18 @@ The `useKeybindingsSetting` hook manages local state and localStorage persistenc
 
 Returns `400` with a descriptive error if validation fails.
 
+### Day Divider
+
+Arrow-key and swipe navigation in the reader stops between publication days.
+
+| Item | Detail |
+|---|---|
+| Trigger | The target article's local calendar day differs from the current one. Either side missing a `published_at` raises no divider — there is no day to announce |
+| Appearance | Full-screen panel naming the day, with a hint to continue |
+| Continue | The same direction again, or a click/tap on the panel |
+| Back out | The opposite direction, or Escape — the reader stays on the current article |
+| Data | `articleDates` in the keyboard-navigation context, populated by the article list and extended by `useExtendArticleList` |
+
 ### Visual Feedback
 
 The keyboard-focused article receives the following styles:

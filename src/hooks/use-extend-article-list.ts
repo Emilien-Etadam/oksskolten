@@ -22,6 +22,7 @@ interface ArticlesResponse {
 export interface ExtendedList {
   ids: string[]
   urls: Record<string, string>
+  dates: Record<string, string | null>
 }
 
 /** Map a list route path to the /api/articles query it displays. */
@@ -59,21 +60,21 @@ function buildListQuery(listPath: string, clipFeedId: number | null, categoryUnr
  * should use the return value), or null when there was nothing to add.
  */
 export function useExtendArticleList(): () => Promise<ExtendedList | null> {
-  const { articleIds, articleUrls, setArticleIds, setArticleUrls, lastListUrl } = useKeyboardNavigationContext()
+  const { articleIds, articleUrls, articleDates, setArticleIds, setArticleUrls, setArticleDates, lastListUrl } = useKeyboardNavigationContext()
   const clipFeedId = useClipFeedId()
   const { settings } = useAppLayout()
   const categoryUnreadOnly = settings.categoryUnreadOnly === 'on'
 
   // Keep latest values in refs so the callback stays stable
-  const stateRef = useRef({ articleIds, articleUrls, lastListUrl, clipFeedId, categoryUnreadOnly })
-  stateRef.current = { articleIds, articleUrls, lastListUrl, clipFeedId, categoryUnreadOnly }
+  const stateRef = useRef({ articleIds, articleUrls, articleDates, lastListUrl, clipFeedId, categoryUnreadOnly })
+  stateRef.current = { articleIds, articleUrls, articleDates, lastListUrl, clipFeedId, categoryUnreadOnly }
   const inFlightRef = useRef<Promise<ExtendedList | null> | null>(null)
 
   return useCallback(() => {
     if (inFlightRef.current) return inFlightRef.current
 
     const run = (async (): Promise<ExtendedList | null> => {
-      const { articleIds, articleUrls, lastListUrl, clipFeedId, categoryUnreadOnly } = stateRef.current
+      const { articleIds, articleUrls, articleDates, lastListUrl, clipFeedId, categoryUnreadOnly } = stateRef.current
       const params = buildListQuery(lastListUrl || '/inbox', clipFeedId, categoryUnreadOnly)
       if (!params) return null
 
@@ -93,14 +94,19 @@ export function useExtendArticleList(): () => Promise<ExtendedList | null> {
 
       const ids = [...articleIds, ...fresh.map(a => String(a.id))]
       const urls = { ...articleUrls }
-      for (const a of fresh) urls[String(a.id)] = a.url
+      const dates = { ...articleDates }
+      for (const a of fresh) {
+        urls[String(a.id)] = a.url
+        dates[String(a.id)] = a.published_at ?? null
+      }
       setArticleIds(ids)
       setArticleUrls(urls)
-      return { ids, urls }
+      setArticleDates(dates)
+      return { ids, urls, dates }
     })()
 
     inFlightRef.current = run
     void run.finally(() => { inFlightRef.current = null })
     return run
-  }, [setArticleIds, setArticleUrls])
+  }, [setArticleIds, setArticleUrls, setArticleDates])
 }
