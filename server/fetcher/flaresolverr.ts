@@ -1,4 +1,7 @@
 import { Semaphore } from './util.js'
+import { logger } from '../logger.js'
+
+const log = logger.child('flaresolverr')
 
 const FLARESOLVERR_URL = process.env.FLARESOLVERR_URL
 const FLARESOLVERR_CONCURRENCY = Number(process.env.FLARESOLVERR_CONCURRENCY) || 0
@@ -98,9 +101,17 @@ async function doFetch(url: string, options?: FlareSolverrOptions): Promise<Flar
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(65_000),
     })
-    if (!res.ok) return null
+    if (!res.ok) {
+      log.warn(`Solver answered HTTP ${res.status} for ${url}`)
+      return null
+    }
     const data = await res.json() as FlareSolverrResponse
-    if (data.solution?.status === 200 && data.solution.response) {
+    if (data.solution?.status !== 200) {
+      // The solver ran but the site refused it too — a browser is not enough here
+      log.warn(`Solver could not load ${url}: status ${data.solution?.status ?? data.status ?? 'unknown'}`)
+      return null
+    }
+    if (data.solution.status === 200 && data.solution.response) {
       let body = data.solution.response
       // Chromium renders XML feeds as HTML with an XML viewer —
       // extract the raw XML from the embedded source element
@@ -113,7 +124,10 @@ async function doFetch(url: string, options?: FlareSolverrOptions): Promise<Flar
       }
     }
     return null
-  } catch {
+  } catch (err) {
+    // Unreachable solver, wrong port, timeout: without this the caller only
+    // ever saw the site's own status and had nothing to act on
+    log.warn(`Solver request failed for ${url}: ${err instanceof Error ? err.message : err}`)
     return null
   }
 }
