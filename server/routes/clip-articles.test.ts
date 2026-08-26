@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setupTestDb } from '../__tests__/helpers/testDb.js'
 import { buildApp } from '../__tests__/helpers/buildApp.js'
-import { createFeed, insertArticle, ensureClipFeed, getArticleById, markImagesArchived, markArticleSeen, upsertSetting } from '../db.js'
+import { createFeed, insertArticle, ensureClipFeed, getArticleById, markImagesArchived, markArticleSeen, upsertSetting, getDb } from '../db.js'
 import type { FastifyInstance } from 'fastify'
 import path from 'node:path'
 import os from 'node:os'
@@ -276,6 +276,139 @@ describe('POST /api/articles/from-url', () => {
 
     expect(res.statusCode).toBe(500)
     expect(res.json().error).toMatch(/clip feed/i)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// POST /api/articles/from-url — slow pages
+// ---------------------------------------------------------------------------
+
+describe('POST /api/articles/from-url when the page outlives the request', () => {
+  const originalBudget = process.env.CLIP_FETCH_BUDGET_MS
+
+  beforeEach(() => {
+    process.env.CLIP_FETCH_BUDGET_MS = '20'
+  })
+
+  afterEach(() => {
+    if (originalBudget === undefined) delete process.env.CLIP_FETCH_BUDGET_MS
+    else process.env.CLIP_FETCH_BUDGET_MS = originalBudget
+  })
+
+  /** last_error is not part of the article projection the API returns. */
+  function lastErrorOf(articleId: number): string | null {
+    const row = getDb().prepare('SELECT last_error FROM articles WHERE id = ?').get(articleId) as { last_error: string | null }
+    return row.last_error
+  }
+
+  /** A fetch the caller controls: resolves only when `finish` is called. */
+  function deferredFetch() {
+    let finish!: (content: unknown) => void
+    mockFetchArticleContent.mockReturnValue(new Promise(resolve => { finish = resolve }))
+    return { finish }
+  }
+
+  it('201: saves the clip and reports the content as pending', async () => {
+    ensureClipFeed()
+    deferredFetch()
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/articles/from-url',
+      headers: json,
+      payload: { url: 'https://slow.example.com/deep/post' },
+    })
+
+    expect(res.statusCode).toBe(201)
+    const body = res.json()
+    expect(body.created).toBe(true)
+    expect(body.content_pending).toBe(true)
+    // Saved right away so the clip is not lost, titled after the host until
+    // the page hands over its own title.
+    expect(body.article.title).toBe('slow.example.com')
+    expect(body.article.full_text).toBeNull()
+    // last_error is set so the retry pass adopts the row if the server dies.
+    expect(lastErrorOf(body.article.id)).toBeTruthy()
+  })
+
+  it('fills the article in when the background fetch finishes', async () => {
+    ensureClipFeed()
+    const { finish } = deferredFetch()
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/articles/from-url',
+      headers: json,
+      payload: { url: 'https://slow.example.com/deep/post' },
+    })
+    const articleId = res.json().article.id
+
+    finish({
+      fullText: 'The body that took its time',
+      ogImage: 'https://slow.example.com/og.jpg',
+      excerpt: 'Short excerpt',
+      lang: 'en',
+      lastError: null,
+      title: 'The Real Title',
+    })
+    await vi.waitFor(() => {
+      expect(getArticleById(articleId)?.full_text).toBe('The body that took its time')
+    })
+
+    const article = getArticleById(articleId)
+    expect(article?.title).toBe('The Real Title')
+    expect(article?.og_image).toBe('https://slow.example.com/og.jpg')
+    expect(article?.lang).toBe('en')
+    expect(lastErrorOf(articleId)).toBeNull()
+    // One page fetch in total — the request and the background fill share it.
+    expect(mockFetchArticleContent).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a caller-supplied title when the background fetch finds another', async () => {
+    ensureClipFeed()
+    const { finish } = deferredFetch()
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/articles/from-url',
+      headers: json,
+      payload: { url: 'https://slow.example.com/deep/post', title: 'My Custom Title' },
+    })
+    const articleId = res.json().article.id
+
+    finish({
+      fullText: 'Body',
+      ogImage: null,
+      excerpt: null,
+      lang: 'en',
+      lastError: null,
+      title: 'The Real Title',
+    })
+    await vi.waitFor(() => {
+      expect(getArticleById(articleId)?.full_text).toBe('Body')
+    })
+
+    expect(getArticleById(articleId)?.title).toBe('My Custom Title')
+  })
+
+  it('records the reason when the background fetch fails outright', async () => {
+    ensureClipFeed()
+    let fail!: (err: Error) => void
+    mockFetchArticleContent.mockReturnValue(new Promise((_resolve, reject) => { fail = reject }))
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/articles/from-url',
+      headers: json,
+      payload: { url: 'https://slow.example.com/deep/post' },
+    })
+    const articleId = res.json().article.id
+
+    fail(new Error('socket hang up'))
+    await vi.waitFor(() => {
+      expect(lastErrorOf(articleId)).toBe('socket hang up')
+    })
+    expect(getArticleById(articleId)?.full_text).toBeNull()
   })
 })
 

@@ -6,11 +6,12 @@ import { LocaleContext } from '../../lib/i18n'
 import { TooltipProvider } from '../ui/tooltip'
 import { KeyboardNavigationProvider } from '../../contexts/keyboard-navigation-context'
 
-const { mockApiPatch, mockApiPost, mockTrackRead, mockQueueSeenIds } = vi.hoisted(() => ({
+const { mockApiPatch, mockApiPost, mockTrackRead, mockQueueSeenIds, mockFetcher } = vi.hoisted(() => ({
   mockApiPatch: vi.fn(),
   mockApiPost: vi.fn(() => Promise.resolve()),
   mockTrackRead: vi.fn(),
   mockQueueSeenIds: vi.fn((_ids: number[]) => Promise.resolve()),
+  mockFetcher: vi.fn((_key: string): Promise<unknown> => Promise.reject(new Error('no network in tests'))),
 }))
 
 vi.mock('../../lib/fetcher', async () => {
@@ -19,6 +20,7 @@ vi.mock('../../lib/fetcher', async () => {
     ...actual,
     apiPatch: mockApiPatch,
     apiPost: mockApiPost,
+    fetcher: (key: string) => mockFetcher(key),
   }
 })
 
@@ -74,6 +76,11 @@ vi.mock('../chat/chat-fab', () => ({
 }))
 
 import { ArticleDetail } from './article-detail'
+
+beforeEach(() => {
+  mockFetcher.mockReset()
+  mockFetcher.mockRejectedValue(new Error('no network in tests'))
+})
 
 const mockSettings = {
   internalLinks: 'on' as const,
@@ -479,5 +486,120 @@ describe('ArticleDetail title translation', () => {
 
     expect(screen.getByText('Titre traduit')).toBeTruthy()
     expect(screen.queryByText('Original Title')).toBeNull()
+  })
+})
+
+describe('ArticleDetail empty body recovery', () => {
+  const articleUrl = 'https://example.com/posts/clipped'
+  const articleKey = `/api/articles/by-url?url=${encodeURIComponent(articleUrl)}`
+
+  const baseArticle = {
+    id: 7,
+    feed_id: 3,
+    feed_name: 'Clips',
+    title: 'Clipped Article',
+    url: articleUrl,
+    published_at: '2026-03-04T00:00:00.000Z',
+    lang: 'en',
+    summary: null,
+    full_text: null as string | null,
+    full_text_translated: null as string | null,
+    translated_lang: null as string | null,
+    seen_at: '2026-03-04T00:00:00.000Z',
+    read_at: '2026-03-04T00:00:00.000Z',
+    bookmarked_at: null,
+    liked_at: null,
+  }
+
+  beforeEach(() => {
+    mockApiPatch.mockReset()
+    mockApiPost.mockReset()
+    mockApiPost.mockResolvedValue(undefined)
+    mockTrackRead.mockReset()
+    mockQueueSeenIds.mockClear()
+    mockUseTranslate.mockClear()
+    mockUseTranslate.mockReturnValue({
+      viewMode: 'original',
+      setViewMode: vi.fn(),
+      translating: false,
+      translatingText: '',
+      fullTextTranslated: null,
+      handleTranslate: vi.fn(),
+      translatingHtml: '',
+      error: null,
+    })
+  })
+
+  // The app disables SWR revalidation globally, so these tests reproduce that
+  // config: without it SWR would refetch on mount anyway and prove nothing.
+  function renderCached(article: typeof baseArticle) {
+    render(
+      <MemoryRouter>
+        <LocaleContext.Provider value={{ locale: 'ja', setLocale: vi.fn() }}>
+          <TooltipProvider>
+            <SWRConfig
+              value={{
+                provider: () => new Map(),
+                revalidateOnFocus: false,
+                revalidateIfStale: false,
+                revalidateOnReconnect: false,
+                fallback: { [articleKey]: article },
+              }}
+            >
+              <Routes>
+                <Route element={<OutletWrapper />}>
+                  <Route path="*" element={<ArticleDetail articleUrl={articleUrl} />} />
+                </Route>
+              </Routes>
+            </SWRConfig>
+          </TooltipProvider>
+        </LocaleContext.Provider>
+      </MemoryRouter>,
+    )
+  }
+
+  // Other keys (the chat panel) go through the same fetcher, so count only
+  // the requests aimed at this article.
+  function articleFetchCount() {
+    return mockFetcher.mock.calls.filter(([key]) => key === articleKey).length
+  }
+
+  function serveArticle(article: unknown) {
+    mockFetcher.mockImplementation((key: string) =>
+      key === articleKey ? Promise.resolve(article) : Promise.reject(new Error('no network in tests')))
+  }
+
+  it('refetches an article whose body is still empty, and shows the recovered text', async () => {
+    serveArticle({ ...baseArticle, full_text: 'Recovered body text' })
+
+    renderCached(baseArticle)
+
+    await waitFor(() => {
+      expect(screen.getByText('Recovered body text')).toBeTruthy()
+    })
+    expect(articleFetchCount()).toBe(1)
+  })
+
+  it('refetches only once when the body is still empty on the server', async () => {
+    serveArticle({ ...baseArticle })
+
+    renderCached(baseArticle)
+
+    await waitFor(() => {
+      expect(articleFetchCount()).toBe(1)
+    })
+    // Give a re-render pass a chance to fire a second request before asserting.
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(articleFetchCount()).toBe(1)
+  })
+
+  it('does not refetch an article that already has a body', async () => {
+    serveArticle({ ...baseArticle, full_text: 'Already here' })
+
+    renderCached({ ...baseArticle, full_text: 'Already here' })
+
+    expect(screen.getByText('Already here')).toBeTruthy()
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(articleFetchCount()).toBe(0)
   })
 })

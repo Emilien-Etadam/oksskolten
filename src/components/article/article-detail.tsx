@@ -44,6 +44,18 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
   const { data: article, error, mutate } = useSWR<ArticleDetailData>(articleKey, fetcher)
   const { mutate: globalMutate } = useSWRConfig()
 
+  // An article with no body is an unfinished answer, not a final one: the
+  // server fills full_text in later (retry pass, anti-bot solver, a re-clip).
+  // Revalidation is disabled app-wide, which would otherwise pin that empty
+  // copy to the cache until a full page reload, so ask once for fresh data.
+  const bodyRefetchedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!article || article.full_text) return
+    if (bodyRefetchedFor.current === articleKey) return
+    bodyRefetchedFor.current = articleKey
+    void mutate()
+  }, [article, articleKey, mutate])
+
   const isUserLang = article?.lang === (translateTargetLang || locale)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
 
