@@ -246,6 +246,24 @@ server/lib/cleaner/
 node --import tsx scripts/debug-extract.ts <url>
 ```
 
+### Google News Links
+
+Google News feeds link to `news.google.com/rss/articles/<token>`, a wrapper that
+carries no article text — only a redirect to the publisher. `fetchFullText()`
+resolves it before anything else runs, so extraction reads the real page
+(`server/fetcher/google-news.ts`).
+
+| Strategy | Cost | Covers |
+|---|---|---|
+| Decode the token | No network — the payload of a pre-2024 token contains the publisher URL as plain ASCII | Legacy links |
+| Follow the redirect | One request; uses the final URL, or the `data-n-au` / meta-refresh / first non-Google link in the shell | Links Google still redirects server-side |
+| FlareSolverr | A browser run, only when configured | Script-driven redirects |
+
+The article keeps the wrapper as its stored `url` — it is the RSS item's identity
+and the deduplication key, and it still resolves in a browser. When every
+strategy comes up empty the wrapper is fetched as before, which yields the RSS
+excerpt rather than an error.
+
 ### Language Detection (Local Processing)
 
 ```typescript
