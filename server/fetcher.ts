@@ -244,7 +244,7 @@ async function processArticle(task: ArticleTask): Promise<boolean> {
       maybeEnqueueAutoTranslate(articleId, content.fullText, effectiveLang)
       enqueueAiFilter(articleId, task.feed_id)
       // Fire-and-forget: detect similar articles asynchronously
-      void detectAndStoreSimilarArticles(articleId, task.title, task.feed_id, task.published_at)
+      void detectAndStoreSimilarArticles(articleId, task.title, task.feed_id, task.published_at, task.url)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       if (!msg.includes('UNIQUE constraint failed')) {

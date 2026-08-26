@@ -21,7 +21,7 @@ Users subscribing to multiple feeds covering the same topics (e.g., tech news) s
 
 1. After a new article is inserted, search Meilisearch using the article's title as query
 2. Filter candidates: within ±3 days of `published_at`, OR with no `published_at` at all (see note below)
-3. Exclude same-feed candidates (`feed_id != X`) in application code
+3. Exclude same-feed candidates (`feed_id != X`) in application code, except two Reddit posts of **different subreddits**: an aggregator feed (a Reddit multi) carries a crosspost and its original side by side, same title, same feed. Same subreddit stays excluded, so a thread posted daily under one title is not folded into its previous editions
 4. Compute bigram Dice coefficient between the new article's title and each candidate's title
 5. Accept matches with score >= 0.4
 

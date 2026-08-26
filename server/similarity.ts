@@ -40,6 +40,29 @@ export function computeTitleSimilarity(a: string, b: string): number {
   return (2 * intersection) / (setA.size + setB.size)
 }
 
+/** Subreddit an article URL belongs to, or null when it is not a Reddit post. */
+function subredditOf(url: string | undefined): string | null {
+  if (!url) return null
+  const m = /^https?:\/\/(?:www\.|old\.|new\.)?reddit\.com\/r\/([^/]+)\/comments\//i.exec(url)
+  return m ? m[1].toLowerCase() : null
+}
+
+/**
+ * Whether two articles of the same feed may still be compared.
+ *
+ * Same-feed candidates are normally skipped: within one blog, "Weekly digest
+ * #12" and "#13" share almost every bigram without being the same story.
+ * Aggregator feeds break that assumption — a Reddit multi carries a crosspost
+ * and its original side by side, same title, same feed. Those are compared,
+ * but only across subreddits, so a thread posted under the same title in the
+ * same subreddit every day stays separate.
+ */
+function comparableWithinFeed(url: string | undefined, candidateUrl: string | undefined): boolean {
+  const a = subredditOf(url)
+  const b = subredditOf(candidateUrl)
+  return a !== null && b !== null && a !== b
+}
+
 /**
  * Detect and store similar articles for a newly inserted article.
  * Runs asynchronously (fire-and-forget) after article insertion.
@@ -49,6 +72,7 @@ export async function detectAndStoreSimilarArticles(
   title: string,
   feedId: number,
   publishedAt: string | null,
+  url?: string,
 ): Promise<void> {
   try {
     if (!isSearchReady()) return
@@ -80,8 +104,9 @@ export async function detectAndStoreSimilarArticles(
     let markedSeen = false
 
     for (const candidate of candidates) {
-      // Skip same-feed articles
-      if (candidate.feed_id === feedId) continue
+      // Skip same-feed articles, unless they are Reddit posts from different
+      // subreddits — a crosspost and its original land in the same multi feed
+      if (candidate.feed_id === feedId && !comparableWithinFeed(url, candidate.url)) continue
 
       const score = computeTitleSimilarity(title, candidate.title)
       if (score < SIMILARITY_THRESHOLD) continue
