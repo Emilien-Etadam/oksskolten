@@ -130,6 +130,59 @@ describe('detectAndStoreSimilarArticles', () => {
     expect(mockInsertSimilarity).not.toHaveBeenCalled()
   })
 
+  it('links a crosspost to its original inside the same aggregator feed', async () => {
+    mockMeiliSearch.mockResolvedValue({ hits: [{ id: 2 }], estimatedTotalHits: 1 })
+    mockGetArticlesByIds.mockReturnValue([
+      {
+        id: 2,
+        feed_id: 10,
+        title: 'I built a free cross-platform client for open-weight models',
+        url: 'https://www.reddit.com/r/LocalLLaMA/comments/aaa111/i_built_a_free_client/',
+        published_at: null,
+        read_at: null,
+      },
+    ])
+    await detectAndStoreSimilarArticles(
+      1,
+      'I built a free cross-platform client for open-weight models',
+      10,
+      '2026-01-01T00:00:00Z',
+      'https://www.reddit.com/r/LocalLLM/comments/bbb222/i_built_a_free_client/',
+    )
+    expect(mockInsertSimilarity).toHaveBeenCalledWith(1, 2, 1)
+  })
+
+  it('keeps a recurring thread of one subreddit separate', async () => {
+    mockMeiliSearch.mockResolvedValue({ hits: [{ id: 2 }], estimatedTotalHits: 1 })
+    mockGetArticlesByIds.mockReturnValue([
+      {
+        id: 2,
+        feed_id: 10,
+        title: 'Daily Discussion Thread',
+        url: 'https://www.reddit.com/r/LocalLLaMA/comments/aaa111/daily_discussion_thread/',
+        published_at: null,
+        read_at: null,
+      },
+    ])
+    await detectAndStoreSimilarArticles(
+      1,
+      'Daily Discussion Thread',
+      10,
+      '2026-01-01T00:00:00Z',
+      'https://www.reddit.com/r/LocalLLaMA/comments/bbb222/daily_discussion_thread/',
+    )
+    expect(mockInsertSimilarity).not.toHaveBeenCalled()
+  })
+
+  it('still skips same-feed candidates outside Reddit', async () => {
+    mockMeiliSearch.mockResolvedValue({ hits: [{ id: 2 }], estimatedTotalHits: 1 })
+    mockGetArticlesByIds.mockReturnValue([
+      { id: 2, feed_id: 10, title: 'Weekly digest #13', url: 'https://blog.example.com/digest-13', published_at: null, read_at: null },
+    ])
+    await detectAndStoreSimilarArticles(1, 'Weekly digest #12', 10, '2026-01-01T00:00:00Z', 'https://blog.example.com/digest-12')
+    expect(mockInsertSimilarity).not.toHaveBeenCalled()
+  })
+
   it('skips candidates below the similarity threshold', async () => {
     mockMeiliSearch.mockResolvedValue({ hits: [{ id: 2 }], estimatedTotalHits: 1 })
     mockGetArticlesByIds.mockReturnValue([

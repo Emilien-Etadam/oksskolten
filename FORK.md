@@ -159,6 +159,29 @@ blocked by network security"), so fetches escalate through a ladder, first match
 5. **Anti-bot solver** — FlareSolverr or the API-compatible
    [Byparr](https://github.com/ThePhaseless/Byparr) via `FLARESOLVERR_URL`.
 
+## Crossposts are grouped inside an aggregator feed
+
+Similarity detection skips same-feed candidates, because within one blog
+"Weekly digest #12" and "#13" share almost every bigram without being the same
+story. A Reddit multi breaks that assumption: a crosspost and its original
+arrive in the same feed, under the same title, and were shown as two articles.
+
+`comparableWithinFeed()` in `server/similarity.ts` lets same-feed candidates
+through when both are Reddit posts from *different* subreddits — the crosspost
+case — while a thread posted under the same title in the same subreddit every
+day stays separate. `detectAndStoreSimilarArticles()` takes the article's URL
+for it.
+
+## Removed Reddit posts are not ingested
+
+Reddit keeps removed posts in its RSS feeds, with `[ Removed by Reddit ]` (or
+`[deleted by user]`) as the title and the removal notice as the body. They were
+being stored and shown like any article, translated placeholder title included.
+`isRemovedRedditPost()` in `server/fetcher/reddit.ts` recognises them, and the
+task builder in `server/fetcher.ts` drops them before the fetch phase. The check
+is scoped to Reddit post URLs, so an ordinary article whose title mentions
+removal is untouched.
+
 ## Social searches as feeds
 
 Adding a search or hashtag URL creates a feed from it
@@ -340,6 +363,8 @@ can rewrite a feed's RSS URL, which is not a bulk operation.
 | `src/components/feed/feed-modal.tsx` | +`initialStep` prop (opens on a given step, hides the back arrow) |
 | `src/components/article/article-list.tsx` | per-day sections in the render loop, publishes `articleDates` to the nav context |
 | `src/lib/dateFormat.ts` | `formatRelativeDate` counts calendar days; +`calendarDaysAgo` |
+| `server/fetcher.ts` | +1 import, removed Reddit posts filtered out of the new-article tasks, article URL passed to similarity detection |
+| `server/similarity.ts` | same-feed skip relaxed for cross-subreddit Reddit duplicates |
 | `src/contexts/keyboard-navigation-context.tsx` | +`articleDates` (sessionStorage-backed, like ids and URLs) |
 | `src/hooks/use-extend-article-list.ts` | carries `dates` through the extension payload |
 | `src/lib/i18n.ts` | +35 keys (`settings.feeds*`), `feedError.httpError` placeholder fixed |

@@ -26,6 +26,7 @@ import { type FetchRssResult, type RssItem, fetchAndParseRss, RateLimitError } f
 import { computeInterval, computeEmpiricalInterval, sqliteFuture, DEFAULT_INTERVAL } from './fetcher/schedule.js'
 import { DEFAULT_LANGUAGE } from '../shared/lang.js'
 import { detectLanguage } from './fetcher/ai.js'
+import { isRemovedRedditPost } from './fetcher/reddit.js'
 import { enqueueAutoTranslate, enqueueAutoSummarize, enqueueAiFilter, isAutoTranslateEnabled, isAutoSummarizeEnabled, resumePendingAiTasks } from './fetcher/ai-queue.js'
 import { logger } from './logger.js'
 
@@ -243,7 +244,7 @@ async function processArticle(task: ArticleTask): Promise<boolean> {
       maybeEnqueueAutoTranslate(articleId, content.fullText, effectiveLang)
       enqueueAiFilter(articleId, task.feed_id)
       // Fire-and-forget: detect similar articles asynchronously
-      void detectAndStoreSimilarArticles(articleId, task.title, task.feed_id, task.published_at)
+      void detectAndStoreSimilarArticles(articleId, task.title, task.feed_id, task.published_at, task.url)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       if (!msg.includes('UNIQUE constraint failed')) {
@@ -313,8 +314,15 @@ export async function fetchSingleFeed(
   const existing = getExistingArticleUrls(urls)
   refreshStaleArticles(feed.id, rssResult.items)
 
+  const removedRedditPosts = rssResult.items.filter(item => isRemovedRedditPost(item.url, item.title))
+  if (removedRedditPosts.length > 0) {
+    log.info(`Feed ${feed.name}: skipping ${removedRedditPosts.length} removed Reddit post(s)`)
+  }
+
   const tasks: ArticleTask[] = rssResult.items
-    .filter(item => !existing.has(item.url))
+    // Reddit keeps removed posts in the feed with a placeholder title and a
+    // removal notice for a body — nothing worth storing or reading.
+    .filter(item => !existing.has(item.url) && !isRemovedRedditPost(item.url, item.title))
     .map(item => ({
       kind: 'new' as const,
       feed_id: feed.id,
