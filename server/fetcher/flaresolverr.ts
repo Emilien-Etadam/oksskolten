@@ -1,7 +1,17 @@
 import { Semaphore } from './util.js'
+import { logger } from '../logger.js'
+
+const log = logger.child('flaresolverr')
 
 const FLARESOLVERR_URL = process.env.FLARESOLVERR_URL
 const FLARESOLVERR_CONCURRENCY = Number(process.env.FLARESOLVERR_CONCURRENCY) || 0
+/**
+ * How long the solver may spend on one page. FlareSolverr answers a simple
+ * page in seconds, but a browser-based solver on a site that stalls it can sit
+ * far longer — Byparr on Medium outlasts a minute — and the fixed 60s cut the
+ * request off before any answer, good or bad, came back.
+ */
+const SOLVER_TIMEOUT_MS = Number(process.env.FLARESOLVERR_TIMEOUT_MS) || 60_000
 const flaresolverrSemaphore = FLARESOLVERR_CONCURRENCY > 0 ? new Semaphore(FLARESOLVERR_CONCURRENCY) : null
 
 export type FlareSolverrResult = { body: string; contentType: string; url: string }
@@ -88,7 +98,7 @@ export async function fetchViaFlareSolverr(url: string, options?: FlareSolverrOp
 
 async function doFetch(url: string, options?: FlareSolverrOptions): Promise<FlareSolverrResult | null> {
   try {
-    const payload: Record<string, unknown> = { cmd: 'request.get', url, maxTimeout: 60_000 }
+    const payload: Record<string, unknown> = { cmd: 'request.get', url, maxTimeout: SOLVER_TIMEOUT_MS }
     if (options?.waitForSelector) {
       payload.waitForSelector = options.waitForSelector
     }
@@ -96,11 +106,20 @@ async function doFetch(url: string, options?: FlareSolverrOptions): Promise<Flar
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(65_000),
+      // Leave the solver a margin to answer after its own deadline
+      signal: AbortSignal.timeout(SOLVER_TIMEOUT_MS + 10_000),
     })
-    if (!res.ok) return null
+    if (!res.ok) {
+      log.warn(`Solver answered HTTP ${res.status} for ${url}`)
+      return null
+    }
     const data = await res.json() as FlareSolverrResponse
-    if (data.solution?.status === 200 && data.solution.response) {
+    if (data.solution?.status !== 200) {
+      // The solver ran but the site refused it too — a browser is not enough here
+      log.warn(`Solver could not load ${url}: status ${data.solution?.status ?? data.status ?? 'unknown'}`)
+      return null
+    }
+    if (data.solution.status === 200 && data.solution.response) {
       let body = data.solution.response
       // Chromium renders XML feeds as HTML with an XML viewer —
       // extract the raw XML from the embedded source element
@@ -113,7 +132,10 @@ async function doFetch(url: string, options?: FlareSolverrOptions): Promise<Flar
       }
     }
     return null
-  } catch {
+  } catch (err) {
+    // Unreachable solver, wrong port, timeout: without this the caller only
+    // ever saw the site's own status and had nothing to act on
+    log.warn(`Solver request failed for ${url}: ${err instanceof Error ? err.message : err}`)
     return null
   }
 }

@@ -17,7 +17,7 @@ vi.mock('./flaresolverr.js', () => ({
   fetchViaFlareSolverr: (...args: unknown[]) => mockFetchViaFlareSolverr(...args),
 }))
 
-import { fetchHtml, decodeResponse, USER_AGENT, DEFAULT_TIMEOUT, DISCOVERY_TIMEOUT, PROBE_TIMEOUT } from './http.js'
+import { fetchHtml, decodeResponse, USER_AGENT, BROWSER_USER_AGENT, DEFAULT_TIMEOUT, DISCOVERY_TIMEOUT, PROBE_TIMEOUT } from './http.js'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -148,6 +148,58 @@ function fakeResponse(body: Uint8Array, contentType?: string): Response {
     arrayBuffer: async () => body.buffer,
   } as Response
 }
+
+describe('fetchHtml bot-block retry', () => {
+  function htmlResponse(body: string) {
+    return {
+      ok: true,
+      text: async () => body,
+      arrayBuffer: async () => new TextEncoder().encode(body).buffer,
+      headers: new Headers({ 'content-type': 'text/html' }),
+    }
+  }
+
+  it('retries as a browser when the site answers 403', async () => {
+    mockSafeFetch
+      .mockResolvedValueOnce({ ok: false, status: 403 })
+      .mockResolvedValueOnce(htmlResponse('<html>article</html>'))
+
+    const result = await fetchHtml('https://medium.com/@someone/a-story')
+
+    expect(result.html).toBe('<html>article</html>')
+    expect(result.usedFlareSolverr).toBe(false)
+    const [, retryInit] = mockSafeFetch.mock.calls[1]
+    expect((retryInit as { headers: Record<string, string> }).headers['User-Agent']).toBe(BROWSER_USER_AGENT)
+    expect(mockFetchViaFlareSolverr).not.toHaveBeenCalled()
+  })
+
+  it('falls through to FlareSolverr when the retry is blocked too', async () => {
+    mockSafeFetch
+      .mockResolvedValueOnce({ ok: false, status: 403 })
+      .mockResolvedValueOnce({ ok: false, status: 403 })
+    mockFetchViaFlareSolverr.mockResolvedValue({ body: '<html>via browser</html>', contentType: 'text/html', url: 'https://medium.com/x' })
+
+    const result = await fetchHtml('https://medium.com/@someone/a-story')
+
+    expect(result.usedFlareSolverr).toBe(true)
+    expect(mockSafeFetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not retry a plain 404', async () => {
+    mockSafeFetch.mockResolvedValue({ ok: false, status: 404 })
+    mockFetchViaFlareSolverr.mockResolvedValue(null)
+
+    await expect(fetchHtml('https://example.com/gone')).rejects.toThrow('HTTP 404')
+    expect(mockSafeFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports the original status when everything fails', async () => {
+    mockSafeFetch.mockResolvedValue({ ok: false, status: 403 })
+    mockFetchViaFlareSolverr.mockResolvedValue(null)
+
+    await expect(fetchHtml('https://medium.com/@someone/a-story')).rejects.toThrow('HTTP 403')
+  })
+})
 
 describe('decodeResponse', () => {
   it('uses fast path for explicit UTF-8 charset', async () => {

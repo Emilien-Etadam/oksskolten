@@ -185,6 +185,10 @@ blocked by network security"), so fetches escalate through a ladder, first match
 4. **Anonymous ladder** — default UA, browser UA, then `old.reddit.com`.
 5. **Anti-bot solver** — FlareSolverr or the API-compatible
    [Byparr](https://github.com/ThePhaseless/Byparr) via `FLARESOLVERR_URL`.
+   Its per-page budget is `FLARESOLVERR_TIMEOUT_MS` (default 60s): a
+   browser-based solver on a site that stalls it can outlast a fixed minute,
+   and the request used to be cut off before any answer came back. Every
+   failure path now logs its cause instead of returning a silent null.
 
 ## Crossposts are grouped inside an aggregator feed
 
@@ -198,6 +202,16 @@ through when both are Reddit posts from *different* subreddits — the crosspost
 case — while a thread posted under the same title in the same subreddit every
 day stays separate. `detectAndStoreSimilarArticles()` takes the article's URL
 for it.
+
+## A browser-shaped retry before the solver
+
+Article fetches announce themselves as `RSSReader/1.0`, and sites behind a WAF
+answer `403` on sight — a clipped Medium story stored nothing but
+`fetchFullText: HTTP 403`. `fetchHtml()` now retries once with a browser
+User-Agent (and the `Accept` headers that go with it) on `403` and `503` before
+reaching for FlareSolverr, which is both slower and often not deployed. Other
+statuses are answers rather than blocks and are not retried. The browser UA
+moved to `server/fetcher/http.ts`, where the Reddit ladder now takes it from.
 
 ## Google News links resolve to the publisher
 
@@ -413,6 +427,7 @@ can rewrite a feed's RSS URL, which is not a bulk operation.
 | `src/lib/dateFormat.ts` | `formatRelativeDate` counts calendar days; +`calendarDaysAgo` |
 | `server/fetcher.ts` | +1 import, removed Reddit posts filtered out of the new-article tasks, article URL passed to similarity detection |
 | `server/fetcher/content.ts` | +1 import, Google News wrapper resolved at the top of `fetchFullText()` |
+| `server/fetcher/http.ts` | browser-UA retry on 403/503, +`BROWSER_USER_AGENT` (moved from `reddit.ts`) |
 | `server/similarity.ts` | same-feed skip relaxed for cross-subreddit Reddit duplicates |
 | `src/contexts/keyboard-navigation-context.tsx` | +`articleDates` (sessionStorage-backed, like ids and URLs) |
 | `src/hooks/use-extend-article-list.ts` | carries `dates` through the extension payload |

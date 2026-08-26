@@ -4,6 +4,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
+const { mockWarn } = vi.hoisted(() => ({ mockWarn: vi.fn() }))
+vi.mock('../logger.js', () => ({
+  logger: { child: () => ({ warn: mockWarn, info: vi.fn(), debug: vi.fn(), error: vi.fn() }) },
+}))
+
 // Reset module between tests to clear internal cache
 beforeEach(() => {
   vi.clearAllMocks()
@@ -262,5 +267,43 @@ describe('fetchViaFlareSolverr', () => {
     expect(r1).toEqual(r2)
     // Should only make one actual fetch call due to caching
     expect(callCount).toBe(1)
+  })
+})
+
+describe('fetchViaFlareSolverr diagnostics', () => {
+  it('says so when the solver cannot be reached', async () => {
+    mockFetch.mockRejectedValue(new Error('connect ECONNREFUSED 192.168.30.225:8191'))
+    const { fetchViaFlareSolverr } = await import('./flaresolverr.js')
+
+    expect(await fetchViaFlareSolverr('https://medium.com/@a/unreachable-solver')).toBeNull()
+    expect(mockWarn).toHaveBeenCalledWith(expect.stringContaining('ECONNREFUSED'))
+  })
+
+  it('says so when the solver loads the page but the site refuses it', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: 'ok', solution: { url: 'https://medium.com/x', status: 403, response: '', headers: {} } }),
+    })
+    const { fetchViaFlareSolverr } = await import('./flaresolverr.js')
+
+    expect(await fetchViaFlareSolverr('https://medium.com/@a/refused-through-solver')).toBeNull()
+    expect(mockWarn).toHaveBeenCalledWith(expect.stringContaining('403'))
+  })
+})
+
+describe('solver timeout budget', () => {
+  it('asks for the configured budget instead of a fixed minute', async () => {
+    vi.stubEnv('FLARESOLVERR_TIMEOUT_MS', '150000')
+    vi.resetModules()
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: 'ok', solution: { url: 'https://slow.example', status: 200, response: '<html>ok</html>', headers: {} } }),
+    })
+    const { fetchViaFlareSolverr } = await import('./flaresolverr.js')
+
+    await fetchViaFlareSolverr('https://slow.example/article')
+
+    const [, init] = mockFetch.mock.calls[0]
+    expect(JSON.parse((init as { body: string }).body).maxTimeout).toBe(150000)
   })
 })
