@@ -204,8 +204,10 @@ function toArticleDetail(a: SeedArticle): ArticleDetail {
     full_text_translated: translatedIds.has(a.id) ? (a.full_text_translated ?? null) : null,
     translated_lang: translatedIds.has(a.id) ? getLocale() : null,
     images_archived_at: null,
+    videos_archived_at: null,
     feed_type: feeds.find(f => f.id === a.feed_id)?.type ?? 'rss',
     imageArchivingEnabled: false,
+    videoArchivingEnabled: false,
   }
 }
 

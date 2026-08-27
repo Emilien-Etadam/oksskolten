@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import { ActionChip } from '../ui/action-chip'
 import { ChatInlineTrigger } from '../chat/chat-inline'
-import { Bookmark, ThumbsUp, CloudUpload, CloudCheck, Trash2, Languages, Sparkles } from 'lucide-react'
+import { Bookmark, ThumbsUp, CloudUpload, CloudCheck, Trash2, Languages, Sparkles, Film, FileVideo } from 'lucide-react'
+import { mentionsVideo } from '../../../shared/video'
 import { useI18n } from '../../lib/i18n'
 import type { ArticleDetail } from '../../../shared/types'
 
@@ -20,9 +21,11 @@ interface ArticleToolbarProps {
   isBookmarked: boolean
   isLiked: boolean
   archivingImages: boolean
+  archivingVideo: boolean
   onToggleBookmark: () => void
   onToggleLike: () => void
   onArchiveImages: () => void
+  onArchiveVideo: () => void
   onDelete: () => void
 }
 
@@ -41,9 +44,11 @@ export function ArticleToolbar({
   isBookmarked,
   isLiked,
   archivingImages,
+  archivingVideo,
   onToggleBookmark,
   onToggleLike,
   onArchiveImages,
+  onArchiveVideo,
   onDelete,
 }: ArticleToolbarProps) {
   const navigate = useNavigate()
@@ -106,6 +111,22 @@ export function ArticleToolbar({
       {article.images_archived_at && (
         <ActionChip active tooltip={t('article.imagesArchived')}>
           <CloudCheck className="w-3.5 h-3.5" />
+        </ActionChip>
+      )}
+      {article.videoArchivingEnabled && article.full_text && mentionsVideo(article.full_text) && !article.videos_archived_at && !archivingVideo && (
+        <ActionChip onClick={onArchiveVideo} tooltip={t('article.archiveVideo')}>
+          <Film className="w-3.5 h-3.5" />
+        </ActionChip>
+      )}
+      {archivingVideo && !article.videos_archived_at && (
+        <ActionChip>
+          <Film className="w-3.5 h-3.5 animate-pulse" />
+          <span className="text-muted">{t('article.archivingVideo')}</span>
+        </ActionChip>
+      )}
+      {article.videos_archived_at && (
+        <ActionChip active tooltip={t('article.videoArchived')}>
+          <FileVideo className="w-3.5 h-3.5" />
         </ActionChip>
       )}
       {article.full_text && (

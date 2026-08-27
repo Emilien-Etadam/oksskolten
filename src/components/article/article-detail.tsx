@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import useSWR from 'swr'
 import { renderMarkdown } from '../../lib/markdown'
 import { sanitizeHtml } from '../../lib/sanitize'
+import { markVideoCards } from '../../lib/video-card'
 import { fetcher, apiPost } from '../../lib/fetcher'
 import { queueSeenIds } from '../../lib/offlineQueue'
 import { useSWRConfig } from 'swr'
@@ -71,8 +72,8 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
   )
   const { viewMode, setViewMode, translating, translatingText, fullTextTranslated, handleTranslate, translatingHtml, error: translateError } = useTranslate(translateInput, metrics)
   const {
-    isBookmarked, isLiked, archivingImages, deleteConfirmOpen, setDeleteConfirmOpen,
-    toggleBookmark, toggleLike, handleArchiveImages, handleDelete,
+    isBookmarked, isLiked, archivingImages, archivingVideo, deleteConfirmOpen, setDeleteConfirmOpen,
+    toggleBookmark, toggleLike, handleArchiveImages, handleArchiveVideo, handleDelete,
   } = useArticleActions(article, articleKey)
   const chat = useChatInline(article?.id ?? 0)
 
@@ -117,7 +118,7 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
       md = article.full_text || ''
     }
     if (!md) return `<p class="text-muted">${t('article.noContent')}</p>`
-    return sanitizeHtml(renderMarkdown(md))
+    return markVideoCards(sanitizeHtml(renderMarkdown(md)))
   }, [article, viewMode, isUserLang, fullTextTranslated, t])
 
   const { rewrittenHtml: displayContent } = useRewriteInternalLinks(
@@ -233,9 +234,11 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
         isBookmarked={!!isBookmarked}
         isLiked={isLiked}
         archivingImages={archivingImages}
+        archivingVideo={archivingVideo}
         onToggleBookmark={toggleBookmark}
         onToggleLike={toggleLike}
         onArchiveImages={handleArchiveImages}
+        onArchiveVideo={handleArchiveVideo}
         onDelete={() => setDeleteConfirmOpen(true)}
       />
 

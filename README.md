@@ -85,6 +85,7 @@ Additions live in new files, with only small insertion points in upstream ones, 
 - **Bottom tab bar** — newspaper-app-style bottom navigation (Inbox, Search, Read Later, Chat, Menu), shown when the sidebar is closed. The sidebar's collapsed state now persists across reloads
 - **Swipe between articles** — swipe left/right, or press the arrow keys, to move through the list you came from
 - **Mark as read without opening** — a check button on every unread card, in all five layouts. On touch devices, swiping a card to the right does the same
+- **Embedded videos survive** — a video the article embedded used to be dropped at extraction, leaving its caption behind; it is now kept as a play card. With video archiving switched on, a button on the article keeps a copy of the video itself, so the article stays complete after the source takes it down (requires `yt-dlp`)
 - **Articles that live in an embedded page** — when a page turns out to be a shell whose text sits in an iframe (a Hugging Face Space, a document viewer) or one meta refresh or AMP link away, the fetcher follows that pointer once and reads the text there, keeping the saved page's title and preview image
 - **Le Monde theme** — an importable custom theme inspired by the newspaper's app (`custom-themes/le-monde.json`)
 

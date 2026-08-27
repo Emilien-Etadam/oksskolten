@@ -1,6 +1,7 @@
 import { JSDOM, VirtualConsole } from 'jsdom'
 import { Readability } from '@mozilla/readability'
 import TurndownService from 'turndown'
+import { parseVideoUrl } from '../../shared/video.js'
 import pino from 'pino'
 import { preClean, postClean } from '../lib/cleaner/index.js'
 import { findBestContentBlock } from '../lib/cleaner/content-scorer.js'
@@ -41,6 +42,32 @@ turndown.addRule('barePreBlock', {
     const lang = el.getAttribute('data-lang') || ''
     const text = el.textContent || ''
     return `\n\n\`\`\`${lang}\n${text.replace(/\n+$/, '')}\n\`\`\`\n\n`
+  },
+})
+
+/** Keep a label from breaking out of the link syntax it is placed in. */
+function markdownLabel(text: string): string {
+  return text.replace(/\s+/g, ' ').trim().replace(/([[\]])/g, '\\$1')
+}
+
+// Video embeds. The cleaners keep player iframes on purpose, but Turndown has
+// no rule for <iframe>, so the video used to vanish at conversion and leave the
+// reader holding its caption alone. Write a poster that links to the video: the
+// image archiver already picks up `![alt](url)`, so the thumbnail is archived
+// with the rest of the article, and the reader turns it into a play card.
+turndown.addRule('videoEmbed', {
+  filter(node) {
+    return node.nodeName === 'IFRAME' && !!parseVideoUrl((node as HTMLElement).getAttribute('src'))
+  },
+  replacement(_content, node) {
+    const el = node as HTMLElement
+    const video = parseVideoUrl(el.getAttribute('src'))
+    if (!video) return ''
+    const label = markdownLabel(el.getAttribute('title') || video.providerName)
+    const card = video.poster
+      ? `[![${label}](${video.poster})](${video.watchUrl})`
+      : `[${label}](${video.watchUrl})`
+    return `\n\n${card}\n\n`
   },
 })
 

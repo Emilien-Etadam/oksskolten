@@ -64,6 +64,9 @@ const PREF_KEYS = [
   'retention.read_days',
   'retention.unread_days',
   'github.release_types',
+  'videos.enabled',
+  'videos.max_size_mb',
+  'videos.max_height',
 ] as const
 type PrefKey = typeof PREF_KEYS[number]
 
@@ -105,6 +108,9 @@ const PREF_ALLOWED: Record<PrefKey, string[] | null> = {
   'retention.read_days': null,
   'retention.unread_days': null,
   'github.release_types': RELEASE_TYPE_VALUES,
+  'videos.enabled': ['on', 'off'],
+  'videos.max_size_mb': null,
+  'videos.max_height': null,
 }
 
 const PROVIDER_MODEL_PAIRS: Array<{ providerKey: PrefKey; modelKey: PrefKey }> = [

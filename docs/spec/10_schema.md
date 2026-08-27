@@ -140,6 +140,7 @@ CREATE TABLE articles (
   bookmarked_at   TEXT,                               -- Bookmark timestamp
   liked_at        TEXT,                               -- Like timestamp
   images_archived_at TEXT,                            -- Image archive completion timestamp
+  videos_archived_at TEXT,                            -- Video archive completion timestamp
   score           REAL NOT NULL DEFAULT 0,             -- Engagement × time-decay score (periodic Cron update + immediate update on action)
   category_id     INTEGER REFERENCES categories(id) ON DELETE SET NULL, -- Denormalized feed category (for fast category-based sorting)
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))

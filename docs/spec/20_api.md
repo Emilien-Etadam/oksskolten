@@ -618,6 +618,28 @@ If `images_archived_at` is set, locally archived image files are also deleted.
 After returning 202, images are downloaded in the background and Markdown image URLs are rewritten to local/remote URLs. See [81_feature_images.md](./81_feature_images.md) for details.
 
 
+**POST /api/articles/:id/archive-video** — Archive the video an article embeds
+
+```json
+// Response: 202
+{ "status": "accepted" }
+```
+
+| Status | Condition |
+|---|---|
+| 202 | Background download started |
+| 400 | No `full_text`, video archiving is disabled, or the article embeds no video |
+| 404 | Article not found |
+| 409 | Already archived |
+
+After returning 202 the download runs in the background — minutes, not seconds — and the Markdown card is replaced by a `<video>` element pointing at the local copy. See [82_feature_video_archive.md](./82_feature_video_archive.md) for details.
+
+
+**GET /api/articles/videos/:filename** — Serve archived videos
+
+Same path-traversal checks as the image route, plus byte ranges: `<video>` seeks by asking for one, so a request carrying `Range` is answered `206` with `Content-Range`, and an unsatisfiable or multipart range is answered `416` with `Content-Range: bytes */size`.
+
+
 **GET /api/articles/images/:filename** — Serve archived images
 
 Serves locally stored images. Performs path traversal checks on the filename (`path.basename` + `..` detection).
