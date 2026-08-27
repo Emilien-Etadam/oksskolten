@@ -228,6 +228,35 @@ behaves exactly as before.
 The stored `url` stays the wrapper: it is the RSS item's identity and the
 deduplication key, and a browser resolves it anyway.
 
+## Pages whose text lives elsewhere are followed once
+
+Some URLs carry no article of their own. A Hugging Face Space, a document
+viewer, a whitepaper reader: the page a reader saves is a shell of markup whose
+words sit inside an iframe. `huggingface.co/spaces/AdithyaSK/rl-environments-guide`
+is 25,891 characters of HTML holding 104 characters of text. Extraction returned
+a title and nothing else, and the anti-bot solver could not help — rendering the
+shell still leaves the text inside the frame.
+
+`server/fetcher/embedded-content.ts` reads the outer HTML for the page's own
+pointer to where its text lives, in order of how explicit it is: a meta refresh,
+then `<link rel="amphtml">`, then the first iframe that is not hidden, declared
+under 200px, or hosted by a player, ad network, code sandbox or social embed.
+`fetchFullText()` follows that one URL when extraction came up short, parses it
+directly — one hop, never recursing — and keeps the result only if it beats the
+outer page and clears `MIN_EXTRACTED_LENGTH`. A thin frame therefore still falls
+through to the solver, and a wrong guess costs one fetch rather than a wrong
+article.
+
+For an iframe the outer page keeps naming the article: its title and og:image
+win, since that is the URL the reader saved. A meta refresh or an AMP link is
+the article's own page, so the target's own win.
+
+Readability throws outright on a page with nothing to extract, which is exactly
+what a shell page is, so `fetchFullText()` now holds that error while the
+fallbacks run and rethrows it only if none of them find anything. Without that,
+the emptiest pages — the ones this feature exists for — failed before reaching
+it.
+
 ## Removed Reddit posts are not ingested
 
 Reddit keeps removed posts in its RSS feeds, with `[ Removed by Reddit ]` (or
@@ -426,7 +455,7 @@ can rewrite a feed's RSS URL, which is not a bulk operation.
 | `src/components/article/article-list.tsx` | per-day sections in the render loop, publishes `articleDates` to the nav context |
 | `src/lib/dateFormat.ts` | `formatRelativeDate` counts calendar days; +`calendarDaysAgo` |
 | `server/fetcher.ts` | +1 import, removed Reddit posts filtered out of the new-article tasks, article URL passed to similarity detection |
-| `server/fetcher/content.ts` | +1 import, Google News wrapper resolved at the top of `fetchFullText()` |
+| `server/fetcher/content.ts` | +2 imports, Google News wrapper resolved at the top of `fetchFullText()`, embedded-content hop before the solver fallback |
 | `server/fetcher/http.ts` | browser-UA retry on 403/503, +`BROWSER_USER_AGENT` (moved from `reddit.ts`) |
 | `server/similarity.ts` | same-feed skip relaxed for cross-subreddit Reddit duplicates |
 | `src/contexts/keyboard-navigation-context.tsx` | +`articleDates` (sessionStorage-backed, like ids and URLs) |

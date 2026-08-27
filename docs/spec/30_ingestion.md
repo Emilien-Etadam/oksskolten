@@ -211,7 +211,23 @@ fetchFullText(articleUrl, cleanerConfig?)
 │     Extract first 200 characters from Markdown text
 │     Uses markdownToExcerpt(): strips images and link syntax, then truncates
 │
-└─ 8. FlareSolverr automatic retry (quality gate) [Main Thread]
+├─ 8. Embedded-content hop (quality gate) [Main Thread]
+│     If the extracted text is under MIN_EXTRACTED_LENGTH (200 chars),
+│     classified as garbage, or Readability threw outright:
+│     ├─ findEmbeddedContentUrl() reads the outer HTML for the page's own
+│     │   pointer to where its text lives, in order of how explicit it is:
+│     │   meta refresh > <link rel="amphtml"> > first content-bearing <iframe>
+│     ├─ Iframes are skipped when hidden, declared under 200px in a
+│     │   dimension, or hosted by a player, ad, sandbox or social embed
+│     ├─ Fetch that one URL (SSRF-checked, DISCOVERY_TIMEOUT) and re-run the
+│     │   parse on it — one hop only, never recursing into fetchFullText
+│     └─ Adopt it only if it beats the outer page AND clears
+│         MIN_EXTRACTED_LENGTH, so a thin frame still falls through to 9
+│     * For an iframe the outer page keeps naming the article: its title and
+│       og:image win, since that is the URL the reader saved. A meta refresh
+│       or AMP link IS the article's own page, so the target's own win.
+│
+└─ 9. FlareSolverr automatic retry (quality gate) [Main Thread]
       If requires_js_challenge was NOT set and the extracted text is
       under MIN_EXTRACTED_LENGTH (200 chars) or classified as garbage:
       ├─ Garbage detection (isGarbageExtraction): bot-block patterns,
@@ -224,6 +240,13 @@ fetchFullText(articleUrl, cleanerConfig?)
         an automatic quality gate that retries with JS rendering when
         static fetch produces poor results
 ```
+
+**Why the hop comes before the solver**: it costs one plain fetch instead of a
+browser run, and the solver cannot solve this shape of failure anyway —
+rendering a shell page leaves its text inside the frame, where extraction still
+cannot reach it. Readability throwing on the outer page is treated as an empty
+result rather than an error so both gates still get their turn; the original
+error is rethrown only if neither finds anything.
 
 **Fail-open design**: pre-clean/post-clean are wrapped in try-catch, and on exception, the original HTML/Readability result is used as-is. This guarantees that cleaner failures never block article ingestion.
 

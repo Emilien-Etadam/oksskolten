@@ -2,9 +2,10 @@ import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { Piscina as PiscinaPool } from 'piscina'
 import { JSDOM } from 'jsdom'
-import { fetchHtml } from './http.js'
+import { fetchHtml, DISCOVERY_TIMEOUT } from './http.js'
 import { resolveGoogleNewsUrl } from './google-news.js'
 import { fetchViaFlareSolverr } from './flaresolverr.js'
+import { findEmbeddedContentUrl, type EmbeddedContent } from './embedded-content.js'
 import { fetchRedditPostContent } from './reddit.js'
 import type { CleanerConfig } from '../lib/cleaner/selectors.js'
 import type { ParseHtmlInput, ParseHtmlResult } from './contentWorker.js'
@@ -206,32 +207,105 @@ export async function fetchFullText(url: string, options?: FetchFullTextOptions)
 
   // Step 1: Fetch HTML (async I/O, non-blocking — stays on main thread)
   const { html } = await fetchHtml(articleUrl, { useFlareSolverr: requiresJsChallenge })
-  const extractedHtml = extractAnchoredContentHtml(html, articleUrl)
-  const cleanedHtml = stripHeavyTags(extractedHtml)
 
-  // Step 2: Parse HTML in worker thread (CPU-intensive, off main thread)
-  const input: ParseHtmlInput = { html: cleanedHtml, articleUrl, cleanerConfig }
-  const result = await runWithTimeout(input, WORKER_TIMEOUT_MS)
+  // Step 2: Parse HTML in worker thread (CPU-intensive, off main thread).
+  //
+  // Readability throws outright when a page holds nothing to extract, which is
+  // precisely the shape of a page whose text lives somewhere else. Hold that
+  // error instead of propagating it so the fallbacks below still get their
+  // turn, and rethrow only if none of them find anything either.
+  let result: ParseHtmlResult | null = null
+  let parseError: unknown = null
+  try {
+    result = await parseFrom(html, articleUrl, cleanerConfig)
+  } catch (err) {
+    parseError = err
+  }
 
-  // Step 3: FlareSolverr fallback if extracted text is too short or looks like garbage
-  const extractedLen = result.fullText.replace(/\s+/g, ' ').trim().length
-  const needsRetry = extractedLen < MIN_EXTRACTED_LENGTH || isGarbageExtraction(result.fullText)
-  if (needsRetry && !requiresJsChallenge) {
+  const extractedLen = result ? textLength(result.fullText) : 0
+  const needsRetry = !result || extractedLen < MIN_EXTRACTED_LENGTH || isGarbageExtraction(result.fullText)
+  if (result && !needsRetry) return result
+
+  // Step 3: the words may not be on this page at all — held inside an iframe
+  // (a Hugging Face Space, a document viewer) or one meta refresh / AMP link
+  // away. Tried before the solver: it costs a single plain fetch, and the
+  // solver cannot help here anyway, since rendering a shell page still leaves
+  // the text inside the frame.
+  const embedded = findEmbeddedContentUrl(html, articleUrl)
+  if (embedded) {
+    const followed = await followEmbeddedContent(embedded, result, extractedLen, cleanerConfig)
+    if (followed) return followed
+  }
+
+  // Step 4: FlareSolverr fallback if extracted text is too short or looks like garbage
+  if (!requiresJsChallenge) {
     const flare = await fetchViaFlareSolverr(articleUrl, {
       waitForSelector: 'article, main, [role="main"], .post-content, .entry-content',
     })
     if (flare) {
-      const flareHtml = stripHeavyTags(extractAnchoredContentHtml(flare.body, articleUrl))
-      const flareInput: ParseHtmlInput = { html: flareHtml, articleUrl, cleanerConfig }
-      const flareResult = await runWithTimeout(flareInput, WORKER_TIMEOUT_MS)
-      const flareLen = flareResult.fullText.replace(/\s+/g, ' ').trim().length
-      if (flareLen > extractedLen) {
+      const flareResult = await parseFrom(flare.body, articleUrl, cleanerConfig).catch(() => null)
+      if (flareResult && textLength(flareResult.fullText) > extractedLen) {
         return flareResult
       }
     }
   }
 
-  return result
+  if (result) return result
+  throw parseError instanceof Error ? parseError : new Error(String(parseError))
+}
+
+/** Trimmed length of extracted text — the measure every fallback is judged on. */
+function textLength(text: string): number {
+  return text.replace(/\s+/g, ' ').trim().length
+}
+
+/** Clean one page's HTML and run the extraction worker over it. */
+async function parseFrom(
+  html: string,
+  articleUrl: string,
+  cleanerConfig?: CleanerConfig,
+): Promise<ParseHtmlResult> {
+  const input: ParseHtmlInput = {
+    html: stripHeavyTags(extractAnchoredContentHtml(html, articleUrl)),
+    articleUrl,
+    cleanerConfig,
+  }
+  return runWithTimeout(input, WORKER_TIMEOUT_MS)
+}
+
+/**
+ * Follow the page's pointer to where its text lives and extract there.
+ *
+ * Returns null unless the hop actually beat what the outer page gave us, so a
+ * wrong guess costs one fetch and never a wrong article. Only one hop is taken:
+ * this parses the target directly rather than recursing through fetchFullText.
+ */
+async function followEmbeddedContent(
+  embedded: EmbeddedContent,
+  outer: ParseHtmlResult | null,
+  outerLen: number,
+  cleanerConfig?: CleanerConfig,
+): Promise<ParseHtmlResult | null> {
+  let result: ParseHtmlResult
+  try {
+    const { html } = await fetchHtml(embedded.url, { timeout: DISCOVERY_TIMEOUT })
+    result = await parseFrom(html, embedded.url, cleanerConfig)
+  } catch {
+    return null
+  }
+  // The hop has to clear the same bar as any other extraction: more text than
+  // the outer page gave us, and enough of it to be an article. A frame that
+  // yields a loading message is not an improvement, and accepting it would rob
+  // the solver fallback below of its turn.
+  const followedLen = textLength(result.fullText)
+  if (followedLen <= outerLen || followedLen < MIN_EXTRACTED_LENGTH) return null
+
+  // An iframe holds the article without being it: the page the reader linked
+  // keeps its own title and preview image. A meta refresh or an AMP link, by
+  // contrast, points at the article's own page, which carries its own.
+  return embedded.kind === 'iframe'
+    ? { ...result, title: outer?.title || result.title, ogImage: outer?.ogImage || result.ogImage }
+    : result
 }
 
 /**

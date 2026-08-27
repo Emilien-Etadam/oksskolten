@@ -2227,6 +2227,105 @@ describe('FlareSolverr — fetchAndParseRss', () => {
   })
 })
 
+describe('fetchFullText — pages whose text lives elsewhere', () => {
+  let fetchFullText: typeof import('./fetcher/content.js').fetchFullText
+
+  beforeEach(async () => {
+    const mod = await import('./fetcher/content.js')
+    fetchFullText = mod.fetchFullText
+    // These pages are thin, not bot-blocked: keep the solver out of the way so
+    // the assertions speak about the embedded hop alone.
+    mockFlareSolverr.mockResolvedValue(null)
+  })
+
+  /** A shell page: markup, a title, and an iframe where the words actually are. */
+  function shellHtml(frameSrc: string): string {
+    const chrome = Array(40).fill('<div class="row"><span></span></div>').join('\n')
+    return `<!DOCTYPE html>
+<html>
+<head><title>The ultimate guide</title><meta property="og:image" content="https://shell.example.com/cover.png" /></head>
+<body><main>${chrome}<iframe src="${frameSrc}" title="app"></iframe><p>Running</p></main></body>
+</html>`
+  }
+
+  function serve(pages: Record<string, string>) {
+    mockFetch.mockImplementation((input: string | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      const body = pages[url] ?? pages[url.replace(/\/$/, '')]
+      if (body === undefined) return Promise.resolve(mockResponse('Not found', { status: 404 }))
+      return Promise.resolve(mockResponse(body))
+    })
+  }
+
+  it('follows an iframe to the page that holds the text', async () => {
+    serve({
+      'https://shell.example.com/spaces/guide': shellHtml('https://app.example.com/guide'),
+      'https://app.example.com/guide': articleHtml({ title: 'Embedded app' }),
+    })
+
+    const result = await fetchFullText('https://shell.example.com/spaces/guide')
+
+    expect(result.fullText).toContain('paragraph of article content')
+    // The shell is what the reader linked, so it keeps naming the article.
+    expect(result.title).toBe('The ultimate guide')
+    expect(result.ogImage).toBe('https://shell.example.com/cover.png')
+  })
+
+  it('follows the iframe even when the shell has nothing to extract at all', async () => {
+    // Readability throws on this one — the fallback still has to run.
+    const bare = '<!DOCTYPE html><html><head><title>Shell</title></head><body><iframe src="https://app.example.com/guide"></iframe></body></html>'
+    serve({
+      'https://shell.example.com/bare': bare,
+      'https://app.example.com/guide': articleHtml({ title: 'Embedded app' }),
+    })
+
+    const result = await fetchFullText('https://shell.example.com/bare')
+
+    expect(result.fullText).toContain('paragraph of article content')
+  })
+
+  it('keeps the outer page when the frame holds no more text than it did', async () => {
+    serve({
+      'https://shell.example.com/spaces/guide': shellHtml('https://app.example.com/empty'),
+      'https://app.example.com/empty': '<!DOCTYPE html><html><body><article><p>Loading.</p></article></body></html>',
+    })
+
+    const result = await fetchFullText('https://shell.example.com/spaces/guide')
+
+    expect(result.fullText).not.toContain('Loading.')
+    expect(result.title).toBe('The ultimate guide')
+  })
+
+  it('still lets the solver have its turn when the frame is thin', async () => {
+    serve({
+      'https://shell.example.com/spaces/guide': shellHtml('https://app.example.com/empty'),
+      'https://app.example.com/empty': '<!DOCTYPE html><html><body><article><p>Loading.</p></article></body></html>',
+    })
+    mockFlareSolverr.mockResolvedValue({ body: articleHtml({ title: 'Rendered' }), contentType: 'text/html' })
+
+    const result = await fetchFullText('https://shell.example.com/spaces/guide')
+
+    expect(result.fullText).toContain('paragraph of article content')
+  })
+
+  it('does not follow an embedded video', async () => {
+    serve({ 'https://shell.example.com/clip': shellHtml('https://www.youtube.com/embed/abc123') })
+
+    const result = await fetchFullText('https://shell.example.com/clip')
+
+    expect(result.title).toBe('The ultimate guide')
+    const fetched = mockFetch.mock.calls.map(call => String(call[0]))
+    expect(fetched.some(url => url.includes('youtube.com'))).toBe(false)
+  })
+
+  it('reports the original extraction failure when the hop finds nothing either', async () => {
+    const bare = '<!DOCTYPE html><html><head><title>Shell</title></head><body><iframe src="https://app.example.com/gone"></iframe></body></html>'
+    serve({ 'https://shell.example.com/bare': bare })
+
+    await expect(fetchFullText('https://shell.example.com/bare')).rejects.toThrow(/Readability/)
+  })
+})
+
 describe('FlareSolverr — fetchFullText', () => {
   let fetchFullText: typeof import('./fetcher/content.js').fetchFullText
 

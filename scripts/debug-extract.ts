@@ -23,7 +23,7 @@ import fs from 'node:fs'
 import { JSDOM } from 'jsdom'
 import { Readability } from '@mozilla/readability'
 import { fetchHtml } from '../server/fetcher/http.js'
-import { stripHeavyTags, extractAnchoredContentHtml } from '../server/fetcher/content.js'
+import { stripHeavyTags, extractAnchoredContentHtml, MIN_EXTRACTED_LENGTH } from '../server/fetcher/content.js'
 import { parseHtml } from '../server/fetcher/contentWorker.js'
 import { preClean } from '../server/lib/cleaner/index.js'
 import { findBestContentBlock, scoreAndRemoveNonContent } from '../server/lib/cleaner/content-scorer.js'
@@ -263,20 +263,30 @@ async function main(): Promise<void> {
   })
 
   const production = results[0].len
-  const rescued = results.slice(1).filter(r => r.len > production && r.len >= 200)
+  const rescued = results.slice(1).filter(r => r.len > production && r.len >= MIN_EXTRACTED_LENGTH)
 
   console.log('')
-  if (production >= 200) {
+  if (production >= MIN_EXTRACTED_LENGTH) {
     console.log('VERDICT: extraction succeeds here. If the stored article is empty, it was')
     console.log('         fetched under different conditions (bot block, redirect, or a')
     console.log('         since-changed page) — re-fetch the article and compare.')
+  } else if (beforePre < MIN_EXTRACTED_LENGTH) {
+    // Checked before the cleaning verdict below: no stage can be blamed for
+    // losing a body the page never had. What a disabled stage "recovers" here
+    // is the title and a link or two, inflated past the threshold by markdown
+    // syntax — enough to look like a fix and send the reader after the cleaner.
+    console.log(`VERDICT: the page itself carries almost no text — ${fmt(beforePre)} chars before any`)
+    console.log('         cleaning ran. Nothing at this URL can be extracted, whatever the')
+    console.log('         cleaning stages do. The body is rendered by JS or served inside an')
+    console.log('         iframe: find the URL that carries the text directly (iframe src,')
+    console.log('         embed URL, or AMP version) and read that instead.')
   } else if (rescued.length > 0) {
     const names = rescued.map(r => `"${r.label}"`).join(', ')
     console.log(`VERDICT: the cleaning pipeline is deleting the body — ${names} recovers it.`)
     console.log('         Look at phase 5 above to see where the character count drops.')
   } else if (production > 0) {
     console.log('VERDICT: extraction yields real but short text, under MIN_EXTRACTED_LENGTH')
-    console.log('         (200). The page itself is short — most likely a paywall teaser.')
+    console.log(`         (${MIN_EXTRACTED_LENGTH}). The page itself is short — most likely a paywall teaser.`)
   } else {
     console.log('VERDICT: the page carries no extractable body text at all, and no cleaning')
     console.log('         stage is at fault. The body is paywalled, JS-rendered, or the')
