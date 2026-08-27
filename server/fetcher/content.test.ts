@@ -49,6 +49,50 @@ describe('parseHtml', () => {
     mockFindBestContentBlock.mockReset().mockReturnValue(null)
   })
 
+  describe('embedded videos', () => {
+    const prose = Array(6).fill('<p>Parasolid has sat at the centre of CAD kernels for decades, and this paragraph is here so Readability treats the page as a real article.</p>').join('\n')
+
+    it('keeps a YouTube embed as a poster linking to the video', () => {
+      const html = articleHtml(
+        `${prose}<figure><iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="Parasolid history"></iframe><figcaption>A short history</figcaption></figure>${prose}`,
+      )
+
+      const result = parseHtml({ html, articleUrl: 'https://blogs.example.com/parasolid' })
+
+      expect(result.fullText).toContain(
+        '[![Parasolid history](https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg)](https://www.youtube.com/watch?v=dQw4w9WgXcQ)',
+      )
+      expect(result.fullText).toContain('A short history')
+    })
+
+    it('falls back to the provider name when the embed carries no title', () => {
+      const html = articleHtml(`${prose}<iframe src="https://player.vimeo.com/video/76979871"></iframe>${prose}`)
+
+      const result = parseHtml({ html, articleUrl: 'https://blogs.example.com/vimeo' })
+
+      // Vimeo serves no predictable poster, so the card is a plain link.
+      expect(result.fullText).toContain('[Vimeo](https://vimeo.com/76979871)')
+    })
+
+    it('does not let an embed title break out of the link syntax', () => {
+      const html = articleHtml(
+        `${prose}<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="A [bracketed] title"></iframe>${prose}`,
+      )
+
+      const result = parseHtml({ html, articleUrl: 'https://blogs.example.com/brackets' })
+
+      expect(result.fullText).toContain('[![A \\[bracketed\\] title](https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg)]')
+    })
+
+    it('still drops iframes that are not videos', () => {
+      const html = articleHtml(`${prose}<iframe src="https://ads.example.com/banner"></iframe>${prose}`)
+
+      const result = parseHtml({ html, articleUrl: 'https://blogs.example.com/ads' })
+
+      expect(result.fullText).not.toContain('ads.example.com')
+    })
+  })
+
   it('extracts article text via Readability', async () => {
     const html = articleHtml('<p>This is a test article with enough text content for Readability to extract.</p>')
 

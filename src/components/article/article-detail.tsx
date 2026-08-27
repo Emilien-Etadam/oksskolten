@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import useSWR from 'swr'
 import { renderMarkdown } from '../../lib/markdown'
 import { sanitizeHtml } from '../../lib/sanitize'
+import { markVideoCards } from '../../lib/video-card'
 import { fetcher, apiPost } from '../../lib/fetcher'
 import { queueSeenIds } from '../../lib/offlineQueue'
 import { useSWRConfig } from 'swr'
@@ -117,7 +118,7 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
       md = article.full_text || ''
     }
     if (!md) return `<p class="text-muted">${t('article.noContent')}</p>`
-    return sanitizeHtml(renderMarkdown(md))
+    return markVideoCards(sanitizeHtml(renderMarkdown(md)))
   }, [article, viewMode, isUserLang, fullTextTranslated, t])
 
   const { rewrittenHtml: displayContent } = useRewriteInternalLinks(
