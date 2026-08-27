@@ -39,11 +39,20 @@ export function markVideoCards(html: string): string {
     overlay.setAttribute('aria-hidden', 'true')
     overlay.className = 'absolute inset-0 flex items-center justify-center'
     const disc = doc.createElement('span')
-    disc.className = 'flex h-16 w-16 items-center justify-center rounded-full bg-bg/70'
+    disc.className = 'flex h-16 w-16 items-center justify-center rounded-full'
+    // The scrim and the triangle are set inline, and fixed rather than themed,
+    // for two reasons. They sit on someone else's thumbnail rather than on app
+    // chrome, so they have to stay legible whatever the page's colours are —
+    // a themed triangle turns dark on a dark scrim under a light theme. And
+    // Tailwind cannot make a translucent token anyway: the theme colours are
+    // plain CSS variables with no <alpha-value> placeholder, so `bg-bg/70`
+    // silently generates no rule at all and the disc disappears.
+    disc.setAttribute('style', 'background: rgba(0, 0, 0, 0.55)')
     // A bordered triangle rather than ▶, which renders as an emoji on some
     // platforms and as a hollow glyph on others.
     const triangle = doc.createElement('span')
-    triangle.className = 'ml-1 border-y-[11px] border-l-[18px] border-y-transparent border-l-text'
+    triangle.className = 'ml-1 border-y-[11px] border-l-[18px] border-y-transparent'
+    triangle.setAttribute('style', 'border-left-color: #fff')
     disc.appendChild(triangle)
     overlay.appendChild(disc)
     anchor.appendChild(overlay)

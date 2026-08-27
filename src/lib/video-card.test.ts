@@ -20,7 +20,12 @@ describe('markVideoCards', () => {
     // The poster keeps its alt text: the badge is decoration and stays hidden
     // from assistive technology.
     expect(anchor!.querySelector('img')?.getAttribute('alt')).toBe('Parasolid history')
-    expect(anchor!.querySelector('[aria-hidden="true"]')).not.toBeNull()
+    const badge = anchor!.querySelector('[aria-hidden="true"]')
+    expect(badge).not.toBeNull()
+    // The scrim must carry its colour inline. Expressed as a Tailwind class it
+    // silently produced no rule — the theme tokens are plain CSS variables, so
+    // the opacity modifier generates nothing and the disc vanishes.
+    expect(badge!.querySelector('[style*="background"]')).not.toBeNull()
   })
 
   it('leaves an ordinary link to a video alone', () => {
