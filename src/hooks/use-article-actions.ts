@@ -11,6 +11,7 @@ export function useArticleActions(article: ArticleDetail | undefined, articleKey
   const [optimisticBookmark, setOptimisticBookmark] = useState<boolean | undefined>(undefined)
   const [optimisticLiked, setOptimisticLiked] = useState<string | null | undefined>(undefined)
   const [archivingImages, setArchivingImages] = useState(false)
+  const [archivingVideo, setArchivingVideo] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 
   const isBookmarked = optimisticBookmark !== undefined ? optimisticBookmark : !!article?.bookmarked_at
@@ -83,6 +84,19 @@ export function useArticleActions(article: ArticleDetail | undefined, articleKey
     }
   }, [article, articleKey, archivingImages, globalMutate])
 
+  const handleArchiveVideo = useCallback(async () => {
+    if (!article || archivingVideo) return
+    setArchivingVideo(true)
+    try {
+      await apiPost(`/api/articles/${article.id}/archive-video`)
+    } catch {
+      setArchivingVideo(false)
+      return
+    }
+    // A download runs for minutes, so unlike images there is no useful moment
+    // to poll for: ask once, and let the reader reopen the article to see it.
+  }, [article, archivingVideo])
+
   const handleDelete = useCallback(() => {
     if (!article) return
     const feedId = article.feed_id
@@ -101,11 +115,13 @@ export function useArticleActions(article: ArticleDetail | undefined, articleKey
     isBookmarked,
     isLiked,
     archivingImages,
+    archivingVideo,
     deleteConfirmOpen,
     setDeleteConfirmOpen,
     toggleBookmark,
     toggleLike,
     handleArchiveImages,
+    handleArchiveVideo,
     handleDelete,
   }
 }

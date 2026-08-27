@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setupTestDb } from '../__tests__/helpers/testDb.js'
 import { buildApp } from '../__tests__/helpers/buildApp.js'
-import { createFeed, insertArticle, ensureClipFeed, getArticleById, markImagesArchived, markArticleSeen, upsertSetting, getDb } from '../db.js'
+import { parseByteRange } from './articles.js'
+import { createFeed, insertArticle, ensureClipFeed, getArticleById, markImagesArchived, markVideosArchived, markArticleSeen, upsertSetting, getDb } from '../db.js'
 import type { FastifyInstance } from 'fastify'
 import path from 'node:path'
 import os from 'node:os'
@@ -44,6 +45,20 @@ vi.mock('../fetcher/article-images.js', () => ({
   deleteArticleImages: (...args: unknown[]) => mockDeleteArticleImages(...args),
 }))
 
+const { mockArchiveArticleVideos, mockIsVideoArchivingEnabled, mockDeleteArticleVideos, mockFindArchivableVideos } = vi.hoisted(() => ({
+  mockArchiveArticleVideos: vi.fn(),
+  mockIsVideoArchivingEnabled: vi.fn(),
+  mockDeleteArticleVideos: vi.fn(),
+  mockFindArchivableVideos: vi.fn(),
+}))
+
+vi.mock('../fetcher/article-videos.js', () => ({
+  archiveArticleVideos: (...args: unknown[]) => mockArchiveArticleVideos(...args),
+  isVideoArchivingEnabled: (...args: unknown[]) => mockIsVideoArchivingEnabled(...args),
+  deleteArticleVideos: (...args: unknown[]) => mockDeleteArticleVideos(...args),
+  findArchivableVideos: (...args: unknown[]) => mockFindArchivableVideos(...args),
+}))
+
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
@@ -80,6 +95,10 @@ beforeEach(async () => {
   mockIsImageArchivingEnabled.mockReturnValue(false)
   mockArchiveArticleImages.mockResolvedValue({ rewrittenText: '', downloaded: 0, errors: 0 })
   mockDeleteArticleImages.mockReturnValue(0)
+  mockIsVideoArchivingEnabled.mockReturnValue(true)
+  mockArchiveArticleVideos.mockResolvedValue({ rewrittenText: '', downloaded: 1, errors: 0 })
+  mockDeleteArticleVideos.mockReturnValue(0)
+  mockFindArchivableVideos.mockReturnValue([{ watchUrl: 'https://www.youtube.com/watch?v=x' }])
 })
 
 // ---------------------------------------------------------------------------
@@ -582,6 +601,180 @@ describe('GET /api/articles/images/:filename', () => {
     })
 
     expect(res.statusCode).toBe(404)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// POST /api/articles/:id/archive-video
+// ---------------------------------------------------------------------------
+
+describe('POST /api/articles/:id/archive-video', () => {
+  function seedWithVideo() {
+    const feed = seedFeed()
+    return insertArticle({
+      feed_id: feed.id,
+      title: 'Parasolid',
+      url: `https://blog.example.com/parasolid/${Math.random()}`,
+      published_at: '2026-01-01T00:00:00Z',
+      full_text: 'Prose [![Talk](https://i.ytimg.com/vi/x/hqdefault.jpg)](https://www.youtube.com/watch?v=x) more prose',
+    })
+  }
+
+  it('202: accepts the download and runs it in the background', async () => {
+    const id = seedWithVideo()
+
+    const res = await app.inject({ method: 'POST', url: `/api/articles/${id}/archive-video` })
+
+    expect(res.statusCode).toBe(202)
+    expect(mockArchiveArticleVideos).toHaveBeenCalledWith(id, expect.stringContaining('youtube.com/watch'))
+  })
+
+  it('400: archiving is switched off', async () => {
+    mockIsVideoArchivingEnabled.mockReturnValue(false)
+    const id = seedWithVideo()
+
+    const res = await app.inject({ method: 'POST', url: `/api/articles/${id}/archive-video` })
+
+    expect(res.statusCode).toBe(400)
+    expect(mockArchiveArticleVideos).not.toHaveBeenCalled()
+  })
+
+  it('400: the article embeds no video', async () => {
+    mockFindArchivableVideos.mockReturnValue([])
+    const id = seedWithVideo()
+
+    const res = await app.inject({ method: 'POST', url: `/api/articles/${id}/archive-video` })
+
+    expect(res.statusCode).toBe(400)
+    expect(res.json().error).toMatch(/no video/i)
+    expect(mockArchiveArticleVideos).not.toHaveBeenCalled()
+  })
+
+  it('409: already archived', async () => {
+    const id = seedWithVideo()
+    markVideosArchived(id)
+
+    const res = await app.inject({ method: 'POST', url: `/api/articles/${id}/archive-video` })
+
+    expect(res.statusCode).toBe(409)
+    expect(mockArchiveArticleVideos).not.toHaveBeenCalled()
+  })
+
+  it('404: unknown article', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/articles/999999/archive-video' })
+
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// GET /api/articles/videos/:filename
+// ---------------------------------------------------------------------------
+
+// Bodies are not asserted here: a file stream sent through app.inject arrives
+// empty in this harness, which is why the image route's tests check headers
+// only. The range arithmetic is covered directly by parseByteRange below.
+describe('GET /api/articles/videos/:filename', () => {
+  let tmpDir: string
+  const filename = '1_abc123.mp4'
+  const body = '0123456789'
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reader-test-videos-'))
+    upsertSetting('videos.storage_path', tmpDir)
+    fs.writeFileSync(path.join(tmpDir, filename), body)
+  })
+
+  it('200: serves the whole file and advertises range support', async () => {
+    const res = await app.inject({ method: 'GET', url: `/api/articles/videos/${filename}` })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.headers['content-type']).toBe('video/mp4')
+    expect(res.headers['accept-ranges']).toBe('bytes')
+  })
+
+  it('206: answers a byte range, which is how a player seeks', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/articles/videos/${filename}`,
+      headers: { range: 'bytes=2-5' },
+    })
+
+    expect(res.statusCode).toBe(206)
+    expect(res.headers['content-range']).toBe('bytes 2-5/10')
+  })
+
+  it('206: an open-ended range runs to the end of the file', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/articles/videos/${filename}`,
+      headers: { range: 'bytes=7-' },
+    })
+
+    expect(res.statusCode).toBe(206)
+    expect(res.headers['content-range']).toBe('bytes 7-9/10')
+  })
+
+  it('206: a suffix range asks for the last bytes', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/articles/videos/${filename}`,
+      headers: { range: 'bytes=-3' },
+    })
+
+    expect(res.statusCode).toBe(206)
+    expect(res.headers['content-range']).toBe('bytes 7-9/10')
+  })
+
+  it('416: a range past the end of the file', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/articles/videos/${filename}`,
+      headers: { range: 'bytes=50-60' },
+    })
+
+    expect(res.statusCode).toBe(416)
+    expect(res.headers['content-range']).toBe('bytes */10')
+  })
+
+  it('400: path traversal attempt', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/articles/videos/..secret' })
+
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('404: file not found', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/articles/videos/nope.mp4' })
+
+    expect(res.statusCode).toBe(404)
+  })
+})
+
+describe('parseByteRange', () => {
+  it('reads the range shapes a player sends', () => {
+    expect(parseByteRange('bytes=0-499', 1000)).toEqual({ start: 0, end: 499 })
+    expect(parseByteRange('bytes=500-', 1000)).toEqual({ start: 500, end: 999 })
+    expect(parseByteRange('bytes=-200', 1000)).toEqual({ start: 800, end: 999 })
+    expect(parseByteRange(' bytes=0-0 ', 1000)).toEqual({ start: 0, end: 0 })
+  })
+
+  it('clamps an end past the last byte rather than refusing', () => {
+    expect(parseByteRange('bytes=900-5000', 1000)).toEqual({ start: 900, end: 999 })
+    expect(parseByteRange('bytes=-5000', 1000)).toEqual({ start: 0, end: 999 })
+  })
+
+  it('refuses what cannot be satisfied', () => {
+    expect(parseByteRange('bytes=1000-1200', 1000)).toBeNull()
+    expect(parseByteRange('bytes=600-500', 1000)).toBeNull()
+    expect(parseByteRange('bytes=-0', 1000)).toBeNull()
+    expect(parseByteRange('bytes=-', 1000)).toBeNull()
+  })
+
+  it('refuses shapes this route does not implement', () => {
+    // Multipart ranges are legal but no player asks for them.
+    expect(parseByteRange('bytes=0-100,200-300', 1000)).toBeNull()
+    expect(parseByteRange('items=0-100', 1000)).toBeNull()
+    expect(parseByteRange('garbage', 1000)).toBeNull()
   })
 })
 

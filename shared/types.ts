@@ -89,8 +89,10 @@ export interface ArticleDetail extends ArticleListItem {
   full_text_translated: string | null
   translated_lang: string | null
   images_archived_at: string | null
+  videos_archived_at: string | null
   feed_type: 'rss' | 'clip'
   imageArchivingEnabled: boolean
+  videoArchivingEnabled: boolean
   /** Set when the feed's AI filter rejected the article; it stays hidden from lists */
   filtered_at?: string | null
 }

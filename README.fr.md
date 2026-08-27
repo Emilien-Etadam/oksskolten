@@ -80,6 +80,7 @@ Les ajouts vivent dans de nouveaux fichiers, avec seulement de petits points d'i
 - **Barre d'onglets en bas** — navigation basse façon application de presse (Inbox, Recherche, À lire plus tard, Chat, Menu), affichée quand la sidebar est fermée. L'état replié de la sidebar est désormais conservé d'un rechargement à l'autre
 - **Navigation par swipe** — balayer vers la gauche ou la droite, ou utiliser les flèches du clavier, pour parcourir la liste d'où vous venez
 - **Marquer comme lu sans ouvrir** — un bouton de validation sur chaque carte non lue, dans les cinq mises en page. Sur mobile, balayer une carte vers la droite fait la même chose
+- **Les vidéos intégrées ne disparaissent plus** — une vidéo intégrée à l'article était supprimée à l'extraction, ne laissant que sa légende ; elle devient une carte cliquable. Avec l'archivage vidéo activé, un bouton sur l'article en conserve une copie, pour que l'article reste complet même si la source la supprime (nécessite `yt-dlp`)
 - **Articles hébergés dans une page imbriquée** — quand une page se révèle être une coquille dont le texte se trouve dans une iframe (un Space Hugging Face, une liseuse de documents) ou à un meta refresh / lien AMP de distance, le récupérateur suit ce pointeur une fois et lit le texte là où il est, en conservant le titre et l'image de la page enregistrée
 - **Thème Le Monde** — un thème personnalisé importable, inspiré de l'application du journal (`custom-themes/le-monde.json`)
 

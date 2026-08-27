@@ -214,7 +214,7 @@ export function getArticleByUrl(url: string): ArticleDetail | undefined {
     SELECT a.id, a.feed_id, f.name AS feed_name, f.type AS feed_type,
            a.title, a.title_translated, a.url, a.published_at, a.lang, a.summary, a.excerpt, a.og_image,
            a.full_text, a.full_text_translated, a.translated_lang, a.seen_at, a.read_at, a.bookmarked_at, a.liked_at,
-           a.images_archived_at,
+           a.images_archived_at, a.videos_archived_at,
            (SELECT COUNT(*) FROM article_similarities WHERE article_id = a.id) AS similar_count
     FROM active_articles a
     JOIN feeds f ON a.feed_id = f.id
@@ -258,7 +258,7 @@ export function getArticleById(id: number): ArticleDetail | undefined {
     SELECT a.id, a.feed_id, f.name AS feed_name, f.type AS feed_type,
            a.title, a.title_translated, a.url, a.published_at, a.lang, a.summary, a.excerpt, a.og_image,
            a.full_text, a.full_text_translated, a.translated_lang, a.seen_at, a.read_at, a.bookmarked_at, a.liked_at,
-           a.images_archived_at,
+           a.images_archived_at, a.videos_archived_at,
            (SELECT COUNT(*) FROM article_similarities WHERE article_id = a.id) AS similar_count
     FROM active_articles a
     JOIN feeds f ON a.feed_id = f.id
@@ -710,6 +710,14 @@ export function markImagesArchived(articleId: number): void {
 
 export function clearImagesArchived(articleId: number): void {
   getDb().prepare('UPDATE articles SET images_archived_at = NULL WHERE id = ?').run(articleId)
+}
+
+export function markVideosArchived(articleId: number): void {
+  getDb().prepare("UPDATE articles SET videos_archived_at = datetime('now') WHERE id = ?").run(articleId)
+}
+
+export function clearVideosArchived(articleId: number): void {
+  getDb().prepare('UPDATE articles SET videos_archived_at = NULL WHERE id = ?').run(articleId)
 }
 
 export function deleteArticle(id: number): boolean {

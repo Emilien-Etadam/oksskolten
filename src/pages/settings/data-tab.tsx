@@ -2,6 +2,7 @@ import { Construction } from 'lucide-react'
 import { useI18n } from '../../lib/i18n'
 import { DataSection } from './sections/data-section'
 import { RetentionSection } from './sections/retention-section'
+import { VideoArchiveSection } from './sections/video-archive-section'
 import { Separator } from '@/components/ui/separator'
 
 function PlaceholderSection({ titleKey, descKey }: { titleKey: string; descKey: string }) {
@@ -28,6 +29,8 @@ export function DataTab() {
       <PlaceholderSection titleKey="settings.dbBackup" descKey="settings.dbBackupDesc" />
       <Separator />
       <RetentionSection />
+      <Separator />
+      <VideoArchiveSection />
     </>
   )
 }

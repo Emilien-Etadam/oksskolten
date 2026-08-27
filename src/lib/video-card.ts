@@ -39,11 +39,11 @@ export function markVideoCards(html: string): string {
     overlay.setAttribute('aria-hidden', 'true')
     overlay.className = 'absolute inset-0 flex items-center justify-center'
     const disc = doc.createElement('span')
-    disc.className = 'flex h-16 w-16 items-center justify-center rounded-full bg-black/60'
+    disc.className = 'flex h-16 w-16 items-center justify-center rounded-full bg-bg/70'
     // A bordered triangle rather than ▶, which renders as an emoji on some
     // platforms and as a hollow glyph on others.
     const triangle = doc.createElement('span')
-    triangle.className = 'ml-1 border-y-[11px] border-l-[18px] border-y-transparent border-l-white'
+    triangle.className = 'ml-1 border-y-[11px] border-l-[18px] border-y-transparent border-l-text'
     disc.appendChild(triangle)
     overlay.appendChild(disc)
     anchor.appendChild(overlay)

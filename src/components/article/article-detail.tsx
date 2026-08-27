@@ -72,8 +72,8 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
   )
   const { viewMode, setViewMode, translating, translatingText, fullTextTranslated, handleTranslate, translatingHtml, error: translateError } = useTranslate(translateInput, metrics)
   const {
-    isBookmarked, isLiked, archivingImages, deleteConfirmOpen, setDeleteConfirmOpen,
-    toggleBookmark, toggleLike, handleArchiveImages, handleDelete,
+    isBookmarked, isLiked, archivingImages, archivingVideo, deleteConfirmOpen, setDeleteConfirmOpen,
+    toggleBookmark, toggleLike, handleArchiveImages, handleArchiveVideo, handleDelete,
   } = useArticleActions(article, articleKey)
   const chat = useChatInline(article?.id ?? 0)
 
@@ -234,9 +234,11 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
         isBookmarked={!!isBookmarked}
         isLiked={isLiked}
         archivingImages={archivingImages}
+        archivingVideo={archivingVideo}
         onToggleBookmark={toggleBookmark}
         onToggleLike={toggleLike}
         onArchiveImages={handleArchiveImages}
+        onArchiveVideo={handleArchiveVideo}
         onDelete={() => setDeleteConfirmOpen(true)}
       />
 

@@ -257,6 +257,39 @@ fallbacks run and rethrows it only if none of them find anything. Without that,
 the emptiest pages — the ones this feature exists for — failed before reaching
 it.
 
+## The embedded video survives, and can be archived
+
+The cleaning pipeline protects player iframes on purpose — `preClean` and
+`postClean` both carry a video exception, with tests to match — and then
+Turndown, which has a rule for tables and nothing else, dropped them at the
+Markdown conversion, and the reader's sanitizer would have dropped them again.
+A Siemens post with an embedded talk kept its caption and lost the video.
+
+`shared/video.ts` holds one definition of which URLs are videos; the Turndown
+rule in `server/fetcher/contentWorker.ts` writes the embed into the Markdown as
+a poster linking to it, and `src/lib/video-card.ts` marks such a link as a play
+card in the reader. That form needs nothing new anywhere else: the image
+archiver already matches `![alt](url)`, so the thumbnail is archived with the
+rest of the article, and `img-src` already allows https. An iframe would have
+needed `frame-src`, which the CSP does not grant.
+
+On top of that, `server/fetcher/article-videos.ts` archives the video itself —
+the sibling of `article-images.ts`, and deliberately the same shape: requested
+per article, processed in the background, served from this instance, deleted
+with the article. It differs in the two ways size forces. It is never
+automatic, since a video is three orders of magnitude larger than the images
+beside it. And it cannot be fetched with a GET — a provider page serves a
+player, not a file — so it shells out to `yt-dlp`, an external binary the
+providers break every few months and which has to be kept updated. When it is
+missing or fails, the article is left exactly as it was.
+
+Serving one is not serving an image either: `<video>` seeks by asking for a byte
+range, so `GET /api/articles/videos/:filename` answers `206`. The archived file
+plays under `default-src 'self'` with no CSP change, which makes the archive
+cheaper than the embed it replaces. Height and size ceilings (720p and 500 MB by
+default) keep a download from filling the disk. See
+[`82_feature_video_archive.md`](docs/spec/82_feature_video_archive.md).
+
 ## Removed Reddit posts are not ingested
 
 Reddit keeps removed posts in its RSS feeds, with `[ Removed by Reddit ]` (or

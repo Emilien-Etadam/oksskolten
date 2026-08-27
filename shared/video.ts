@@ -94,3 +94,12 @@ export function parseVideoUrl(url: string | null | undefined): VideoEmbed | null
 
   return null
 }
+
+/**
+ * Cheap test for whether a body of text points at a video at all. Used to
+ * decide whether to offer an archive control; the server re-checks properly
+ * before downloading anything.
+ */
+export function mentionsVideo(text: string): boolean {
+  return /youtube\.com\/watch|youtu\.be\/|player\.vimeo\.com\/|vimeo\.com\/\d/i.test(text)
+}
