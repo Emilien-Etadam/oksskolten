@@ -169,6 +169,18 @@ body {
   cursor: zoom-in;
 }
 
+/* An archived video plays in place of the card it replaced. Without this it
+   renders at the file's own width and pushes the article column sideways —
+   .prose img is constrained, and nothing constrained its sibling. */
+.prose video {
+  max-width: 100%;
+  height: auto;
+  max-height: 600px;
+  border-radius: 4px;
+  margin: 1.5em auto;
+  display: block;
+}
+
 .prose img.error {
   height: 60px;
   max-height: 60px;
