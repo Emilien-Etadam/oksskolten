@@ -146,6 +146,9 @@ describe('archiveArticleVideos', () => {
     expect(result.downloaded).toBe(0)
     expect(result.errors).toBe(1)
     expect(getArticleById(articleId)!.full_text).toBe(before)
+    // Not marked as archived: the reader has to be able to press the button
+    // again once whatever broke the download is fixed.
+    expect(getArticleById(articleId)!.videos_archived_at).toBeNull()
   })
 
   it('counts a silent no-op as an error rather than rewriting to a missing file', async () => {
@@ -157,6 +160,7 @@ describe('archiveArticleVideos', () => {
 
     expect(result).toMatchObject({ downloaded: 0, errors: 1 })
     expect(getArticleById(articleId)!.full_text).toBe(before)
+    expect(getArticleById(articleId)!.videos_archived_at).toBeNull()
   })
 
   it('deletes an article\'s archived videos and nothing else', async () => {

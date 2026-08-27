@@ -55,12 +55,20 @@ archiveArticleVideos(articleId, fullText)
     │   ├─ the file's existence is the success signal: yt-dlp exits 0 without
     │   │   writing anything when the video is over --max-filesize
     │   └─ swap the Markdown card for <video controls preload="none" …>
-    └─ mark videos_archived_at
+    └─ mark videos_archived_at, but only if something landed
 ```
 
 Errors are counted, never thrown: one video that refuses to download must not
 cost the reader the others, nor the article's text. The article is only
 rewritten for videos that actually landed.
+
+`videos_archived_at` is likewise set only when at least one download succeeded.
+The flag hides the archive control and makes the endpoint answer `409`, so
+setting it after a failed download would lock the article out of ever being
+retried — and this download fails for reasons that get fixed later: a missing
+JS runtime, a yt-dlp the providers have broken, a network blip. This is where
+video parts company with images, whose per-image failures are partial and
+routine.
 
 ### Serving
 
