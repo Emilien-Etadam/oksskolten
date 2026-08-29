@@ -21,7 +21,7 @@ import {
 import { Semaphore, CONCURRENCY, errorMessage } from './fetcher/util.js'
 import { detectAndStoreSimilarArticles } from './similarity.js'
 import { type FetchProgressEvent, emitProgress, markFeedDone } from './fetcher/progress.js'
-import { fetchFullText, isBotBlockPage, convertHtmlToMarkdown, markdownToExcerpt, MIN_EXTRACTED_LENGTH } from './fetcher/content.js'
+import { fetchFullText, isBotBlockPage, convertHtmlToMarkdown, markdownToExcerpt, ensureLeadImage, MIN_EXTRACTED_LENGTH } from './fetcher/content.js'
 import { type FetchRssResult, type RssItem, fetchAndParseRss, RateLimitError } from './fetcher/rss.js'
 import { computeInterval, computeEmpiricalInterval, sqliteFuture, DEFAULT_INTERVAL } from './fetcher/schedule.js'
 import { DEFAULT_LANGUAGE } from '../shared/lang.js'
@@ -174,6 +174,14 @@ export async function fetchArticleContent(
     lang = detectLanguage(fullText)
   } else if (existing) {
     lang = existing.lang
+  }
+
+  // Step 3: Hero-image fallback — restore a lead image the extraction lost.
+  // Only for bodies that already pass the length bar: prepending a markdown
+  // image inflates full_text length, which would otherwise mask a too-short
+  // extraction from the stale-article repair loop (countStaleArticlesByFeed).
+  if (fullText && fullText.replace(/\s+/g, ' ').trim().length >= MIN_EXTRACTED_LENGTH) {
+    fullText = ensureLeadImage(fullText, ogImage, url)
   }
 
   return { fullText, ogImage, excerpt, lang, lastError, title }

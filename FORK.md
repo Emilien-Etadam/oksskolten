@@ -290,6 +290,28 @@ cheaper than the embed it replaces. Height and size ceilings (720p and 500 MB by
 default) keep a download from filling the disk. See
 [`82_feature_video_archive.md`](docs/spec/82_feature_video_archive.md).
 
+## The lead image survives
+
+WordPress-style themes — Hackaday is the reproducible case — emit the featured
+image in the post's header region, outside the content block. The extraction
+pipeline throws that region away wholesale: `stripHeavyTags` deletes every
+`<header>…</header>` before the worker even parses the page, and Readability
+keeps only the main text container. The same picture still arrives through
+`og:image`, which is read from the meta tags before any cleaning — so the
+article list showed a thumbnail that the article body did not contain.
+
+`ensureLeadImage()` in `server/fetcher/markdown-utils.ts` closes the gap at the
+end of `fetchArticleContent` (one insertion point in `server/fetcher.ts`): when
+the extracted markdown has no image within its opening stretch, the og:image is
+prepended as the hero. It never doubles a picture the body already carries —
+URLs are compared by host + path, so CDN resize variants (`?w=400` vs `?w=800`)
+count as the same image — and it stands down for generated social cards
+(GitHub's per-page og banners), for Reddit posts, whose markdown
+`fetchRedditPostContent` composes deliberately, and for bodies under
+`MIN_EXTRACTED_LENGTH`, so a padded length cannot hide a failed extraction from
+the stale-article repair loop. The prepended line is ordinary markdown, so the
+image archiver stores the hero with the rest of the article.
+
 ## Removed Reddit posts are not ingested
 
 Reddit keeps removed posts in its RSS feeds, with `[ Removed by Reddit ]` (or
@@ -487,7 +509,8 @@ can rewrite a feed's RSS URL, which is not a bulk operation.
 | `src/components/feed/feed-modal.tsx` | +`initialStep` prop (opens on a given step, hides the back arrow) |
 | `src/components/article/article-list.tsx` | per-day sections in the render loop, publishes `articleDates` to the nav context |
 | `src/lib/dateFormat.ts` | `formatRelativeDate` counts calendar days; +`calendarDaysAgo` |
-| `server/fetcher.ts` | +1 import, removed Reddit posts filtered out of the new-article tasks, article URL passed to similarity detection |
+| `server/fetcher.ts` | +1 import, removed Reddit posts filtered out of the new-article tasks, article URL passed to similarity detection, hero-image fallback step at the end of `fetchArticleContent` |
+| `server/fetcher/markdown-utils.ts` | +`ensureLeadImage()` (og:image restored as the lead when extraction lost it) |
 | `server/fetcher/content.ts` | +2 imports, Google News wrapper resolved at the top of `fetchFullText()`, embedded-content hop before the solver fallback |
 | `server/fetcher/http.ts` | browser-UA retry on 403/503, +`BROWSER_USER_AGENT` (moved from `reddit.ts`) |
 | `server/similarity.ts` | same-feed skip relaxed for cross-subreddit Reddit duplicates |
