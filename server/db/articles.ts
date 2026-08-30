@@ -555,17 +555,31 @@ export function getRetryArticles(
   batchLimit = RETRY_BATCH_LIMIT,
 ): Article[] {
   return getDb().prepare(`
-    SELECT * FROM active_articles
-    WHERE last_error IS NOT NULL
-      AND full_text IS NULL
-      AND retry_count < :max_attempts
+    SELECT a.* FROM active_articles a
+    JOIN feeds f ON f.id = a.feed_id
+    WHERE a.retry_count < :max_attempts
       AND (
-        last_retry_at IS NULL
+        a.last_retry_at IS NULL
         OR ${BACKOFF_DEADLINE} <= datetime('now')
       )
-    ORDER BY retry_count ASC, last_retry_at ASC
+      AND (
+        (a.last_error IS NOT NULL AND a.full_text IS NULL)
+        OR (
+          f.type = 'clip'
+          AND length(trim(COALESCE(a.full_text, ''))) < :min_body
+        )
+      )
+    ORDER BY a.retry_count ASC, a.last_retry_at ASC
     LIMIT :batch_limit
-  `).all({ max_attempts: maxAttempts, batch_limit: batchLimit }) as Article[]
+  `).all({
+    max_attempts: maxAttempts,
+    batch_limit: batchLimit,
+    // Mirrors MIN_EXTRACTED_LENGTH in fetcher/content.ts. Duplicated so the
+    // DB layer does not import the worker-pool module. A clip whose body is
+    // only shell chrome would otherwise sit forever: retry used to require
+    // full_text IS NULL, and a successful-looking 80-character extract is not.
+    min_body: 200,
+  }) as Article[]
 }
 
 export interface RetryStats {

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setupTestDb } from './__tests__/helpers/testDb.js'
-import { createFeed, insertArticle, getArticleByUrl, getFeedById, upsertSetting } from './db.js'
+import { createFeed, insertArticle, getArticleByUrl, getFeedById, upsertSetting, ensureClipFeed } from './db.js'
 import type { Feed } from './db.js'
 
 // --- Anthropic mock ---
@@ -711,6 +711,43 @@ describe('fetchAllFeeds', () => {
     const row = getDb().prepare('SELECT full_text, last_error FROM articles WHERE url = ?').get('https://example.com/retry') as { full_text: string | null; last_error: string | null }
     expect(row.full_text).toBeTruthy()
     expect(row.last_error).toBeNull()
+  })
+
+  it('retries a clip whose stored body is only the hub shell', async () => {
+    const clip = ensureClipFeed()
+    insertArticle({
+      feed_id: clip.id,
+      title: 'The Smol Training Playbook - a Hugging Face Space',
+      url: 'https://huggingface.co/spaces/HuggingFaceTB/smol-training-playbook',
+      published_at: '2024-01-01T00:00:00Z',
+      full_text: 'Fetching metadata from the HF Docker repository... Refreshing',
+    })
+
+    const hub = `<!DOCTYPE html>
+<html>
+<head><title>The Smol Training Playbook - a Hugging Face Space</title></head>
+<body>
+  <p>Fetching metadata from the HF Docker repository...</p>
+  <iframe src="https://huggingfacetb-smol-training-playbook.hf.space/" aria-label="docker space app"></iframe>
+</body>
+</html>`
+    const inner = articleHtml({ title: 'The Smol Training Playbook' })
+
+    mockFetch.mockImplementation((url: string | URL) => {
+      const u = url.toString()
+      if (u === 'https://huggingface.co/spaces/HuggingFaceTB/smol-training-playbook') {
+        return Promise.resolve(mockResponse(hub))
+      }
+      if (u === 'https://huggingfacetb-smol-training-playbook.hf.space/' || u === 'https://huggingfacetb-smol-training-playbook.hf.space') {
+        return Promise.resolve(mockResponse(inner))
+      }
+      return Promise.resolve(mockResponse('', { status: 404 }))
+    })
+
+    await fetchAllFeeds()
+
+    const row = getArticleByUrl('https://huggingface.co/spaces/HuggingFaceTB/smol-training-playbook')
+    expect(row?.full_text).toContain('paragraph of article content')
   })
 
   it('isolates feed errors — one failure does not affect others', async () => {
@@ -2284,16 +2321,39 @@ describe('fetchFullText — pages whose text lives elsewhere', () => {
     expect(result.fullText).toContain('paragraph of article content')
   })
 
-  it('keeps the outer page when the frame holds no more text than it did', async () => {
+  it('does not keep a shell page when the frame holds no more text than it did', async () => {
+    // Returning the chrome would store "Running" as the article and lock the
+    // row out of the retry queue (which only picks up full_text IS NULL).
     serve({
       'https://shell.example.com/spaces/guide': shellHtml('https://app.example.com/empty'),
       'https://app.example.com/empty': '<!DOCTYPE html><html><body><article><p>Loading.</p></article></body></html>',
     })
 
-    const result = await fetchFullText('https://shell.example.com/spaces/guide')
+    await expect(fetchFullText('https://shell.example.com/spaces/guide'))
+      .rejects.toThrow(/Readability|embedded article/)
+  })
 
-    expect(result.fullText).not.toContain('Loading.')
-    expect(result.title).toBe('The ultimate guide')
+  it('follows a Hugging Face Space iframe to the research article it hosts', async () => {
+    // huggingface.co/spaces/... is a hub shell: title, a spinner, and an
+    // iframe pointing at <space>.hf.space, where the words actually are.
+    const hub = `<!DOCTYPE html>
+<html>
+<head><title>The Smol Training Playbook - a Hugging Face Space</title></head>
+<body>
+  <p>Fetching metadata from the HF Docker repository...</p>
+  <p>Refreshing</p>
+  <iframe src="https://huggingfacetb-smol-training-playbook.hf.space/" aria-label="docker space app"></iframe>
+</body>
+</html>`
+    serve({
+      'https://huggingface.co/spaces/HuggingFaceTB/smol-training-playbook': hub,
+      'https://huggingfacetb-smol-training-playbook.hf.space/': articleHtml({ title: 'The Smol Training Playbook' }),
+    })
+
+    const result = await fetchFullText('https://huggingface.co/spaces/HuggingFaceTB/smol-training-playbook')
+
+    expect(result.fullText).toContain('paragraph of article content')
+    expect(result.title).toBe('The Smol Training Playbook - a Hugging Face Space')
   })
 
   it('still lets the solver have its turn when the frame is thin', async () => {
