@@ -162,6 +162,22 @@ score, image preferred) followed by the top unread articles of each category,
 reusing the magazine card variants. The chat-first home screen it replaces remains
 available as the chat page (`/chat`). Note: `/` is not wired into demo mode.
 
+## New-conversation composer on the chat tab
+
+`src/components/chat/chat-new-conversation.tsx` (+ test) — replacing the
+chat-first home screen with the front page left `/chat` with no way to start a
+conversation: the tab only listed existing ones. The composer sits above the
+conversation list with the same input box and suggestion chips the home screen
+had (reusing `ChatInputArea` and the `/api/chat/suggestions` fallback).
+Sending a message streams the new conversation in place (`ChatPanel`
+variant=`full`) and swaps the URL to `/chat/:id` with `replaceState` — a real
+navigation would remount the page and drop the stream. Re-navigating to `/chat`
+(sidebar, command palette) returns to the list; to make that safe mid-stream,
+`useChat`'s dead `abortRef` (never set) was wired into a stream-generation
+guard so `reset()` actually detaches an in-flight stream instead of letting it
+write into the next conversation. Mounted from `src/pages/chat-page.tsx`
+(2-line insertion wrapping the list view).
+
 ## Reddit articles: comments, crossposts, and access
 
 Reddit-hosted articles get their body from the post's JSON (`server/fetcher/reddit.ts`,
@@ -517,6 +533,9 @@ can rewrite a feed's RSS URL, which is not a bulk operation.
 | `src/contexts/keyboard-navigation-context.tsx` | +`articleDates` (sessionStorage-backed, like ids and URLs) |
 | `src/hooks/use-extend-article-list.ts` | carries `dates` through the extension payload |
 | `src/lib/i18n.ts` | +35 keys (`settings.feeds*`), `feedError.httpError` placeholder fixed |
+| `src/pages/chat-page.tsx` | +2 lines (import + `<ChatNewConversation>` wrapper around the list view) |
+| `src/hooks/use-chat.ts` | dead `abortRef` replaced by a stream-generation guard; `reset()` detaches an in-flight stream |
+| `src/hooks/use-chat.test.ts` | +1 test (reset detaches an in-flight stream) |
 
 `src/app.tsx` additionally has 2 lines adjusted and a small effect added (sidebar
 auto-open respects the persisted collapse state).

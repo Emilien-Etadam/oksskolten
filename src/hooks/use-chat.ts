@@ -26,7 +26,8 @@ export function useChat(articleId?: number, context?: 'home') {
   const [thinking, setThinking] = useState(false)
   const [activeTool, setActiveTool] = useState<ToolStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const abortRef = useRef(false)
+  // Bumped by reset(); a stream started before the bump must no longer touch state
+  const streamGenRef = useRef(0)
 
   const sendMessage = useCallback(async (text: string, opts?: { suggestionKey?: string }) => {
     if (!text.trim() || streaming) return
@@ -34,7 +35,7 @@ export function useChat(articleId?: number, context?: 'home') {
     setError(null)
     setStreaming(true)
     setThinking(false)
-    abortRef.current = false
+    const gen = ++streamGenRef.current
 
     // Add user message
     setMessages(prev => [...prev, { role: 'user', text }])
@@ -54,7 +55,7 @@ export function useChat(articleId?: number, context?: 'home') {
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         },
         (event: ChatSSEEvent) => {
-          if (abortRef.current) return
+          if (gen !== streamGenRef.current) return
 
           switch (event.type) {
             case 'conversation_id':
@@ -111,6 +112,7 @@ export function useChat(articleId?: number, context?: 'home') {
         },
       )
     } catch (err) {
+      if (gen !== streamGenRef.current) return
       setError(err instanceof Error ? err.message : 'Unknown error')
       // Remove empty assistant message on error
       setMessages(prev => {
@@ -121,9 +123,11 @@ export function useChat(articleId?: number, context?: 'home') {
         return prev
       })
     } finally {
-      setStreaming(false)
-      setThinking(false)
-      setActiveTool(null)
+      if (gen === streamGenRef.current) {
+        setStreaming(false)
+        setThinking(false)
+        setActiveTool(null)
+      }
     }
   }, [conversationId, articleId, context, streaming])
 
@@ -159,6 +163,7 @@ export function useChat(articleId?: number, context?: 'home') {
   }, [])
 
   const reset = useCallback(() => {
+    streamGenRef.current++
     setMessages([])
     setConversationId(null)
     setError(null)
