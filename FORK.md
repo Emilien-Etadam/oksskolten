@@ -259,9 +259,15 @@ then `<link rel="amphtml">`, then the first iframe that is not hidden, declared
 under 200px, or hosted by a player, ad network, code sandbox or social embed.
 `fetchFullText()` follows that one URL when extraction came up short, parses it
 directly — one hop, never recursing — and keeps the result only if it beats the
-outer page and clears `MIN_EXTRACTED_LENGTH`. A thin frame therefore still falls
-through to the solver, and a wrong guess costs one fetch rather than a wrong
-article.
+outer page and clears `MIN_EXTRACTED_LENGTH`. The hop uses the same
+`DEFAULT_TIMEOUT` as any other article fetch: the frame *is* the article, and a
+Hugging Face Space can serve several megabytes of HTML (or spend ten seconds
+waking). A thin frame therefore still falls through to the solver, and a wrong
+guess costs one fetch rather than a wrong article. If the hop fails and the
+shell is still under `MIN_EXTRACTED_LENGTH`, the fetch throws rather than
+keeping a handful of chrome characters as the body — that would lock an RSS
+row out of the retry queue (`full_text IS NULL`). Clips with a body shorter
+than `MIN_EXTRACTED_LENGTH` are retried as well.
 
 For an iframe the outer page keeps naming the article: its title and og:image
 win, since that is the URL the reader saved. A meta refresh or an AMP link is

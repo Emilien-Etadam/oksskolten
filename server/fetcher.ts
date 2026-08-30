@@ -112,7 +112,7 @@ export async function fetchArticleContent(
     requiresJsChallenge?: boolean
     /** CSS Bridge listing-page excerpt, used as fullText fallback */
     listingExcerpt?: string
-    /** Existing article data for retry (skips fetch if full_text present) */
+    /** Existing article data for retry (skips fetch if a real body is already stored) */
     existingArticle?: { full_text: string | null; og_image: string | null; lang: string | null }
   },
 ): Promise<FetchedContent> {
@@ -125,13 +125,14 @@ export async function fetchArticleContent(
 
   const existing = options?.existingArticle
 
-  // Step 1: Fetch full text (skip if retry article already has content)
-  // For anchor-link articles (URL has # fragment), the page is shared across
-  // multiple items, so page fetch would return irrelevant content. Use RSS
-  // inline content (content:encoded) directly if available.
+  // Step 1: Fetch full text (skip if retry article already has a real body).
+  // A handful of shell chrome is not a body: it is what a Hugging Face Space
+  // leaves behind when the iframe hop fails, and skipping the fetch would
+  // freeze that chrome in place.
   const isAnchorLink = url.includes('#')
+  const existingBodyLen = existing?.full_text?.replace(/\s+/g, ' ').trim().length ?? 0
 
-  if (existing?.full_text) {
+  if (existing && existingBodyLen >= MIN_EXTRACTED_LENGTH) {
     fullText = existing.full_text
     ogImage = existing.og_image
   } else if (isAnchorLink && options?.listingExcerpt) {
@@ -269,7 +270,8 @@ async function processArticle(task: ArticleTask): Promise<boolean> {
     })
     maybeEnqueueAutoTranslate(task.article.id, content.fullText, effectiveLang)
   }
-  return !!content.lastError
+  const extractedLen = content.fullText?.replace(/\s+/g, ' ').trim().length ?? 0
+  return !!content.lastError || (task.kind === 'retry' && extractedLen < MIN_EXTRACTED_LENGTH)
 }
 
 // --- Single feed fetch ---
