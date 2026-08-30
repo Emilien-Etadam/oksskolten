@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest'
-import { fixLegacyMarkdown, escapeNestedBrackets } from './markdown'
+import { fixLegacyMarkdown, escapeNestedBrackets, renderMarkdown } from './markdown'
 
 describe('fixLegacyMarkdown', () => {
   // --- Pattern 1: markdown link wrapping <picture> ---
@@ -153,6 +153,26 @@ GitHub ModelsManage prompts
     const input = '<img src="photo.jpg" alt="photo">'
     expect(fixLegacyMarkdown(input)).toBe(input)
   })
+
+  it('does not hang on a Python list that is not a markdown link', () => {
+    // Reproduction of r/LocalLLaMA "testing out Qwen 3.8": indented hangman
+    // ASCII art lives inside `stages = [ ... ]`. The old regex treated that `[`
+    // as a multi-line markdown link and backtracked until Firefox threw
+    // InternalError: too much recursion (V8 just froze).
+    const input = 'stages = [\n' + '              |   |\n'.repeat(80) + ']\n'
+    const start = Date.now()
+    const result = fixLegacyMarkdown(input)
+    expect(Date.now() - start).toBeLessThan(500)
+    expect(result).toBe(input)
+  })
+
+  it('does not hang on an unclosed <picture> in a large document', () => {
+    const input = 'intro\n<picture' + 'x'.repeat(8000) + '\nno close\n[link](https://example.com)'
+    const start = Date.now()
+    const result = fixLegacyMarkdown(input)
+    expect(Date.now() - start).toBeLessThan(500)
+    expect(result).toContain('[link](https://example.com)')
+  })
 })
 
 describe('escapeNestedBrackets', () => {
@@ -191,5 +211,35 @@ describe('escapeNestedBrackets', () => {
   it('handles deeply nested brackets', () => {
     const input = '[Title [with [deep] nesting]](https://example.com)'
     expect(escapeNestedBrackets(input)).toBe('[Title \\[with \\[deep\\] nesting\\]](https://example.com)')
+  })
+})
+
+describe('renderMarkdown', () => {
+  it('renders a hangman-style Reddit post without throwing', () => {
+    const md = [
+      "Here's the code.",
+      '',
+      '    import random',
+      '    stages = [',
+      ...Array.from({ length: 40 }, () => '              |   |'),
+      '            ]',
+      '',
+      '**And I’m stuck with you.**',
+    ].join('\n')
+    const html = renderMarkdown(md)
+    expect(html).toContain('import random')
+    expect(html).toContain('stuck with you')
+  })
+
+  it('highlights a fenced block when the language is known', () => {
+    const html = renderMarkdown('```js\nconst x = 1\n```')
+    expect(html).toContain('hljs')
+    expect(html).toContain('language-js')
+  })
+
+  it('renders an untagged code fence without auto-detecting the language', () => {
+    const html = renderMarkdown('```\nconst x = 1\n```')
+    expect(html).toContain('<code')
+    expect(html).toContain('const x = 1')
   })
 })

@@ -1,6 +1,7 @@
 import { Marked } from 'marked'
 import { markedHighlight } from 'marked-highlight'
 import hljs from 'highlight.js/lib/core'
+import { collapseMultilineLinks, walkLinks } from '../../shared/markdown-links'
 
 // Register languages individually to keep bundle size small
 import javascript from 'highlight.js/lib/languages/javascript'
@@ -62,6 +63,62 @@ hljs.registerAliases(['sh', 'zsh'], { languageName: 'bash' })
 hljs.registerAliases(['yml'], { languageName: 'yaml' })
 hljs.registerAliases(['html'], { languageName: 'xml' })
 
+export { walkLinks }
+
+function altFromImgTag(imgTag: string): string {
+  const altMatch = imgTag.match(/alt=["']([^"']*)["']/i)
+  return altMatch?.[1] ?? ''
+}
+
+/**
+ * Rewrite <picture> blocks to markdown images without nested `[\s\S]*?`
+ * regexes. Firefox's regex engine recurses on those and throws
+ * InternalError: too much recursion on a large unclosed tag.
+ */
+function rewritePictureElements(s: string): string {
+  const startRe = /<picture[^>]*>/gi
+  const out: string[] = []
+  let pos = 0
+  let match: RegExpExecArray | null
+  while ((match = startRe.exec(s)) !== null) {
+    const tagStart = match.index
+    const tagEnd = tagStart + match[0].length
+    const closeRel = s.slice(tagEnd).toLowerCase().indexOf('</picture>')
+    if (closeRel === -1) break
+    const innerEnd = tagEnd + closeRel
+    const picEnd = innerEnd + '</picture>'.length
+    const inner = s.slice(tagEnd, innerEnd)
+    const imgMatch = inner.match(/<img\s[^>]*src=["']([^"']*)["'][^>]*>/i)
+    startRe.lastIndex = picEnd
+    if (!imgMatch) continue
+
+    const src = imgMatch[1]
+    const alt = altFromImgTag(imgMatch[0])
+
+    let bracket = tagStart - 1
+    while (bracket >= pos && /\s/.test(s[bracket])) bracket--
+    const linked = bracket >= pos && s[bracket] === '[' && (bracket === 0 || s[bracket - 1] !== '!')
+    const closeLink = linked ? s.slice(picEnd).match(/^\s*\]\s*\(([^)]*)\)/) : null
+
+    if (closeLink) {
+      out.push(s.slice(pos, bracket))
+      out.push(`[![${alt}](${src})](${closeLink[1]})`)
+      pos = picEnd + closeLink[0].length
+      startRe.lastIndex = pos
+    } else {
+      out.push(s.slice(pos, tagStart))
+      out.push(`![${alt}](${src})`)
+      pos = picEnd
+    }
+  }
+  out.push(s.slice(pos))
+  return out.join('')
+}
+
+function escapeAsPre(text: string): string {
+  return `<pre>${text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`
+}
+
 /**
  * Fix malformed markdown in legacy stored content.
  * New content is normalized server-side before storage; this function exists solely
@@ -82,106 +139,12 @@ export function fixLegacyMarkdown(md: string): string {
   const parts = md.split(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g)
   for (let i = 0; i < parts.length; i += 2) {
     let s = parts[i]
-    // Helper: extract alt text from an <img> tag string
-    const extractAlt = (_match: string, imgTag: string) => {
-      const altMatch = imgTag.match(/alt=["']([^"']*)["']/i)
-      return altMatch?.[1] || ''
-    }
-    // Pattern 1: markdown link wrapping a <picture> — [<picture>...</picture>](url)
-    s = s.replace(
-      /\[\s*<picture[^>]*>[\s\S]*?(<img\s[^>]*?src=["']([^"']*)["'][^>]*?>)[\s\S]*?<\/picture>\s*\]\s*\(([^)]*)\)/gi,
-      (_m, imgTag, src, url) => `[![${extractAlt(_m, imgTag)}](${src})](${url})`,
-    )
-    // Pattern 2: standalone <picture> blocks (not wrapped in a link)
-    s = s.replace(
-      /<picture[^>]*>[\s\S]*?(<img\s[^>]*?src=["']([^"']*)["'][^>]*?>)[\s\S]*?<\/picture>/gi,
-      (_m, imgTag, src) => `![${extractAlt(_m, imgTag)}](${src})`,
-    )
-    // Remove any remaining standalone <source> tags
-    s = s.replace(/<source\s[^>]*?\/?>/gi, '')
-    // Collapse multi-line linked images: [\n![alt](src)\n](url) → [![alt](src)](url)
-    s = s.replace(
-      /\[\s*\n+\s*(!\[[^\]]*\]\([^)]*\))\s*\n+\s*\]\s*\(([^)]*)\)/g,
-      (_m, img, url) => `[${img}](${url})`,
-    )
-    // Collapse multi-line markdown links (plain text, no nested brackets) into single-line
-    s = s.replace(
-      /\[([^\]]*(?:\n[^\]]*)+)\]\(([^)]+)\)/g,
-      (_m, text: string, url: string) => {
-        const collapsed = text.replace(/\s*\n\s*/g, ' ').trim()
-        return `[${collapsed}](${url})`
-      },
-    )
+    if (/<picture/i.test(s)) s = rewritePictureElements(s)
+    if (/<source/i.test(s)) s = s.replace(/<source\s[^>]*>/gi, '')
+    s = collapseMultilineLinks(s)
     parts[i] = s
   }
   return parts.join('')
-}
-
-/**
- * Walk markdown links `[text](url)` in a string, calling `visitor` for each.
- * The visitor receives (text, url) and returns the replacement string,
- * or null to leave the link unchanged.
- * Image links `![…](…)` are always skipped.
- */
-export function walkLinks(
-  s: string,
-  visitor: (text: string, url: string) => string | null,
-): string {
-  const result: string[] = []
-  let pos = 0
-
-  while (pos < s.length) {
-    const idx = s.indexOf('[', pos)
-    if (idx === -1) {
-      result.push(s.slice(pos))
-      break
-    }
-
-    // Skip image links ![...](...) — they're fine as-is
-    if (idx > 0 && s[idx - 1] === '!') {
-      result.push(s.slice(pos, idx + 1))
-      pos = idx + 1
-      continue
-    }
-
-    // Find the matching `]` accounting for nesting depth
-    let depth = 1
-    let end = idx + 1
-    while (end < s.length && depth > 0) {
-      if (s[end] === '[') depth++
-      else if (s[end] === ']') depth--
-      if (depth > 0) end++
-    }
-
-    if (depth !== 0) {
-      result.push(s.slice(pos, idx + 1))
-      pos = idx + 1
-      continue
-    }
-
-    // end points to the closing `]` — check if followed by `(url)`
-    if (end + 1 < s.length && s[end + 1] === '(') {
-      const urlStart = end + 2
-      const urlEnd = s.indexOf(')', urlStart)
-      if (urlEnd !== -1) {
-        const text = s.slice(idx + 1, end)
-        const url = s.slice(urlStart, urlEnd)
-        const replacement = visitor(text, url)
-        if (replacement !== null) {
-          result.push(s.slice(pos, idx))
-          result.push(replacement)
-          pos = urlEnd + 1
-          continue
-        }
-      }
-    }
-
-    // Not a link or visitor declined — emit up to and including `[`
-    result.push(s.slice(pos, idx + 1))
-    pos = idx + 1
-  }
-
-  return result.join('')
 }
 
 /**
@@ -209,10 +172,12 @@ export const markedInstance = new Marked(
     emptyLangClass: 'hljs',
     langPrefix: 'hljs language-',
     highlight(code, lang) {
-      if (lang && hljs.getLanguage(lang)) {
-        return hljs.highlight(code, { language: lang }).value
+      const language = lang && hljs.getLanguage(lang) ? lang : 'plaintext'
+      try {
+        return hljs.highlight(code, { language, ignoreIllegals: true }).value
+      } catch {
+        return code
       }
-      return hljs.highlightAuto(code).value
     },
   }),
 )
@@ -232,9 +197,14 @@ const defaultPipeline: MarkdownPreprocessor[] = [fixLegacyMarkdown, escapeNested
  *   renderMarkdown(md, [rewriteLinksToAppPaths])  // chat (with URL rewriting)
  */
 export function renderMarkdown(md: string, preprocessors?: MarkdownPreprocessor[]): string {
-  const pipeline = preprocessors
-    ? [...preprocessors, ...defaultPipeline]
-    : defaultPipeline
-  const processed = pipeline.reduce((text, fn) => fn(text), md)
-  return markedInstance.parse(processed) as string
+  try {
+    const pipeline = preprocessors
+      ? [...preprocessors, ...defaultPipeline]
+      : defaultPipeline
+    const processed = pipeline.reduce((text, fn) => fn(text), md)
+    const html = markedInstance.parse(processed)
+    return typeof html === 'string' ? html : escapeAsPre(md)
+  } catch {
+    return escapeAsPre(md)
+  }
 }
