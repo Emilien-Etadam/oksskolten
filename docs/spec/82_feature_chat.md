@@ -325,11 +325,16 @@ interface ChatPanelProps {
 
 #### ChatPage (`/chat`)
 
-Conversation list in the left sidebar, `ChatPanel` (variant=`full`) on the right.
+New-conversation input with suggestion chips (`ChatNewConversation`) above the
+conversation list.
 
-- Create, select, and delete conversations
-- Routing via `/chat/:conversationId`
-- Conversation list with date display
+- Sending a message creates a conversation and streams it in place; the URL is
+  swapped to `/chat/:id` via `replaceState` (a real navigation would remount the
+  page and drop the stream)
+- Selecting a conversation routes to `/chat/:conversationId` and opens
+  `ChatPanel` (variant=`full`)
+- Conversation list with date display, message count, and linked article
+- Re-navigating to `/chat` (sidebar, command palette) returns to the list
 
 #### ChatFab (Floating Chat UI)
 

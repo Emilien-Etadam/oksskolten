@@ -204,6 +204,49 @@ describe('useChat', () => {
     expect(result.current.error).toBeNull()
   })
 
+  it('reset detaches an in-flight stream', async () => {
+    const { result } = renderHook(() => useChat())
+
+    await act(async () => {
+      result.current.sendMessage('first')
+      await Promise.resolve()
+    })
+    const firstOnEvent = capturedOnEvent!
+    const firstResolve = streamResolve!
+
+    await act(async () => {
+      result.current.reset()
+    })
+
+    // Start a second conversation after the reset
+    await act(async () => {
+      result.current.sendMessage('second')
+      await Promise.resolve()
+    })
+
+    // Events from the detached first stream must not touch the new conversation
+    await act(async () => {
+      firstOnEvent({ type: 'text_delta', text: 'stale ' })
+      firstOnEvent({ type: 'conversation_id', conversation_id: 'conv-old' })
+      firstResolve()
+    })
+
+    expect(result.current.conversationId).toBeNull()
+    expect(result.current.messages).toEqual([
+      { role: 'user', text: 'second' },
+      { role: 'assistant', text: '' },
+    ])
+    // The detached stream's completion must not clear the new stream's flag
+    expect(result.current.streaming).toBe(true)
+
+    await act(async () => {
+      capturedOnEvent!({ type: 'text_delta', text: 'fresh' })
+      streamResolve!()
+    })
+    expect(result.current.messages[1].text).toBe('fresh')
+    expect(result.current.streaming).toBe(false)
+  })
+
   it('loadConversation fetches and sets messages', async () => {
     const mockMessages = {
       messages: [
