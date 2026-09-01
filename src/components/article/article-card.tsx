@@ -178,7 +178,7 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, show
       href={href}
       data-original-url={originalUrl}
       onClick={handleClick}
-      className={`article-card block w-full text-left border-b border-border py-3 px-4 md:px-6 transition-[background-color,transform,box-shadow,border-color] duration-100 hover:bg-hover hover:-translate-y-px hover:shadow-sm select-none no-underline text-inherit ${
+      className={`article-card group relative block w-full text-left border-b border-border py-3 px-4 md:px-6 transition-[background-color,transform,box-shadow,border-color] duration-100 hover:bg-hover hover:-translate-y-px hover:shadow-sm select-none no-underline text-inherit ${
         indicatorStyle === 'line'
           ? `border-l-2 transition-[border-color] duration-500 ${showIndicator ? 'border-l-accent' : 'border-l-transparent'}`
           : ''
@@ -206,8 +206,8 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, show
           )}
           <CardMeta domain={domain} dateText={dateText} article={article} isUnread={isUnread} groupCount={groupCount} className="mt-1" />
         </div>
-        {isUnread && onMarkRead && <MarkReadButton onClick={() => onMarkRead(article.id)} />}
       </div>
+      {isUnread && onMarkRead && <MarkReadButton variant="edge" onClick={() => onMarkRead(article.id)} />}
     </a>
   )
 }
@@ -315,7 +315,7 @@ function CompactCard({ article, dateMode, indicatorStyle, showUnreadIndicator, o
       href={href}
       data-original-url={originalUrl}
       onClick={handleClick}
-      className={`article-card block w-full text-left border-b border-border py-1.5 px-4 md:px-6 transition-[background-color,border-color] duration-100 hover:bg-hover select-none no-underline text-inherit ${
+      className={`article-card group relative block w-full text-left border-b border-border py-1.5 px-4 md:px-6 transition-[background-color,border-color] duration-100 hover:bg-hover select-none no-underline text-inherit ${
         indicatorStyle === 'line'
           ? `border-l-2 transition-[border-color] duration-500 ${showIndicator ? 'border-l-accent' : 'border-l-transparent'}`
           : ''
@@ -338,8 +338,8 @@ function CompactCard({ article, dateMode, indicatorStyle, showUnreadIndicator, o
         {groupCount != null && groupCount > 1 && (
           <span className="shrink-0 rounded-full bg-bg-subtle px-1.5 text-[10.5px] font-medium leading-4 text-muted">{`×${groupCount}`}</span>
         )}
-        {isUnread && onMarkRead && <MarkReadButton className="w-6 h-6 -my-1" onClick={() => onMarkRead(article.id)} />}
       </div>
+      {isUnread && onMarkRead && <MarkReadButton variant="edge" onClick={() => onMarkRead(article.id)} />}
     </a>
   )
 }
