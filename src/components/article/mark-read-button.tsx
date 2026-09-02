@@ -57,7 +57,7 @@ export function MarkReadButton({ onClick, className = '', variant = 'round' }: M
       }}
       className={
         isEdge
-          ? `absolute inset-y-1.5 right-1.5 z-10 flex items-center justify-center overflow-hidden w-1.5 rounded-full bg-error text-error opacity-70 transition-[width,inset,border-radius,opacity,color] duration-200 ease-out motion-reduce:transition-none group-hover:inset-y-0 group-hover:right-0 group-hover:w-[var(--mark-read-square,2.5rem)] group-hover:rounded-none group-hover:opacity-100 group-hover:text-white focus-visible:inset-y-0 focus-visible:right-0 focus-visible:w-[var(--mark-read-square,2.5rem)] focus-visible:rounded-none focus-visible:opacity-100 focus-visible:text-white focus-visible:outline-none ${className}`
+          ? `absolute inset-y-0 right-0 z-10 flex items-center justify-center overflow-hidden w-4 rounded bg-error text-error opacity-70 transition-[width,opacity,color] duration-200 ease-out motion-reduce:transition-none group-hover:w-[var(--mark-read-square,2.5rem)] group-hover:opacity-100 group-hover:text-white focus-visible:w-[var(--mark-read-square,2.5rem)] focus-visible:opacity-100 focus-visible:text-white focus-visible:outline-none ${className}`
           : `shrink-0 flex items-center justify-center w-7 h-7 rounded-full text-muted hover:text-accent hover:bg-hover transition-colors ${className}`
       }
     >
