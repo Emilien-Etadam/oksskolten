@@ -24,16 +24,19 @@ export function MarkReadButton({ onClick, className = '', variant = 'round' }: M
   const ref = useRef<HTMLButtonElement>(null)
   // The expanded width has to equal the row height, and CSS cannot derive it:
   // `aspect-square` on a stretched flex item sizes from the icon, and `width`
-  // cannot animate to an aspect-derived `auto`. So measure the strip — which
-  // already spans the row — and animate towards that value.
+  // cannot animate to an aspect-derived `auto`. So measure the row and animate
+  // towards that value.
   const [side, setSide] = useState(0)
 
   useEffect(() => {
     if (variant !== 'edge') return
     const el = ref.current
     if (!el) return
-    const observer = new ResizeObserver(() => setSide(el.offsetHeight))
-    observer.observe(el)
+    // measure the row, not the resting pill: the pill is inset, the expanded
+    // square must match the row's full height
+    const row = el.parentElement ?? el
+    const observer = new ResizeObserver(() => setSide(row.clientHeight))
+    observer.observe(row)
     return () => observer.disconnect()
   }, [variant])
 
@@ -54,7 +57,7 @@ export function MarkReadButton({ onClick, className = '', variant = 'round' }: M
       }}
       className={
         isEdge
-          ? `absolute inset-y-0 right-0 z-10 flex items-center justify-center overflow-hidden w-2.5 border-l border-border bg-error/25 text-error transition-[width,background-color,color] duration-200 ease-out motion-reduce:transition-none group-hover:w-[var(--mark-read-square,2.5rem)] group-hover:bg-error group-hover:text-white focus-visible:w-[var(--mark-read-square,2.5rem)] focus-visible:bg-error focus-visible:text-white focus-visible:outline-none ${className}`
+          ? `absolute inset-y-1.5 right-1.5 z-10 flex items-center justify-center overflow-hidden w-1.5 rounded-full bg-error text-error opacity-70 transition-[width,inset,border-radius,opacity,color] duration-200 ease-out motion-reduce:transition-none group-hover:inset-y-0 group-hover:right-0 group-hover:w-[var(--mark-read-square,2.5rem)] group-hover:rounded-none group-hover:opacity-100 group-hover:text-white focus-visible:inset-y-0 focus-visible:right-0 focus-visible:w-[var(--mark-read-square,2.5rem)] focus-visible:rounded-none focus-visible:opacity-100 focus-visible:text-white focus-visible:outline-none ${className}`
           : `shrink-0 flex items-center justify-center w-7 h-7 rounded-full text-muted hover:text-accent hover:bg-hover transition-colors ${className}`
       }
     >
