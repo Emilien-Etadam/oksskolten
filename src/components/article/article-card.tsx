@@ -190,7 +190,6 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, show
             <span className={`w-1.5 h-1.5 rounded-full bg-accent transition-opacity duration-500 ${showIndicator ? 'opacity-100' : 'opacity-0'}`} />
           </div>
         )}
-        {showThumbnails && <Thumbnail src={article.og_image} articleUrl={article.url} className="w-20 h-20" />}
         <div className="flex-1 min-w-0">
           <span
             className={`text-[15px] transition-colors duration-500 block ${
@@ -206,6 +205,9 @@ function ListCard({ article, dateMode, indicatorStyle, showUnreadIndicator, show
           )}
           <CardMeta domain={domain} dateText={dateText} article={article} isUnread={isUnread} groupCount={groupCount} className="mt-1" />
         </div>
+        {/* Thumbnail sits at the row's end so the mark-as-read square, which
+            expands from the right edge, covers it rather than the title. */}
+        {showThumbnails && <Thumbnail src={article.og_image} articleUrl={article.url} className="w-20 h-20" />}
       </div>
       {isUnread && onMarkRead && <MarkReadButton variant="edge" onClick={() => onMarkRead(article.id)} />}
     </a>
