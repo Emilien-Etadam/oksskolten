@@ -44,7 +44,7 @@ const redditPayload = [
           data: {
             author: 'alice', score: 42, body: 'Great **post**',
             replies: { data: { children: [
-              { kind: 't1', data: { author: 'bob', score: 7, body: 'Agreed', replies: '' } },
+              { kind: 't1', data: { author: 'bob', score: 7, body: 'Agreed https://preview.redd.it/pic.png?width=100&s=ab', replies: '' } },
             ] } },
           },
         },
@@ -108,6 +108,8 @@ describe('GET /api/articles/:id/comments', () => {
     expect(body.comments[0].score).toBe(42)
     expect(body.comments[0].replies).toHaveLength(1)
     expect(body.comments[0].replies[0].author).toBe('bob')
+    // Reddit-hosted image links come back as markdown images
+    expect(body.comments[0].replies[0].body).toBe('Agreed ![](https://preview.redd.it/pic.png?width=100&s=ab)')
   })
 
   it('returns an empty list when reddit and FlareSolverr are unreachable', async () => {

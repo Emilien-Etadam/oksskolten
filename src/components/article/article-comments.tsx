@@ -3,10 +3,11 @@ import useSWR from 'swr'
 import { ArrowBigUp } from 'lucide-react'
 import { fetcher, authHeaders } from '../../lib/fetcher'
 import { renderMarkdown } from '../../lib/markdown'
+import { isRedditArticleUrl } from '../../../shared/reddit-images'
 import { sanitizeHtml } from '../../lib/sanitize'
 import { useI18n } from '../../lib/i18n'
 
-interface ArticleComment {
+export interface ArticleComment {
   author: string
   score: number
   body: string
@@ -23,12 +24,7 @@ const TRANSLATE_TIMEOUT_MS = 120_000
 
 /** Client-side mirror of the server's provider detection, to skip useless requests. */
 export function hasCommentsProvider(articleUrl: string): boolean {
-  try {
-    const host = new URL(articleUrl).hostname.replace(/^(www|old|new)\./, '')
-    return host === 'reddit.com'
-  } catch {
-    return false
-  }
+  return isRedditArticleUrl(articleUrl)
 }
 
 /** Depth-first comment bodies, in the same order applyTranslations consumes them. */
