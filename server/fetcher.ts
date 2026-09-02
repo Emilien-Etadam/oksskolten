@@ -28,6 +28,7 @@ import { DEFAULT_LANGUAGE } from '../shared/lang.js'
 import { detectLanguage } from './fetcher/ai.js'
 import { isRemovedRedditPost } from './fetcher/reddit.js'
 import { enqueueAutoTranslate, enqueueAutoSummarize, enqueueAiFilter, isAutoTranslateEnabled, isAutoSummarizeEnabled, resumePendingAiTasks } from './fetcher/ai-queue.js'
+import { sweepAutoArchiveFeeds } from './fetcher/article-images.js'
 import { logger } from './logger.js'
 
 const log = logger.child('fetcher')
@@ -345,6 +346,7 @@ export async function fetchSingleFeed(
 
   if (tasks.length === 0) {
     log.info(`Feed ${feed.name}: no new articles`)
+    void sweepAutoArchiveFeeds(feed.id)
     return
   }
 
@@ -385,6 +387,7 @@ export async function fetchSingleFeed(
   emitProgress(completeEvent)
   onProgress?.(completeEvent)
 
+  void sweepAutoArchiveFeeds(feed.id)
   log.info(`Feed ${feed.name}: done`)
 }
 
@@ -473,6 +476,7 @@ export async function fetchAllFeeds(
 
   if (allTasks.length === 0) {
     log.info('No articles to process')
+    void sweepAutoArchiveFeeds()
     return
   }
 
@@ -541,6 +545,10 @@ export async function fetchAllFeeds(
       onProgress?.(event)
     }
   }
+
+  // Archive images for feeds flagged archive_images, now that this cycle's
+  // articles are stored. Fire-and-forget: downloads must not hold up the batch.
+  void sweepAutoArchiveFeeds()
 
   log.info('Batch complete')
 }

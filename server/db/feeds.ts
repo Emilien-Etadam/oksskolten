@@ -46,6 +46,13 @@ export function getEnabledFeeds(): Feed[] {
   ).all() as Feed[]
 }
 
+/** Feeds whose images are archived automatically at fetch time. */
+export function getAutoArchiveFeeds(): Feed[] {
+  return getDb().prepare(
+    'SELECT * FROM feeds WHERE archive_images = 1 AND disabled = 0',
+  ).all() as Feed[]
+}
+
 export function ensureClipFeed(): Feed {
   const existing = getDb().prepare("SELECT * FROM feeds WHERE type = 'clip'").get() as Feed | undefined
   if (existing) return existing
@@ -86,7 +93,7 @@ export function createFeed(data: {
 
 export function updateFeed(
   id: number,
-  data: { name?: string; rss_url?: string | null; rss_bridge_url?: string | null; disabled?: number; category_id?: number | null; requires_js_challenge?: number; ai_filter?: string | null },
+  data: { name?: string; rss_url?: string | null; rss_bridge_url?: string | null; disabled?: number; category_id?: number | null; requires_js_challenge?: number; ai_filter?: string | null; archive_images?: number },
 ): Feed | undefined {
   const feed = getFeedById(id)
   if (!feed) return undefined
@@ -125,6 +132,10 @@ export function updateFeed(
   if (data.requires_js_challenge !== undefined) {
     fields.push('requires_js_challenge = @requires_js_challenge')
     params.requires_js_challenge = data.requires_js_challenge
+  }
+  if (data.archive_images !== undefined) {
+    fields.push('archive_images = @archive_images')
+    params.archive_images = data.archive_images
   }
 
   if (fields.length === 0) return feed

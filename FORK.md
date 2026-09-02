@@ -346,6 +346,27 @@ count as the same image — and it stands down for generated social cards
 the stale-article repair loop. The prepended line is ordinary markdown, so the
 image archiver stores the hero with the rest of the article.
 
+## Per-feed image auto-archive
+
+Image archiving runs when the reader opens an article — fine for reading, wrong
+for a feed kept as an archive, where the local copy must exist before the
+source rots, not after someone happens to click. Feeds flagged
+`archive_images` (a toggle in the feed's context menu) have their articles'
+images downloaded automatically instead.
+
+`sweepAutoArchiveFeeds()` in `server/fetcher/article-images.ts` runs
+fire-and-forget at the end of every fetch cycle — both `fetchAllFeeds` and
+`fetchSingleFeed`, on their no-new-articles exits too — archiving up to 50
+not-yet-archived articles per flagged feed, newest first; the remainder drains
+on later cycles, and an in-flight set keeps two sweeps of the same feed from
+downloading the same images twice. Switching the flag on is a request to
+archive the backlog, not only future articles, so `PATCH /api/feeds/:id` kicks
+one large sweep (10,000 articles) immediately. Imageless articles get marked
+archived by their first pass and leave the queue for good — the same terminal
+state the on-open path produces. While the global `images.enabled` toggle is
+off the sweeps are a no-op, since they reuse its storage configuration. See
+[`81_feature_images.md`](docs/spec/81_feature_images.md).
+
 ## Removed Reddit posts are not ingested
 
 Reddit keeps removed posts in its RSS feeds, with `[ Removed by Reddit ]` (or
@@ -545,6 +566,12 @@ can rewrite a feed's RSS URL, which is not a bulk operation.
 | `src/lib/dateFormat.ts` | `formatRelativeDate` counts calendar days; +`calendarDaysAgo` |
 | `server/fetcher.ts` | +1 import, removed Reddit posts filtered out of the new-article tasks, article URL passed to similarity detection, hero-image fallback step at the end of `fetchArticleContent` |
 | `server/fetcher/markdown-utils.ts` | +`ensureLeadImage()` (og:image restored as the lead when extraction lost it) |
+| `server/fetcher/article-images.ts` | +`archiveFeedImages()` / `sweepAutoArchiveFeeds()` (per-feed auto-archive sweep) |
+| `server/db/feeds.ts` | `archive_images` in `updateFeed()`, +`getAutoArchiveFeeds()` |
+| `server/db/articles.ts` | +`getUnarchivedArticlesByFeed()` |
+| `server/routes/feeds.ts` | `archive_images` accepted by `PATCH /api/feeds/:id`, backlog sweep kicked when switched on |
+| `src/components/feed/feed-context-menu.tsx` | +Auto-archive images toggle item |
+| `src/components/feed/feed-list.tsx` | +2 props wiring the toggle to `PATCH /api/feeds/:id` |
 | `server/fetcher/content.ts` | +2 imports, Google News wrapper resolved at the top of `fetchFullText()`, embedded-content hop before the solver fallback |
 | `server/fetcher/http.ts` | browser-UA retry on 403/503, +`BROWSER_USER_AGENT` (moved from `reddit.ts`) |
 | `server/similarity.ts` | same-feed skip relaxed for cross-subreddit Reddit duplicates |

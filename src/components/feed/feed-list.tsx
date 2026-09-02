@@ -365,6 +365,11 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
         onFetch={() => handleFetchFeed(feed)}
         onReDetect={() => handleReDetectFeed(feed)}
         onEditAiFilter={() => setAiFilterFeed(feed)}
+        onToggleArchiveImages={() => {
+          void apiPatch(`/api/feeds/${feed.id}`, { archive_images: feed.archive_images ? 0 : 1 })
+            .then(() => mutateFeeds())
+        }}
+        archiveImagesEnabled={!!feed.archive_images}
       >
         {button}
       </FeedContextMenu>

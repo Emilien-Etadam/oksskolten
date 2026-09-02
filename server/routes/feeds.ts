@@ -23,6 +23,7 @@ import {
 } from '../db.js'
 import { requireJson } from '../auth.js'
 import { fetchSingleFeed, discoverRssUrl } from '../fetcher.js'
+import { sweepAutoArchiveFeeds, SWEEP_LIMIT_BACKLOG } from '../fetcher/article-images.js'
 import { queryRssBridge, inferCssSelectorBridge } from '../rss-bridge.js'
 import { resolveSocialSearchFeed } from '../fetcher/social-search.js'
 import { resolveGithubStarsFeed } from '../fetcher/github-releases.js'
@@ -62,6 +63,7 @@ const UpdateFeedBody = z.object({
   disabled: z.number().optional(),
   category_id: z.number().nullable().optional(),
   ai_filter: z.string().max(AI_FILTER_MAX_CHARS).nullable().optional(),
+  archive_images: z.union([z.literal(0), z.literal(1)]).optional(),
 })
 
 export async function feedRoutes(api: FastifyInstance): Promise<void> {
@@ -227,10 +229,17 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
       const body = parseOrBadRequest(UpdateFeedBody, request.body, reply)
       if (!body) return
 
+      const before = getFeedById(params.id)
       const feed = updateFeed(params.id, body)
       if (!feed) {
         reply.status(404).send({ error: 'Feed not found' })
         return
+      }
+
+      // Switching a feed to auto-archive is a request to archive its backlog,
+      // not only future articles — kick a full sweep in the background.
+      if (body.archive_images === 1 && before?.archive_images !== 1) {
+        void sweepAutoArchiveFeeds(feed.id, SWEEP_LIMIT_BACKLOG)
       }
 
       const feeds = getFeeds()
