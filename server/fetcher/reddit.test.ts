@@ -6,7 +6,7 @@ vi.mock('./flaresolverr.js', () => ({
   fetchViaFlareSolverr: (url: string) => mockFlareSolverr(url),
 }))
 
-import { fetchRedditPostContent, fetchRedditJson, redditJsonUrl, isRemovedRedditPost, _resetRedditOauthForTests } from './reddit.js'
+import { fetchRedditPostContent, fetchRedditJson, redditJsonUrl, isRemovedRedditPost, redditImageLinksToMarkdown, _resetRedditOauthForTests } from './reddit.js'
 
 const mockFetch = vi.fn()
 
@@ -34,6 +34,34 @@ describe('redditJsonUrl', () => {
   it('is null for non-post URLs', () => {
     expect(redditJsonUrl('https://www.reddit.com/r/ollama/')).toBeNull()
     expect(redditJsonUrl('https://example.com/a')).toBeNull()
+  })
+})
+
+describe('redditImageLinksToMarkdown', () => {
+  it('turns a bare reddit image URL into an image', () => {
+    expect(redditImageLinksToMarkdown('look at https://preview.redd.it/abc.png?width=640&format=png&s=1f2e'))
+      .toBe('look at ![](https://preview.redd.it/abc.png?width=640&format=png&s=1f2e)')
+    expect(redditImageLinksToMarkdown('https://i.redd.it/xyz.jpg'))
+      .toBe('![](https://i.redd.it/xyz.jpg)')
+  })
+
+  it('keeps trailing sentence punctuation out of the URL', () => {
+    expect(redditImageLinksToMarkdown('see https://i.redd.it/xyz.jpg.'))
+      .toBe('see ![](https://i.redd.it/xyz.jpg).')
+  })
+
+  it('turns a linked reddit image into an image, keeping the caption', () => {
+    expect(redditImageLinksToMarkdown('[screenshot](https://preview.redd.it/abc.png?s=1)'))
+      .toBe('![screenshot](https://preview.redd.it/abc.png?s=1)')
+  })
+
+  it('leaves existing images, autolinks, and other hosts alone', () => {
+    const image = '![alt](https://preview.redd.it/abc.png?s=1)'
+    expect(redditImageLinksToMarkdown(image)).toBe(image)
+    const autolink = '<https://i.redd.it/xyz.jpg>'
+    expect(redditImageLinksToMarkdown(autolink)).toBe(autolink)
+    const other = 'see [here](https://example.com/a.png) and https://example.com/b'
+    expect(redditImageLinksToMarkdown(other)).toBe(other)
   })
 })
 
@@ -73,6 +101,23 @@ describe('fetchRedditPostContent', () => {
     const content = await fetchRedditPostContent('https://www.reddit.com/r/ollama/comments/abc/xpost/')
     expect(content?.fullText).toBe('> Crossposted from r/OpenaiCodex\n\nOriginal body text')
     expect(content?.title).toBe('Crosspost title')
+  })
+
+  it('renders inline image links as images and uses the first as thumbnail', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(postPayload({
+        title: 'Image post',
+        selftext: 'Before\n\nhttps://preview.redd.it/pic.png?width=640&s=abc\n\nAfter',
+      })),
+    })
+
+    const content = await fetchRedditPostContent('https://www.reddit.com/r/ollama/comments/abc/img/')
+    expect(content?.fullText).toBe('Before\n\n![](https://preview.redd.it/pic.png?width=640&s=abc)\n\nAfter')
+    // No `preview` on the post — the thumbnail falls back to the body image
+    expect(content?.ogImage).toBe('https://preview.redd.it/pic.png?width=640&s=abc')
+    // The excerpt strips the image instead of quoting the signed URL
+    expect(content?.excerpt).toBe('Before After')
   })
 
   it('returns null for link posts without text', async () => {

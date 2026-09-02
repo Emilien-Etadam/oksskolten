@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import useSWR from 'swr'
 import { renderMarkdown } from '../../lib/markdown'
+import { isRedditArticleUrl, redditImageLinksToMarkdown } from '../../../shared/reddit-images'
 import { sanitizeHtml } from '../../lib/sanitize'
 import { markVideoCards } from '../../lib/video-card'
 import { fetcher, apiPost } from '../../lib/fetcher'
@@ -118,6 +119,9 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
       md = article.full_text || ''
     }
     if (!md) return `<p class="text-muted">${t('article.noContent')}</p>`
+    // Reddit articles stored before ingestion rewrote image links still carry
+    // them as plain URLs — rewrite at render time so their pictures show
+    if (isRedditArticleUrl(article.url)) md = redditImageLinksToMarkdown(md)
     return markVideoCards(sanitizeHtml(renderMarkdown(md)))
   }, [article, viewMode, isUserLang, fullTextTranslated, t])
 
