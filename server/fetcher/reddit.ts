@@ -1,4 +1,5 @@
 import { USER_AGENT, BROWSER_USER_AGENT } from './http.js'
+import { redditImageLinksToMarkdown } from '../../shared/reddit-images.js'
 import { fetchViaFlareSolverr } from './flaresolverr.js'
 import { markdownToExcerpt } from './markdown-utils.js'
 import { logger } from '../logger.js'
@@ -305,6 +306,8 @@ export interface RedditPostContent {
   excerpt: string | null
 }
 
+export { redditImageLinksToMarkdown }
+
 interface RedditPostData {
   title?: unknown
   selftext?: unknown
@@ -348,11 +351,16 @@ export async function fetchRedditPostContent(articleUrl: string): Promise<Reddit
 
   if (!markdown) return null
 
+  markdown = redditImageLinksToMarkdown(markdown)
+
   const previewUrl = post.preview?.images?.[0]?.source?.url
+  // Text posts with inline images carry no `preview` — fall back to the first
+  // image in the markdown so the article still gets a thumbnail
+  const firstBodyImage = markdown.match(/!\[[^\]]*\]\(\s*([^)\s]+)/)?.[1] ?? null
   return {
     fullText: markdown,
     title: typeof post.title === 'string' ? post.title : null,
-    ogImage: typeof previewUrl === 'string' ? decodeHtmlEntities(previewUrl) : null,
+    ogImage: typeof previewUrl === 'string' ? decodeHtmlEntities(previewUrl) : firstBodyImage,
     excerpt: markdownToExcerpt(markdown),
   }
 }

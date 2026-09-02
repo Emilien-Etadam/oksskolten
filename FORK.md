@@ -186,6 +186,18 @@ crosspost, and the top comments are rendered below the article
 (`server/routes/comments.ts`, `src/components/article/article-comments.tsx`) with an
 on-demand "translate comments" button.
 
+Reddit markdown references uploaded images as plain links (a bare
+`https://preview.redd.it/…` URL, or `[caption](…)`), which rendered as signed
+URLs instead of pictures. `redditImageLinksToMarkdown`
+(`shared/reddit-images.ts`) rewrites both forms to image syntax — applied to
+the post body at fetch time, to comment bodies as they are served, and again
+at render time in the reader so articles stored before the rewrite show their
+pictures too. Text posts with inline images carry no `preview` field, so the
+thumbnail (`og_image`) falls back to the first image in the body; thumbnails
+of already-stored articles only change on a re-fetch (`og_image` is stored). The Markdown source view (`.md` URLs,
+`article-raw-page.tsx`) appends the comment thread below the article —
+replies nested as blockquotes — so an export carries the discussion too.
+
 Reddit blocks anonymous `.json` requests from many residential IPs ("You've been
 blocked by network security"), so fetches escalate through a ladder, first match wins:
 
@@ -542,6 +554,7 @@ can rewrite a feed's RSS URL, which is not a bulk operation.
 | `src/pages/chat-page.tsx` | +2 lines (import + `<ChatNewConversation>` wrapper around the list view) |
 | `src/hooks/use-chat.ts` | dead `abortRef` replaced by a stream-generation guard; `reset()` detaches an in-flight stream |
 | `src/hooks/use-chat.test.ts` | +1 test (reset detaches an in-flight stream) |
+| `src/components/article/article-raw-page.tsx` | appends the Reddit comment thread to the `.md` source view |
 
 `src/app.tsx` additionally has 2 lines adjusted and a small effect added (sidebar
 auto-open respects the persisted collapse state).
