@@ -7,12 +7,15 @@ import fs from 'node:fs'
 // Mocks
 // ---------------------------------------------------------------------------
 
-const { mockSafeFetch, mockGetSetting, mockUpdateArticleContent, mockMarkImagesArchived, mockClearImagesArchived } = vi.hoisted(() => ({
+const { mockSafeFetch, mockGetSetting, mockUpdateArticleContent, mockMarkImagesArchived, mockClearImagesArchived, mockGetUnarchivedArticlesByFeed, mockGetFeedById, mockGetAutoArchiveFeeds } = vi.hoisted(() => ({
   mockSafeFetch: vi.fn(),
   mockGetSetting: vi.fn(),
   mockUpdateArticleContent: vi.fn(),
   mockMarkImagesArchived: vi.fn(),
   mockClearImagesArchived: vi.fn(),
+  mockGetUnarchivedArticlesByFeed: vi.fn(),
+  mockGetFeedById: vi.fn(),
+  mockGetAutoArchiveFeeds: vi.fn(),
 }))
 
 vi.mock('./ssrf.js', () => ({
@@ -28,13 +31,19 @@ vi.mock('../db/articles.js', () => ({
   updateArticleContent: (...args: unknown[]) => mockUpdateArticleContent(...args),
   markImagesArchived: (...args: unknown[]) => mockMarkImagesArchived(...args),
   clearImagesArchived: (...args: unknown[]) => mockClearImagesArchived(...args),
+  getUnarchivedArticlesByFeed: (...args: unknown[]) => mockGetUnarchivedArticlesByFeed(...args),
+}))
+
+vi.mock('../db/feeds.js', () => ({
+  getFeedById: (...args: unknown[]) => mockGetFeedById(...args),
+  getAutoArchiveFeeds: (...args: unknown[]) => mockGetAutoArchiveFeeds(...args),
 }))
 
 // ---------------------------------------------------------------------------
 // Module under test (loaded after mocks)
 // ---------------------------------------------------------------------------
 
-import { extractByDotPath, isImageArchivingEnabled, deleteArticleImages, archiveArticleImages } from './article-images.js'
+import { extractByDotPath, isImageArchivingEnabled, deleteArticleImages, archiveArticleImages, archiveFeedImages, sweepAutoArchiveFeeds } from './article-images.js'
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -228,5 +237,118 @@ describe('archiveArticleImages', () => {
     expect(result.rewrittenText).toBe(fullText)
     expect(mockClearImagesArchived).toHaveBeenCalledWith(4)
     expect(mockSafeFetch).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// archiveFeedImages / sweepAutoArchiveFeeds
+// ---------------------------------------------------------------------------
+
+function enableLocalArchiving(tmpDir: string): void {
+  mockGetSetting.mockImplementation((key: string) => {
+    if (key === 'images.enabled') return '1'
+    if (key === 'images.storage_path') return tmpDir
+    return undefined
+  })
+}
+
+function mockImageResponse(): void {
+  const buf = Buffer.from('fake-image-data')
+  mockSafeFetch.mockResolvedValue({
+    ok: true,
+    headers: new Map([['content-length', String(buf.length)]]),
+    arrayBuffer: () => Promise.resolve(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)),
+  })
+}
+
+describe('archiveFeedImages', () => {
+  it('archives every unarchived article of the feed and reports totals', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reader-sweep-'))
+    enableLocalArchiving(tmpDir)
+    mockImageResponse()
+    mockGetUnarchivedArticlesByFeed.mockReturnValue([
+      { id: 11, full_text: '![a](https://example.com/a.png)' },
+      { id: 12, full_text: 'no images here' },
+    ])
+
+    const totals = await archiveFeedImages(7, 50)
+
+    expect(mockGetUnarchivedArticlesByFeed).toHaveBeenCalledWith(7, 50)
+    expect(totals).toEqual({ articles: 2, downloaded: 1, errors: 0 })
+    // Both articles leave the queue, the imageless one included
+    expect(mockMarkImagesArchived).toHaveBeenCalledWith(11)
+    expect(mockMarkImagesArchived).toHaveBeenCalledWith(12)
+
+    fs.rmSync(tmpDir, { recursive: true })
+  })
+
+  it('refuses a second sweep of a feed already being swept', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reader-sweep-'))
+    enableLocalArchiving(tmpDir)
+    mockGetUnarchivedArticlesByFeed.mockReturnValue([
+      { id: 21, full_text: '![a](https://example.com/a.png)' },
+    ])
+
+    // Hold the first sweep open on its image download
+    let release!: (v: unknown) => void
+    mockSafeFetch.mockReturnValue(new Promise(resolve => { release = resolve }))
+
+    const first = archiveFeedImages(8, 50)
+    const second = await archiveFeedImages(8, 50)
+    expect(second).toEqual({ articles: 0, downloaded: 0, errors: 0 })
+
+    release({ ok: false })
+    await first
+
+    fs.rmSync(tmpDir, { recursive: true })
+  })
+})
+
+describe('sweepAutoArchiveFeeds', () => {
+  it('does nothing while global image archiving is off', async () => {
+    mockGetSetting.mockReturnValue(undefined)
+    await sweepAutoArchiveFeeds()
+    expect(mockGetAutoArchiveFeeds).not.toHaveBeenCalled()
+    expect(mockGetUnarchivedArticlesByFeed).not.toHaveBeenCalled()
+  })
+
+  it('sweeps every flagged feed when no feedId is given', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reader-sweep-'))
+    enableLocalArchiving(tmpDir)
+    mockImageResponse()
+    mockGetAutoArchiveFeeds.mockReturnValue([{ id: 1, archive_images: 1, disabled: 0 }, { id: 2, archive_images: 1, disabled: 0 }])
+    mockGetUnarchivedArticlesByFeed.mockReturnValue([])
+
+    await sweepAutoArchiveFeeds()
+
+    expect(mockGetUnarchivedArticlesByFeed).toHaveBeenCalledTimes(2)
+    fs.rmSync(tmpDir, { recursive: true })
+  })
+
+  it('re-checks the flag from the DB when a feedId is given', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reader-sweep-'))
+    enableLocalArchiving(tmpDir)
+    mockGetFeedById.mockReturnValue({ id: 3, archive_images: 0, disabled: 0 })
+
+    await sweepAutoArchiveFeeds(3)
+    expect(mockGetUnarchivedArticlesByFeed).not.toHaveBeenCalled()
+
+    mockGetFeedById.mockReturnValue({ id: 3, archive_images: 1, disabled: 0 })
+    mockGetUnarchivedArticlesByFeed.mockReturnValue([])
+    await sweepAutoArchiveFeeds(3, 123)
+    expect(mockGetUnarchivedArticlesByFeed).toHaveBeenCalledWith(3, 123)
+
+    fs.rmSync(tmpDir, { recursive: true })
+  })
+
+  it('skips disabled feeds even when flagged', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reader-sweep-'))
+    enableLocalArchiving(tmpDir)
+    mockGetFeedById.mockReturnValue({ id: 4, archive_images: 1, disabled: 1 })
+
+    await sweepAutoArchiveFeeds(4)
+    expect(mockGetUnarchivedArticlesByFeed).not.toHaveBeenCalled()
+
+    fs.rmSync(tmpDir, { recursive: true })
   })
 })

@@ -3,6 +3,7 @@ import { setupTestDb } from '../__tests__/helpers/testDb.js'
 import {
   createFeed,
   updateFeed,
+  getAutoArchiveFeeds,
   getFeedById,
   getFeeds,
   getEnabledFeeds,
@@ -298,5 +299,28 @@ describe('getFeeds unread count with seen articles', () => {
 
     feeds = getFeeds()
     expect(feeds[0].unread_count).toBe(1)
+  })
+})
+
+describe('updateFeed archive_images', () => {
+  it('persists the flag and lists the feed among auto-archive feeds', () => {
+    const feed = seedFeed()
+    expect(getFeedById(feed.id)!.archive_images).toBe(0)
+    expect(getAutoArchiveFeeds()).toHaveLength(0)
+
+    updateFeed(feed.id, { archive_images: 1 })
+    expect(getFeedById(feed.id)!.archive_images).toBe(1)
+    expect(getAutoArchiveFeeds().map(f => f.id)).toEqual([feed.id])
+
+    updateFeed(feed.id, { archive_images: 0 })
+    expect(getFeedById(feed.id)!.archive_images).toBe(0)
+    expect(getAutoArchiveFeeds()).toHaveLength(0)
+  })
+
+  it('getAutoArchiveFeeds skips disabled feeds', () => {
+    const feed = seedFeed()
+    updateFeed(feed.id, { archive_images: 1 })
+    updateFeed(feed.id, { disabled: 1 })
+    expect(getAutoArchiveFeeds()).toHaveLength(0)
   })
 })

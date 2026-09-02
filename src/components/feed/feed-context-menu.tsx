@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react'
-import { Pencil, CheckCheck, Trash2, FolderInput, RefreshCw, Search, Filter } from 'lucide-react'
+import { Pencil, CheckCheck, Trash2, FolderInput, RefreshCw, Search, Filter, ImageDown, Check } from 'lucide-react'
 import { useI18n } from '../../lib/i18n'
 import {
   ContextMenu,
@@ -23,6 +23,8 @@ interface FeedMenuProps {
   onFetch?: () => void
   onReDetect?: () => void
   onEditAiFilter?: () => void
+  onToggleArchiveImages?: () => void
+  archiveImagesEnabled?: boolean
 }
 
 export function FeedContextMenu({
@@ -36,6 +38,8 @@ export function FeedContextMenu({
   onFetch,
   onReDetect,
   onEditAiFilter,
+  onToggleArchiveImages,
+  archiveImagesEnabled,
 }: FeedMenuProps) {
   const { t } = useI18n()
   const isClip = feedType === 'clip'
@@ -92,6 +96,14 @@ export function FeedContextMenu({
           <ContextMenuItem onSelect={onEditAiFilter}>
             <Filter size={16} strokeWidth={1.5} />
             {t('feeds.aiFilter')}
+          </ContextMenuItem>
+        )}
+
+        {!isClip && onToggleArchiveImages && (
+          <ContextMenuItem onSelect={onToggleArchiveImages}>
+            <ImageDown size={16} strokeWidth={1.5} />
+            {t('feeds.archiveImages')}
+            {archiveImagesEnabled && <Check size={14} strokeWidth={2} className="ml-auto" />}
           </ContextMenuItem>
         )}
 

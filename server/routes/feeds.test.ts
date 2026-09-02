@@ -15,6 +15,19 @@ const { mockDiscoverRssUrl, mockFetchSingleFeed, mockQueryRssBridge, mockInferCs
   mockInferCssSelectorBridge: vi.fn(),
 }))
 
+const { mockSweepAutoArchiveFeeds } = vi.hoisted(() => ({
+  mockSweepAutoArchiveFeeds: vi.fn(),
+}))
+
+vi.mock('../fetcher/article-images.js', () => ({
+  sweepAutoArchiveFeeds: (...args: unknown[]) => mockSweepAutoArchiveFeeds(...args),
+  SWEEP_LIMIT_BACKLOG: 10_000,
+  archiveArticleImages: vi.fn(),
+  isImageArchivingEnabled: vi.fn(() => false),
+  deleteArticleImages: vi.fn(() => 0),
+  extractByDotPath: vi.fn(),
+}))
+
 vi.mock('../fetcher.js', async () => {
   const { EventEmitter } = await import('events')
   return {
@@ -64,6 +77,7 @@ beforeEach(async () => {
   mockFetchSingleFeed.mockReset().mockResolvedValue(undefined)
   mockQueryRssBridge.mockReset().mockResolvedValue(null)
   mockInferCssSelectorBridge.mockReset().mockResolvedValue(null)
+  mockSweepAutoArchiveFeeds.mockReset().mockResolvedValue(undefined)
 })
 
 // ---------------------------------------------------------------------------
@@ -669,5 +683,50 @@ describe('POST /api/opml with selectedUrls', () => {
     const data = res.json()
     expect(data.imported).toBe(1)
     expect(data.skipped).toBe(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// PATCH /api/feeds/:id — archive_images
+// ---------------------------------------------------------------------------
+
+describe('PATCH /api/feeds/:id archive_images', () => {
+  it('persists the flag and kicks a backlog sweep when switched on', async () => {
+    const feed = createFeed({ name: 'Archive Feed', url: 'https://example.com/archive' })
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/feeds/${feed.id}`,
+      payload: { archive_images: 1 },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().archive_images).toBe(1)
+    expect(mockSweepAutoArchiveFeeds).toHaveBeenCalledWith(feed.id, 10_000)
+  })
+
+  it('does not kick a sweep when the flag was already on, or when switched off', async () => {
+    const feed = createFeed({ name: 'Archive Feed', url: 'https://example.com/archive' })
+    await app.inject({ method: 'PATCH', url: `/api/feeds/${feed.id}`, payload: { archive_images: 1 } })
+    mockSweepAutoArchiveFeeds.mockClear()
+
+    const again = await app.inject({ method: 'PATCH', url: `/api/feeds/${feed.id}`, payload: { archive_images: 1 } })
+    expect(again.statusCode).toBe(200)
+    expect(mockSweepAutoArchiveFeeds).not.toHaveBeenCalled()
+
+    const off = await app.inject({ method: 'PATCH', url: `/api/feeds/${feed.id}`, payload: { archive_images: 0 } })
+    expect(off.statusCode).toBe(200)
+    expect(off.json().archive_images).toBe(0)
+    expect(mockSweepAutoArchiveFeeds).not.toHaveBeenCalled()
+  })
+
+  it('rejects values other than 0 or 1', async () => {
+    const feed = createFeed({ name: 'Archive Feed', url: 'https://example.com/archive' })
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/feeds/${feed.id}`,
+      payload: { archive_images: 2 },
+    })
+    expect(res.statusCode).toBe(400)
   })
 })

@@ -31,6 +31,7 @@ import {
   getExistingArticleUrls,
   getRetryArticles,
   markImagesArchived,
+  getUnarchivedArticlesByFeed,
   clearImagesArchived,
   deleteArticle,
   // Categories
@@ -768,6 +769,30 @@ describe('Article image archiving & deletion', () => {
     clearImagesArchived(id)
     const article = getArticleById(id)!
     expect(article.images_archived_at).toBeNull()
+  })
+
+  it('getUnarchivedArticlesByFeed lists only unarchived articles with a body, newest first', () => {
+    const feed = seedFeed()
+    const other = seedFeed({ url: 'https://other.example.com' })
+    const withBody = seedArticle(feed.id, { full_text: '![a](https://example.com/a.png)' })
+    const newer = seedArticle(feed.id, { full_text: 'text only' })
+    const archived = seedArticle(feed.id, { full_text: 'already done' })
+    seedArticle(feed.id) // no full_text
+    seedArticle(other.id, { full_text: 'other feed' })
+    markImagesArchived(archived)
+
+    const rows = getUnarchivedArticlesByFeed(feed.id, 10)
+    expect(rows.map(r => r.id)).toEqual([newer, withBody])
+    expect(rows[1].full_text).toContain('a.png')
+  })
+
+  it('getUnarchivedArticlesByFeed respects the limit', () => {
+    const feed = seedFeed()
+    seedArticle(feed.id, { full_text: 'one' })
+    seedArticle(feed.id, { full_text: 'two' })
+    seedArticle(feed.id, { full_text: 'three' })
+
+    expect(getUnarchivedArticlesByFeed(feed.id, 2)).toHaveLength(2)
   })
 
   it('deleteArticle returns true for existing article', () => {
