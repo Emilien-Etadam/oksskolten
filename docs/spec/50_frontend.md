@@ -17,7 +17,7 @@
 /categories/:categoryId        → Articles by category
 /settings                      → Redirect to /settings/general
 /settings/:tab                 → Settings page (general / appearance / integration / plugins / security / data / viewer / about)
-/chat                          → Chat page (new conversation)
+/chat                          → Chat page (conversation list + new-conversation input)
 /chat/:conversationId          → Chat page (conversation detail)
 /*                             → Article detail (catch-all, original article URL with scheme removed)
 ```

@@ -14,6 +14,7 @@ import {
   recalculateScores,
   getRetryArticles,
   getRetryStats,
+  ensureClipFeed,
 } from '../db.js'
 import { createFeed, createCategory, getDb } from '../db.js'
 
@@ -781,6 +782,23 @@ describe('getRetryArticles', () => {
       'https://example.com/r0', // retry_count=0
       'https://example.com/r1', // retry_count=1
       'https://example.com/r2', // retry_count=2
+    ])
+  })
+
+  it('retries a clip whose stored body is only shell chrome', async () => {
+    const clip = ensureClipFeed()
+    seedArticle(clip.id, {
+      url: 'https://huggingface.co/spaces/HuggingFaceTB/smol-training-playbook',
+      full_text: 'Fetching metadata from the HF Docker repository... Refreshing',
+    })
+    seedArticle(clip.id, {
+      url: 'https://example.com/real-clip',
+      full_text: Array(20).fill('A real clipped article with enough text to keep.').join(' '),
+    })
+
+    const results = getRetryArticles()
+    expect(results.map(r => r.url)).toEqual([
+      'https://huggingface.co/spaces/HuggingFaceTB/smol-training-playbook',
     ])
   })
 })

@@ -229,13 +229,21 @@ fetchFullText(articleUrl, cleanerConfig?)
 │     │   meta refresh > <link rel="amphtml"> > first content-bearing <iframe>
 │     ├─ Iframes are skipped when hidden, declared under 200px in a
 │     │   dimension, or hosted by a player, ad, sandbox or social embed
-│     ├─ Fetch that one URL (SSRF-checked, DISCOVERY_TIMEOUT) and re-run the
-│     │   parse on it — one hop only, never recursing into fetchFullText
+│     ├─ Fetch that one URL (SSRF-checked, DEFAULT_TIMEOUT — this is the
+│     │   article, not a discovery probe; a Hugging Face Space can serve
+│     │   megabytes of HTML and a sleeping Space spends most of 10s waking)
+│     │   and re-run the parse on it — one hop only, never recursing into
+│     │   fetchFullText
 │     └─ Adopt it only if it beats the outer page AND clears
 │         MIN_EXTRACTED_LENGTH, so a thin frame still falls through to 9
 │     * For an iframe the outer page keeps naming the article: its title and
 │       og:image win, since that is the URL the reader saved. A meta refresh
 │       or AMP link IS the article's own page, so the target's own win.
+│     * If the hop fails and the outer page is still under
+│       MIN_EXTRACTED_LENGTH, throw rather than keeping the shell chrome.
+│       A handful of "Loading…" characters would otherwise be stored as the
+│       body: RSS retry requires full_text IS NULL, though clips with a
+│       body under MIN_EXTRACTED_LENGTH are retried as well.
 │
 └─ 9. FlareSolverr automatic retry (quality gate) [Main Thread]
       If requires_js_challenge was NOT set and the extracted text is
