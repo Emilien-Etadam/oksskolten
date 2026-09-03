@@ -68,6 +68,26 @@ describe('queryRssBridge', () => {
     expect(mockFetch.mock.calls[0][0]).toContain(encodeURIComponent('https://example.com'))
   })
 
+  it('resolves the relative URL RSS-Bridge returns by default', async () => {
+    // What a stock RSS-Bridge answers when its self_url is unset. Stored
+    // as-is it is unfetchable, and every fetch of the feed fails with
+    // "Invalid URL" from the day it was added.
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [{ url: './?action=display&context=single&r=LLMDevs&bridge=RedditBridge&format=Atom' }],
+    })
+
+    const result = await queryRssBridge('https://www.reddit.com/r/LLMDevs/')
+
+    expect(result).toBe(`${BRIDGE_URL}/?action=display&context=single&r=LLMDevs&bridge=RedditBridge&format=Atom`)
+  })
+
+  it('returns null when the URL cannot be resolved at all', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => [{ url: 'http://' }] })
+
+    expect(await queryRssBridge('https://example.com')).toBeNull()
+  })
+
   it('returns null when response is not ok', async () => {
     mockFetch.mockResolvedValueOnce({ ok: false })
 
