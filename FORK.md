@@ -290,6 +290,23 @@ cheaper than the embed it replaces. Height and size ceilings (720p and 500 MB by
 default) keep a download from filling the disk. See
 [`82_feature_video_archive.md`](docs/spec/82_feature_video_archive.md).
 
+## RSS-Bridge feeds are stored with a fetchable URL
+
+`queryRssBridge()` stored whatever URL RSS-Bridge's `findfeed` returned. A
+stock RSS-Bridge, whose `self_url` is unset, answers relative to itself —
+`./?action=display&context=single&r=LLMDevs&bridge=RedditBridge&format=Atom`.
+Stored as-is that string is unfetchable: it does not match the
+`RSS_BRIDGE_URL` prefix that routes a feed to the internal plain-fetch path,
+so it fell through to `safeFetch`, where `new URL()` rejected it. Every fetch
+of such a feed failed with `Invalid URL` from the day it was added — two
+subreddit feeds here reached 25 consecutive failures without ever producing
+one article.
+
+The returned URL is now resolved against the instance that answered, which is
+also what makes it match the internal-fetch prefix and skip the SSRF check it
+should never have reached. Feeds already stored this way are repaired by
+`Re-detect RSS`, which re-runs the same query.
+
 ## Removed Reddit posts are not ingested
 
 Reddit keeps removed posts in its RSS feeds, with `[ Removed by Reddit ]` (or

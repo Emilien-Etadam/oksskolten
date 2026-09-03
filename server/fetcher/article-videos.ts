@@ -147,7 +147,6 @@ export async function archiveArticleVideos(
 ): Promise<ArchiveVideosResult> {
   const candidates = findArchivableVideos(fullText)
   if (candidates.length === 0) {
-    markVideosArchived(articleId)
     return { rewrittenText: fullText, downloaded: 0, errors: 0 }
   }
 
@@ -184,8 +183,15 @@ export async function archiveArticleVideos(
     }
   }
 
-  if (downloaded > 0) updateArticleContent(articleId, { full_text: rewrittenText })
-  markVideosArchived(articleId)
+  // Mark only what actually landed. The flag is what hides the archive control
+  // and makes the endpoint answer 409, so setting it after a failed download
+  // would lock the article out of ever being retried — and this download fails
+  // for reasons that get fixed later: a missing JS runtime, a yt-dlp the
+  // providers have broken, a network blip.
+  if (downloaded > 0) {
+    updateArticleContent(articleId, { full_text: rewrittenText })
+    markVideosArchived(articleId)
+  }
 
   return { rewrittenText, downloaded, errors }
 }

@@ -28,7 +28,19 @@ export async function queryRssBridge(url: string): Promise<string | null> {
     if (!Array.isArray(feeds) || feeds.length === 0) return null
 
     const firstUrl = (feeds[0] as Record<string, unknown>)?.url
-    return typeof firstUrl === 'string' ? firstUrl : null
+    if (typeof firstUrl !== 'string') return null
+
+    // RSS-Bridge answers with a URL relative to itself — "./?action=display&…"
+    // — unless its own self_url is configured, which it is not by default.
+    // Stored as-is, that string is unfetchable: `new URL()` in the SSRF check
+    // rejects it and every fetch of the feed fails with "Invalid URL" from the
+    // day it was added. Resolve it against the instance we just asked.
+    try {
+      return new URL(firstUrl, RSS_BRIDGE_URL).href
+    } catch {
+      log.warn({ url, firstUrl }, 'RSS-Bridge returned a feed URL that cannot be resolved')
+      return null
+    }
   } catch (err) {
     log.warn({ err, url }, 'RSS-Bridge query failed')
     return null
