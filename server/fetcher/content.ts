@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { Piscina as PiscinaPool } from 'piscina'
 import { JSDOM } from 'jsdom'
-import { fetchHtml, DISCOVERY_TIMEOUT } from './http.js'
+import { fetchHtml, DEFAULT_TIMEOUT } from './http.js'
 import { resolveGoogleNewsUrl } from './google-news.js'
 import { fetchViaFlareSolverr } from './flaresolverr.js'
 import { findEmbeddedContentUrl, type EmbeddedContent } from './embedded-content.js'
@@ -250,6 +250,16 @@ export async function fetchFullText(url: string, options?: FetchFullTextOptions)
     }
   }
 
+  // A shell whose iframe we could not follow is not an article. Returning its
+  // chrome — "Fetching metadata…", "Refreshing" — would store a few dozen
+  // characters as the body. Clips retry short bodies; RSS articles would sit
+  // forever, because their retry queue still requires full_text IS NULL.
+  if (embedded && extractedLen < MIN_EXTRACTED_LENGTH) {
+    throw parseError instanceof Error
+      ? parseError
+      : new Error('Could not extract embedded article')
+  }
+
   if (result) return result
   throw parseError instanceof Error ? parseError : new Error(String(parseError))
 }
@@ -288,7 +298,11 @@ async function followEmbeddedContent(
 ): Promise<ParseHtmlResult | null> {
   let result: ParseHtmlResult
   try {
-    const { html } = await fetchHtml(embedded.url, { timeout: DISCOVERY_TIMEOUT })
+    // This is the article, not a cheap discovery probe: Hugging Face Spaces
+    // and document viewers routinely serve megabytes of HTML, and a sleeping
+    // Space can spend most of DEFAULT_TIMEOUT just waking up. DISCOVERY_TIMEOUT
+    // (10s) aborted those downloads and left the clip holding the shell.
+    const { html } = await fetchHtml(embedded.url, { timeout: DEFAULT_TIMEOUT })
     result = await parseFrom(html, embedded.url, cleanerConfig)
   } catch {
     return null
@@ -362,4 +376,4 @@ export function isBotBlockPage(text: string): boolean {
 // Re-export markdown utilities so existing import sites don't break.
 // These live in a separate file to avoid circular dependency: contentWorker.ts
 // imports from here, but content.ts creates the Piscina pool that loads contentWorker.ts.
-export { convertHtmlToMarkdown, markdownToExcerpt } from './markdown-utils.js'
+export { convertHtmlToMarkdown, markdownToExcerpt, ensureLeadImage } from './markdown-utils.js'

@@ -28,6 +28,8 @@ export interface Feed {
   check_interval: number | null
   /** Criterion for the per-feed AI relevance filter; absent or null disables it */
   ai_filter?: string | null
+  /** 1 = archive article images automatically at fetch time (default 0: on open) */
+  archive_images?: number
   created_at: string
 }
 

@@ -7,6 +7,7 @@ import { preClean, postClean } from '../lib/cleaner/index.js'
 import { findBestContentBlock } from '../lib/cleaner/content-scorer.js'
 import type { CleanerConfig } from '../lib/cleaner/selectors.js'
 import { markdownToExcerpt } from './markdown-utils.js'
+import { collapseMultilineLinks } from '../../shared/markdown-links.js'
 
 const isDev = process.env.NODE_ENV === 'development'
 const logger = pino({
@@ -161,15 +162,7 @@ export function parseHtml(input: ParseHtmlInput): ParseHtmlResult {
     }
   }
 
-  let fullText = turndown.turndown(contentDoc.body.innerHTML)
-  fullText = fullText.replace(
-    /\[\s*\n+\s*(!\[[^\]]*\]\([^)]*\))\s*\n+\s*\]\s*\(([^)]*)\)/g,
-    (_m, img, url) => `[${img}](${url})`,
-  )
-  fullText = fullText.replace(
-    /\[([^\]]*(?:\n[^\]]*)+)\]\(([^)]+)\)/g,
-    (_m, text, url) => `[${text.replace(/\s*\n\s*/g, ' ').trim()}](${url})`,
-  )
+  const fullText = collapseMultilineLinks(turndown.turndown(contentDoc.body.innerHTML))
   const excerpt = markdownToExcerpt(fullText)
 
   const title = article?.title || ogTitle || htmlTitle

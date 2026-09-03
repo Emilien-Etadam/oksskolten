@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { getArticleById } from '../db/articles.js'
 import { translateSnippet } from '../fetcher/ai.js'
-import { redditJsonUrl, fetchRedditJson, type RedditListing } from '../fetcher/reddit.js'
+import { redditJsonUrl, fetchRedditJson, redditImageLinksToMarkdown, type RedditListing } from '../fetcher/reddit.js'
 
 export { redditJsonUrl }
 
@@ -42,7 +42,7 @@ function parseComments(children: unknown[], limit: number, depth: number): Artic
     out.push({
       author,
       score: typeof c.data.score === 'number' ? c.data.score : 0,
-      body,
+      body: redditImageLinksToMarkdown(body),
       replies,
     })
   }

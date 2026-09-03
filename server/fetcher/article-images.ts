@@ -4,7 +4,9 @@ import crypto from 'node:crypto'
 import { safeFetch } from './ssrf.js'
 import { USER_AGENT } from './http.js'
 import { getSetting } from '../db/settings.js'
-import { updateArticleContent, markImagesArchived, clearImagesArchived } from '../db/articles.js'
+import { updateArticleContent, markImagesArchived, clearImagesArchived, getUnarchivedArticlesByFeed } from '../db/articles.js'
+import { getFeedById, getAutoArchiveFeeds } from '../db/feeds.js'
+import type { Feed } from '../db/types.js'
 import { logger } from '../logger.js'
 import { dataPath } from '../paths.js'
 
@@ -216,6 +218,74 @@ export async function archiveArticleImages(
   markImagesArchived(articleId)
 
   return { rewrittenText, downloaded, errors }
+}
+
+/**
+ * How many articles one sweep archives per feed. New articles arrive a
+ * handful per cycle, so the cap only matters for the backlog right after a
+ * feed is switched to auto-archive: the on-enable kick passes a much larger
+ * budget, and whatever remains drains at this rate on later fetch cycles.
+ */
+const SWEEP_LIMIT_PER_CYCLE = 50
+export const SWEEP_LIMIT_BACKLOG = 10_000
+
+/** Feeds with a sweep in flight — a second concurrent sweep would download the same images again. */
+const sweepingFeeds = new Set<number>()
+
+/**
+ * Archive images for every not-yet-archived article of one feed, sequentially.
+ * Ordinary failures are per-image (archiveArticleImages counts them and still
+ * marks the article archived), so one bad article cannot wedge the sweep.
+ */
+export async function archiveFeedImages(
+  feedId: number,
+  limit: number,
+): Promise<{ articles: number; downloaded: number; errors: number }> {
+  const totals = { articles: 0, downloaded: 0, errors: 0 }
+  if (sweepingFeeds.has(feedId)) return totals
+
+  sweepingFeeds.add(feedId)
+  try {
+    const articles = getUnarchivedArticlesByFeed(feedId, limit)
+    for (const article of articles) {
+      const { downloaded, errors } = await archiveArticleImages(article.id, article.full_text)
+      totals.articles++
+      totals.downloaded += downloaded
+      totals.errors += errors
+    }
+    if (totals.articles > 0) {
+      log.info(
+        `Auto-archived images for feed ${feedId}: ${totals.articles} articles, ` +
+        `${totals.downloaded} images, ${totals.errors} errors`,
+      )
+    }
+  } finally {
+    sweepingFeeds.delete(feedId)
+  }
+  return totals
+}
+
+/**
+ * Fire-and-forget entry point for the fetch pipeline and the feeds API:
+ * archive images for the feeds flagged archive_images. With a feedId, only
+ * that feed is swept (re-checking its flag from the DB); without one, every
+ * flagged enabled feed is. A no-op while the global image archiving feature
+ * is off — the sweep reuses its storage configuration.
+ */
+export async function sweepAutoArchiveFeeds(feedId?: number, limit = SWEEP_LIMIT_PER_CYCLE): Promise<void> {
+  if (!isImageArchivingEnabled()) return
+
+  const feeds = feedId !== undefined
+    ? [getFeedById(feedId)].filter((f): f is Feed => f !== undefined && f.archive_images === 1 && !f.disabled)
+    : getAutoArchiveFeeds()
+
+  for (const feed of feeds) {
+    try {
+      await archiveFeedImages(feed.id, limit)
+    } catch (err) {
+      log.warn(`Image auto-archive sweep failed for feed ${feed.id}:`, err)
+    }
+  }
 }
 
 /**

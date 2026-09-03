@@ -21,13 +21,14 @@ import {
 import { Semaphore, CONCURRENCY, errorMessage } from './fetcher/util.js'
 import { detectAndStoreSimilarArticles } from './similarity.js'
 import { type FetchProgressEvent, emitProgress, markFeedDone } from './fetcher/progress.js'
-import { fetchFullText, isBotBlockPage, convertHtmlToMarkdown, markdownToExcerpt, MIN_EXTRACTED_LENGTH } from './fetcher/content.js'
+import { fetchFullText, isBotBlockPage, convertHtmlToMarkdown, markdownToExcerpt, ensureLeadImage, MIN_EXTRACTED_LENGTH } from './fetcher/content.js'
 import { type FetchRssResult, type RssItem, fetchAndParseRss, RateLimitError } from './fetcher/rss.js'
 import { computeInterval, computeEmpiricalInterval, sqliteFuture, DEFAULT_INTERVAL } from './fetcher/schedule.js'
 import { DEFAULT_LANGUAGE } from '../shared/lang.js'
 import { detectLanguage } from './fetcher/ai.js'
 import { isRemovedRedditPost } from './fetcher/reddit.js'
 import { enqueueAutoTranslate, enqueueAutoSummarize, enqueueAiFilter, isAutoTranslateEnabled, isAutoSummarizeEnabled, resumePendingAiTasks } from './fetcher/ai-queue.js'
+import { sweepAutoArchiveFeeds } from './fetcher/article-images.js'
 import { logger } from './logger.js'
 
 const log = logger.child('fetcher')
@@ -112,7 +113,7 @@ export async function fetchArticleContent(
     requiresJsChallenge?: boolean
     /** CSS Bridge listing-page excerpt, used as fullText fallback */
     listingExcerpt?: string
-    /** Existing article data for retry (skips fetch if full_text present) */
+    /** Existing article data for retry (skips fetch if a real body is already stored) */
     existingArticle?: { full_text: string | null; og_image: string | null; lang: string | null }
   },
 ): Promise<FetchedContent> {
@@ -125,13 +126,14 @@ export async function fetchArticleContent(
 
   const existing = options?.existingArticle
 
-  // Step 1: Fetch full text (skip if retry article already has content)
-  // For anchor-link articles (URL has # fragment), the page is shared across
-  // multiple items, so page fetch would return irrelevant content. Use RSS
-  // inline content (content:encoded) directly if available.
+  // Step 1: Fetch full text (skip if retry article already has a real body).
+  // A handful of shell chrome is not a body: it is what a Hugging Face Space
+  // leaves behind when the iframe hop fails, and skipping the fetch would
+  // freeze that chrome in place.
   const isAnchorLink = url.includes('#')
+  const existingBodyLen = existing?.full_text?.replace(/\s+/g, ' ').trim().length ?? 0
 
-  if (existing?.full_text) {
+  if (existing && existingBodyLen >= MIN_EXTRACTED_LENGTH) {
     fullText = existing.full_text
     ogImage = existing.og_image
   } else if (isAnchorLink && options?.listingExcerpt) {
@@ -174,6 +176,14 @@ export async function fetchArticleContent(
     lang = detectLanguage(fullText)
   } else if (existing) {
     lang = existing.lang
+  }
+
+  // Step 3: Hero-image fallback — restore a lead image the extraction lost.
+  // Only for bodies that already pass the length bar: prepending a markdown
+  // image inflates full_text length, which would otherwise mask a too-short
+  // extraction from the stale-article repair loop (countStaleArticlesByFeed).
+  if (fullText && fullText.replace(/\s+/g, ' ').trim().length >= MIN_EXTRACTED_LENGTH) {
+    fullText = ensureLeadImage(fullText, ogImage, url)
   }
 
   return { fullText, ogImage, excerpt, lang, lastError, title }
@@ -261,7 +271,8 @@ async function processArticle(task: ArticleTask): Promise<boolean> {
     })
     maybeEnqueueAutoTranslate(task.article.id, content.fullText, effectiveLang)
   }
-  return !!content.lastError
+  const extractedLen = content.fullText?.replace(/\s+/g, ' ').trim().length ?? 0
+  return !!content.lastError || (task.kind === 'retry' && extractedLen < MIN_EXTRACTED_LENGTH)
 }
 
 // --- Single feed fetch ---
@@ -335,6 +346,7 @@ export async function fetchSingleFeed(
 
   if (tasks.length === 0) {
     log.info(`Feed ${feed.name}: no new articles`)
+    void sweepAutoArchiveFeeds(feed.id)
     return
   }
 
@@ -375,6 +387,7 @@ export async function fetchSingleFeed(
   emitProgress(completeEvent)
   onProgress?.(completeEvent)
 
+  void sweepAutoArchiveFeeds(feed.id)
   log.info(`Feed ${feed.name}: done`)
 }
 
@@ -463,6 +476,7 @@ export async function fetchAllFeeds(
 
   if (allTasks.length === 0) {
     log.info('No articles to process')
+    void sweepAutoArchiveFeeds()
     return
   }
 
@@ -531,6 +545,10 @@ export async function fetchAllFeeds(
       onProgress?.(event)
     }
   }
+
+  // Archive images for feeds flagged archive_images, now that this cycle's
+  // articles are stored. Fire-and-forget: downloads must not hold up the batch.
+  void sweepAutoArchiveFeeds()
 
   log.info('Batch complete')
 }

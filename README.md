@@ -86,7 +86,9 @@ Additions live in new files, with only small insertion points in upstream ones, 
 - **Swipe between articles** — swipe left/right, or press the arrow keys, to move through the list you came from
 - **Mark as read without opening** — a check button on every unread card, in all five layouts. On touch devices, swiping a card to the right does the same
 - **Embedded videos survive** — a video the article embedded used to be dropped at extraction, leaving its caption behind; it is now kept as a play card. With video archiving switched on, a button on the article keeps a copy of the video itself, so the article stays complete after the source takes it down (requires `yt-dlp`)
+- **Per-feed image auto-archive** — image archiving normally runs when an article is opened; feeds you keep as archives can be flagged (context menu → Auto-archive images) to download every article's images at fetch time, existing backlog included
 - **Articles that live in an embedded page** — when a page turns out to be a shell whose text sits in an iframe (a Hugging Face Space, a document viewer) or one meta refresh or AMP link away, the fetcher follows that pointer once and reads the text there, keeping the saved page's title and preview image
+- **The lead image survives** — WordPress-style themes (Hackaday among them) keep the featured image in the post header, which extraction throws away, so the list showed a thumbnail the article body did not have. When the extracted body opens without an image, the page's `og:image` is restored as the hero
 - **Le Monde theme** — an importable custom theme inspired by the newspaper's app (`custom-themes/le-monde.json`)
 
 ### AI pipeline on a local model

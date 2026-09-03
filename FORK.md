@@ -162,6 +162,22 @@ score, image preferred) followed by the top unread articles of each category,
 reusing the magazine card variants. The chat-first home screen it replaces remains
 available as the chat page (`/chat`). Note: `/` is not wired into demo mode.
 
+## New-conversation composer on the chat tab
+
+`src/components/chat/chat-new-conversation.tsx` (+ test) — replacing the
+chat-first home screen with the front page left `/chat` with no way to start a
+conversation: the tab only listed existing ones. The composer sits above the
+conversation list with the same input box and suggestion chips the home screen
+had (reusing `ChatInputArea` and the `/api/chat/suggestions` fallback).
+Sending a message streams the new conversation in place (`ChatPanel`
+variant=`full`) and swaps the URL to `/chat/:id` with `replaceState` — a real
+navigation would remount the page and drop the stream. Re-navigating to `/chat`
+(sidebar, command palette) returns to the list; to make that safe mid-stream,
+`useChat`'s dead `abortRef` (never set) was wired into a stream-generation
+guard so `reset()` actually detaches an in-flight stream instead of letting it
+write into the next conversation. Mounted from `src/pages/chat-page.tsx`
+(2-line insertion wrapping the list view).
+
 ## Reddit articles: comments, crossposts, and access
 
 Reddit-hosted articles get their body from the post's JSON (`server/fetcher/reddit.ts`,
@@ -169,6 +185,18 @@ short-circuited in `server/fetcher/content.ts`), including the embedded parent o
 crosspost, and the top comments are rendered below the article
 (`server/routes/comments.ts`, `src/components/article/article-comments.tsx`) with an
 on-demand "translate comments" button.
+
+Reddit markdown references uploaded images as plain links (a bare
+`https://preview.redd.it/…` URL, or `[caption](…)`), which rendered as signed
+URLs instead of pictures. `redditImageLinksToMarkdown`
+(`shared/reddit-images.ts`) rewrites both forms to image syntax — applied to
+the post body at fetch time, to comment bodies as they are served, and again
+at render time in the reader so articles stored before the rewrite show their
+pictures too. Text posts with inline images carry no `preview` field, so the
+thumbnail (`og_image`) falls back to the first image in the body; thumbnails
+of already-stored articles only change on a re-fetch (`og_image` is stored). The Markdown source view (`.md` URLs,
+`article-raw-page.tsx`) appends the comment thread below the article —
+replies nested as blockquotes — so an export carries the discussion too.
 
 Reddit blocks anonymous `.json` requests from many residential IPs ("You've been
 blocked by network security"), so fetches escalate through a ladder, first match wins:
@@ -243,9 +271,15 @@ then `<link rel="amphtml">`, then the first iframe that is not hidden, declared
 under 200px, or hosted by a player, ad network, code sandbox or social embed.
 `fetchFullText()` follows that one URL when extraction came up short, parses it
 directly — one hop, never recursing — and keeps the result only if it beats the
-outer page and clears `MIN_EXTRACTED_LENGTH`. A thin frame therefore still falls
-through to the solver, and a wrong guess costs one fetch rather than a wrong
-article.
+outer page and clears `MIN_EXTRACTED_LENGTH`. The hop uses the same
+`DEFAULT_TIMEOUT` as any other article fetch: the frame *is* the article, and a
+Hugging Face Space can serve several megabytes of HTML (or spend ten seconds
+waking). A thin frame therefore still falls through to the solver, and a wrong
+guess costs one fetch rather than a wrong article. If the hop fails and the
+shell is still under `MIN_EXTRACTED_LENGTH`, the fetch throws rather than
+keeping a handful of chrome characters as the body — that would lock an RSS
+row out of the retry queue (`full_text IS NULL`). Clips with a body shorter
+than `MIN_EXTRACTED_LENGTH` are retried as well.
 
 For an iframe the outer page keeps naming the article: its title and og:image
 win, since that is the URL the reader saved. A meta refresh or an AMP link is
@@ -289,6 +323,49 @@ plays under `default-src 'self'` with no CSP change, which makes the archive
 cheaper than the embed it replaces. Height and size ceilings (720p and 500 MB by
 default) keep a download from filling the disk. See
 [`82_feature_video_archive.md`](docs/spec/82_feature_video_archive.md).
+
+## The lead image survives
+
+WordPress-style themes — Hackaday is the reproducible case — emit the featured
+image in the post's header region, outside the content block. The extraction
+pipeline throws that region away wholesale: `stripHeavyTags` deletes every
+`<header>…</header>` before the worker even parses the page, and Readability
+keeps only the main text container. The same picture still arrives through
+`og:image`, which is read from the meta tags before any cleaning — so the
+article list showed a thumbnail that the article body did not contain.
+
+`ensureLeadImage()` in `server/fetcher/markdown-utils.ts` closes the gap at the
+end of `fetchArticleContent` (one insertion point in `server/fetcher.ts`): when
+the extracted markdown has no image within its opening stretch, the og:image is
+prepended as the hero. It never doubles a picture the body already carries —
+URLs are compared by host + path, so CDN resize variants (`?w=400` vs `?w=800`)
+count as the same image — and it stands down for generated social cards
+(GitHub's per-page og banners), for Reddit posts, whose markdown
+`fetchRedditPostContent` composes deliberately, and for bodies under
+`MIN_EXTRACTED_LENGTH`, so a padded length cannot hide a failed extraction from
+the stale-article repair loop. The prepended line is ordinary markdown, so the
+image archiver stores the hero with the rest of the article.
+
+## Per-feed image auto-archive
+
+Image archiving runs when the reader opens an article — fine for reading, wrong
+for a feed kept as an archive, where the local copy must exist before the
+source rots, not after someone happens to click. Feeds flagged
+`archive_images` (a toggle in the feed's context menu) have their articles'
+images downloaded automatically instead.
+
+`sweepAutoArchiveFeeds()` in `server/fetcher/article-images.ts` runs
+fire-and-forget at the end of every fetch cycle — both `fetchAllFeeds` and
+`fetchSingleFeed`, on their no-new-articles exits too — archiving up to 50
+not-yet-archived articles per flagged feed, newest first; the remainder drains
+on later cycles, and an in-flight set keeps two sweeps of the same feed from
+downloading the same images twice. Switching the flag on is a request to
+archive the backlog, not only future articles, so `PATCH /api/feeds/:id` kicks
+one large sweep (10,000 articles) immediately. Imageless articles get marked
+archived by their first pass and leave the queue for good — the same terminal
+state the on-open path produces. While the global `images.enabled` toggle is
+off the sweeps are a no-op, since they reuse its storage configuration. See
+[`81_feature_images.md`](docs/spec/81_feature_images.md).
 
 ## RSS-Bridge feeds are stored with a fetchable URL
 
@@ -504,13 +581,24 @@ can rewrite a feed's RSS URL, which is not a bulk operation.
 | `src/components/feed/feed-modal.tsx` | +`initialStep` prop (opens on a given step, hides the back arrow) |
 | `src/components/article/article-list.tsx` | per-day sections in the render loop, publishes `articleDates` to the nav context |
 | `src/lib/dateFormat.ts` | `formatRelativeDate` counts calendar days; +`calendarDaysAgo` |
-| `server/fetcher.ts` | +1 import, removed Reddit posts filtered out of the new-article tasks, article URL passed to similarity detection |
+| `server/fetcher.ts` | +1 import, removed Reddit posts filtered out of the new-article tasks, article URL passed to similarity detection, hero-image fallback step at the end of `fetchArticleContent` |
+| `server/fetcher/markdown-utils.ts` | +`ensureLeadImage()` (og:image restored as the lead when extraction lost it) |
+| `server/fetcher/article-images.ts` | +`archiveFeedImages()` / `sweepAutoArchiveFeeds()` (per-feed auto-archive sweep) |
+| `server/db/feeds.ts` | `archive_images` in `updateFeed()`, +`getAutoArchiveFeeds()` |
+| `server/db/articles.ts` | +`getUnarchivedArticlesByFeed()` |
+| `server/routes/feeds.ts` | `archive_images` accepted by `PATCH /api/feeds/:id`, backlog sweep kicked when switched on |
+| `src/components/feed/feed-context-menu.tsx` | +Auto-archive images toggle item |
+| `src/components/feed/feed-list.tsx` | +2 props wiring the toggle to `PATCH /api/feeds/:id` |
 | `server/fetcher/content.ts` | +2 imports, Google News wrapper resolved at the top of `fetchFullText()`, embedded-content hop before the solver fallback |
 | `server/fetcher/http.ts` | browser-UA retry on 403/503, +`BROWSER_USER_AGENT` (moved from `reddit.ts`) |
 | `server/similarity.ts` | same-feed skip relaxed for cross-subreddit Reddit duplicates |
 | `src/contexts/keyboard-navigation-context.tsx` | +`articleDates` (sessionStorage-backed, like ids and URLs) |
 | `src/hooks/use-extend-article-list.ts` | carries `dates` through the extension payload |
 | `src/lib/i18n.ts` | +35 keys (`settings.feeds*`), `feedError.httpError` placeholder fixed |
+| `src/pages/chat-page.tsx` | +2 lines (import + `<ChatNewConversation>` wrapper around the list view) |
+| `src/hooks/use-chat.ts` | dead `abortRef` replaced by a stream-generation guard; `reset()` detaches an in-flight stream |
+| `src/hooks/use-chat.test.ts` | +1 test (reset detaches an in-flight stream) |
+| `src/components/article/article-raw-page.tsx` | appends the Reddit comment thread to the `.md` source view |
 
 `src/app.tsx` additionally has 2 lines adjusted and a small effect added (sidebar
 auto-open respects the persisted collapse state).

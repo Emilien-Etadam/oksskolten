@@ -4,6 +4,7 @@ import useSWR, { mutate as globalMutate } from 'swr'
 import { fetcher } from '../lib/fetcher'
 import { useI18n } from '../lib/i18n'
 import { ChatPanel } from '../components/chat/chat-panel'
+import { ChatNewConversation } from '../components/chat/chat-new-conversation'
 import { useDateMode } from '../hooks/use-date-mode'
 import { formatDate, formatRelativeDate } from '../lib/dateFormat'
 import { articleUrlToPath, extractDomain } from '../lib/url'
@@ -102,9 +103,10 @@ export function ChatPage() {
     )
   }
 
-  // Conversation list view
+  // Conversation list view — with the new-conversation composer on top
   return (
-    <div className="max-w-2xl mx-auto px-4 py-4">
+    <ChatNewConversation>
+      <div className="max-w-2xl mx-auto px-4 py-4">
         {conversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted select-none">
             <p className="text-sm">{t('chat.noConversations')}</p>
@@ -183,6 +185,7 @@ export function ChatPage() {
             })}
           </div>
         )}
-    </div>
+      </div>
+    </ChatNewConversation>
   )
 }

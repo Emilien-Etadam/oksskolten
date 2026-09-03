@@ -125,6 +125,16 @@ When the fallback triggers, the RSS content is only used if it is more substanti
 
 This addresses SPA sites where even FlareSolverr returns rendered HTML but `preClean` removes `display: none` elements, leaving Readability with an effectively empty DOM — while the RSS feed itself often contains the full article content (as used by readers like Feedly).
 
+**Lead Image Fallback**: WordPress-style themes (e.g. Hackaday) place the featured image in the post header, outside the content block — a region the extraction pipeline discards (`stripHeavyTags` drops `<header>` blocks before the worker parses the page, and Readability keeps only the main text container). The same picture still reaches us as `og:image`, which is read from the meta tags before any cleaning, so the article list would show a thumbnail the article body did not contain. As its final step, `fetchArticleContent` prepends `![](og_image)` to `full_text` via `ensureLeadImage()` (`server/fetcher/markdown-utils.ts`) when all of the following hold:
+
+1. The extracted body passes `MIN_EXTRACTED_LENGTH` — prepending an image URL inflates `full_text` length, which would otherwise mask a too-short extraction from the stale-article repair loop (`countStaleArticlesByFeed`)
+2. No image appears within the first 600 characters of the markdown (the body has no lead of its own; a video poster card counts as one)
+3. The `og:image` does not already appear anywhere in the body — URLs are compared by host + path, so CDN resize variants (`?w=400` vs `?w=800`) count as the same picture
+4. The `og:image` host is not a generated social-card service (`opengraph.githubassets.com`, `repository-images.githubusercontent.com`)
+5. The article is not a Reddit post — `fetchRedditPostContent` composes that markdown deliberately
+
+The prepended image is ordinary markdown, so image archiving (see [Images spec](./81_feature_images.md)) downloads and rewrites it like any other article image.
+
 ### Full-Text Retrieval and Markdown Conversion Pipeline
 
 End-to-end flow from article URL to Markdown text. A multi-stage pipeline combining HTML cleaning (defuddle-based) and Readability that removes noise such as ads, navigation, and tracking attributes before converting to Markdown. Runs entirely locally with no external API dependencies.
@@ -219,13 +229,21 @@ fetchFullText(articleUrl, cleanerConfig?)
 │     │   meta refresh > <link rel="amphtml"> > first content-bearing <iframe>
 │     ├─ Iframes are skipped when hidden, declared under 200px in a
 │     │   dimension, or hosted by a player, ad, sandbox or social embed
-│     ├─ Fetch that one URL (SSRF-checked, DISCOVERY_TIMEOUT) and re-run the
-│     │   parse on it — one hop only, never recursing into fetchFullText
+│     ├─ Fetch that one URL (SSRF-checked, DEFAULT_TIMEOUT — this is the
+│     │   article, not a discovery probe; a Hugging Face Space can serve
+│     │   megabytes of HTML and a sleeping Space spends most of 10s waking)
+│     │   and re-run the parse on it — one hop only, never recursing into
+│     │   fetchFullText
 │     └─ Adopt it only if it beats the outer page AND clears
 │         MIN_EXTRACTED_LENGTH, so a thin frame still falls through to 9
 │     * For an iframe the outer page keeps naming the article: its title and
 │       og:image win, since that is the URL the reader saved. A meta refresh
 │       or AMP link IS the article's own page, so the target's own win.
+│     * If the hop fails and the outer page is still under
+│       MIN_EXTRACTED_LENGTH, throw rather than keeping the shell chrome.
+│       A handful of "Loading…" characters would otherwise be stored as the
+│       body: RSS retry requires full_text IS NULL, though clips with a
+│       body under MIN_EXTRACTED_LENGTH are retried as well.
 │
 └─ 9. FlareSolverr automatic retry (quality gate) [Main Thread]
       If requires_js_challenge was NOT set and the extracted text is

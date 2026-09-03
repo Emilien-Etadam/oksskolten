@@ -109,6 +109,7 @@ CREATE TABLE feeds (
   error_count     INTEGER NOT NULL DEFAULT 0,         -- Consecutive error count
   disabled              INTEGER NOT NULL DEFAULT 0,   -- 1=auto-disabled (5 consecutive failures)
   requires_js_challenge INTEGER NOT NULL DEFAULT 0,   -- 1=site requires bot verification (JS challenge) bypass
+  archive_images        INTEGER NOT NULL DEFAULT 0,   -- 1=archive article images automatically at fetch time
   etag                  TEXT,                         -- Previous response ETag (for conditional requests)
   last_modified         TEXT,                         -- Previous response Last-Modified (for conditional requests)
   last_content_hash     TEXT,                         -- SHA-256 of previous response body (for servers without ETag)
