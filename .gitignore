@@ -2,6 +2,8 @@ node_modules/
 dist/
 dist-server/
 /data/
+# Meilisearch binary downloaded by the Cloud Agent dev environment install step
+/meilisearch
 /data-prod/
 docs/temp_*
 .env
