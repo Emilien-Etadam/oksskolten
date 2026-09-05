@@ -136,6 +136,30 @@ describe('resolveGoogleNewsUrl', () => {
     expect(mockFlareSolverr).not.toHaveBeenCalled()
   })
 
+  it('tells Google the consent dialog was already answered', async () => {
+    const shell = '<c-wiz data-n-a-id="AU_yqLtoken" data-n-a-sg="signature123" data-n-a-ts="1756231000"></c-wiz>'
+    mockSafeFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        url: 'https://news.google.com/rss/articles/AU_yqLtoken',
+        text: () => Promise.resolve(shell),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () => Promise.resolve(`[["wrb.fr","Fbv4je","[\\"garturlres\\",\\"${ARTICLE}\\"]"]]`),
+      })
+
+    await resolveGoogleNewsUrl('https://news.google.com/rss/articles/AU_yqLtoken')
+
+    // Without these, a European server is bounced to consent.google.com and
+    // never sees the shell — on the wrapper fetch and on the RPC alike.
+    for (const [, init] of mockSafeFetch.mock.calls) {
+      const headers = (init as { headers: Record<string, string> }).headers
+      expect(headers.Cookie).toContain('CONSENT=YES')
+      expect(headers.Cookie).toContain('SOCS=')
+    }
+  })
+
   it('skips the RPC when the shell carries no signature', async () => {
     mockSafeFetch.mockResolvedValue({
       ok: true,

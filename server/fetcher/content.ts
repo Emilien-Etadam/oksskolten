@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { Piscina as PiscinaPool } from 'piscina'
 import { JSDOM } from 'jsdom'
 import { fetchHtml, DEFAULT_TIMEOUT } from './http.js'
-import { resolveGoogleNewsUrl } from './google-news.js'
+import { resolveGoogleNewsUrl, isGoogleNewsUrl } from './google-news.js'
 import { fetchViaFlareSolverr } from './flaresolverr.js'
 import { findEmbeddedContentUrl, type EmbeddedContent } from './embedded-content.js'
 import { fetchRedditPostContent } from './reddit.js'
@@ -190,7 +190,15 @@ export async function fetchFullText(url: string, options?: FetchFullTextOptions)
   // Google News feeds link to a wrapper that holds no article text, only a
   // redirect to the publisher. Resolve it first so everything below reads the
   // real page; the article keeps its wrapper URL, which still works in a browser.
-  const articleUrl = (await resolveGoogleNewsUrl(url)) ?? url
+  //
+  // When Google cannot be made to say where the wrapper points, fail rather
+  // than read the wrapper: its shell yields a few words of chrome, which would
+  // be stored as the body and keep the article out of the retry queue.
+  const resolved = await resolveGoogleNewsUrl(url)
+  if (!resolved && isGoogleNewsUrl(url)) {
+    throw new Error('Could not resolve Google News link to its publisher')
+  }
+  const articleUrl = resolved ?? url
 
   // Reddit posts: build content from the public JSON — the selftext is
   // already Markdown, and crossposted parents are invisible to HTML

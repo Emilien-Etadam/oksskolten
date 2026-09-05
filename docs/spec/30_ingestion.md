@@ -316,10 +316,21 @@ resolves it before anything else runs, so extraction reads the real page
 The RPC response is undocumented and its shape has changed before, so the first
 non-Google URL it contains is taken rather than indexing into the payload.
 
+Every request to Google carries consent cookies (`CONSENT=YES+…; SOCS=CAI`).
+Without them a server in Europe is bounced to `consent.google.com`, a page that
+holds neither the redirect nor the RPC signature, and every strategy fails.
+
 The article keeps the wrapper as its stored `url` — it is the RSS item's identity
 and the deduplication key, and it still resolves in a browser. When every
-strategy comes up empty the wrapper is fetched as before, which yields the RSS
-excerpt rather than an error.
+strategy comes up empty the fetch fails with `last_error` set, so the retry
+queue picks the article up; the wrapper itself is never read as the article.
+
+The RSS excerpt fallback (below) is skipped for Google News items: their
+`<description>` is only a link back to the wrapper plus the publisher's name.
+Storing it would clear the error and freeze the article on a dead link.
+Articles saved that way before this rule are repaired by the stale-article
+refresh pass, which drops the fake body and sets `last_error` so they re-enter
+the retry queue.
 
 ### Language Detection (Local Processing)
 

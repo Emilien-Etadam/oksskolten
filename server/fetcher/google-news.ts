@@ -9,6 +9,18 @@ const log = logger.child('google-news')
 const GOOGLE_HOSTS = /(^|\.)(news\.google\.com|google\.com|gstatic\.com|googleusercontent\.com)$/i
 
 /**
+ * Headers for every request to Google. The cookies say the consent dialog
+ * was already answered: without them, a server in Europe is bounced to
+ * consent.google.com, a page that carries neither the redirect nor the RPC
+ * signature, and every strategy below fails without a word from Google.
+ */
+export const GOOGLE_HEADERS: Record<string, string> = {
+  'User-Agent': USER_AGENT,
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Cookie': 'CONSENT=YES+cb.20210720-07-p0.en+FX+410; SOCS=CAI',
+}
+
+/**
  * True for the wrapper links Google News puts in its RSS feeds
  * (`news.google.com/rss/articles/<token>`), which carry no article text.
  */
@@ -125,8 +137,8 @@ async function resolveViaBatchExecute(html: string, token: string): Promise<stri
     const res = await safeFetch('https://news.google.com/_/DotsSplashUi/data/batchexecute', {
       method: 'POST',
       headers: {
+        ...GOOGLE_HEADERS,
         'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-        'User-Agent': USER_AGENT,
       },
       body: `f.req=${encodeURIComponent(payload)}`,
       signal: AbortSignal.timeout(DEFAULT_TIMEOUT),
@@ -150,7 +162,7 @@ async function resolveViaBatchExecute(html: string, token: string): Promise<stri
  * Resolve a Google News wrapper to the publisher's article URL, so the usual
  * extraction pipeline has something to read. Returns null for anything that is
  * not a Google News link, and when every strategy comes up empty — the caller
- * then falls back to fetching the wrapper, which is what it did before.
+ * then fails the fetch, since the wrapper itself holds nothing worth storing.
  *
  * Four strategies, cheapest first: decode the token; follow the redirect and
  * read the shell; replay the RPC the shell would have made; and finally let
@@ -164,7 +176,7 @@ export async function resolveGoogleNewsUrl(url: string): Promise<string | null> 
 
   try {
     const res = await safeFetch(url, {
-      headers: { 'User-Agent': USER_AGENT },
+      headers: GOOGLE_HEADERS,
       redirect: 'follow',
       signal: AbortSignal.timeout(DEFAULT_TIMEOUT),
     })
