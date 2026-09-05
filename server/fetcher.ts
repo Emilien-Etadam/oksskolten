@@ -23,6 +23,7 @@ import { detectAndStoreSimilarArticles } from './similarity.js'
 import { type FetchProgressEvent, emitProgress, markFeedDone } from './fetcher/progress.js'
 import { fetchFullText, isBotBlockPage, convertHtmlToMarkdown, markdownToExcerpt, ensureLeadImage, MIN_EXTRACTED_LENGTH } from './fetcher/content.js'
 import { type FetchRssResult, type RssItem, fetchAndParseRss, RateLimitError } from './fetcher/rss.js'
+import { isGoogleNewsUrl } from './fetcher/google-news.js'
 import { computeInterval, computeEmpiricalInterval, sqliteFuture, DEFAULT_INTERVAL } from './fetcher/schedule.js'
 import { DEFAULT_LANGUAGE } from '../shared/lang.js'
 import { detectLanguage } from './fetcher/ai.js'
@@ -55,6 +56,8 @@ export type { AiTextResult, AiBillingMode } from './fetcher/ai.js'
  * feed whose stored body is shorter than `MIN_EXTRACTED_LENGTH`, swap in
  * the markdown-converted RSS excerpt when it's larger than what's stored.
  */
+const GOOGLE_NEWS_LINK_ONLY_ERROR = 'Stored body was the Google News link, not the article'
+
 function refreshStaleArticles(feedId: number, rssItems: RssItem[]): void {
   const refreshCandidates = getArticlesNeedingRefresh(feedId, MIN_EXTRACTED_LENGTH)
   if (refreshCandidates.length === 0) return
@@ -66,8 +69,32 @@ function refreshStaleArticles(feedId: number, rssItems: RssItem[]): void {
   const itemsByUrl = new Map(rssItems.map(i => [normalizeUrl(i.url), i]))
   const now = new Date().toISOString()
   for (const candidate of refreshCandidates) {
-    const rssItem = itemsByUrl.get(normalizeUrl(candidate.url))
     const currentLen = (candidate.full_text ?? '').replace(/\s+/g, ' ').trim().length
+
+    // A Google News description is only a link back to the wrapper, never a
+    // body. Articles stored before that was taken into account hold exactly
+    // that link as their text, with no error to put them in the retry queue.
+    // Drop the fake body and set the error so the retry pass fetches the
+    // publisher's page for real.
+    if (isGoogleNewsUrl(candidate.url)) {
+      if (candidate.full_text !== null) {
+        updateArticleContent(candidate.id, {
+          full_text: null,
+          excerpt: null,
+          summary: null,
+          full_text_translated: null,
+          translated_lang: null,
+          last_error: GOOGLE_NEWS_LINK_ONLY_ERROR,
+          last_refresh_attempt_at: now,
+        })
+        log.info({ url: candidate.url, prevLen: currentLen }, 'queued Google News article stored without a body for retry')
+      } else {
+        markArticleRefreshAttempted(candidate.id, now)
+      }
+      continue
+    }
+
+    const rssItem = itemsByUrl.get(normalizeUrl(candidate.url))
     const md = rssItem?.excerpt ? convertHtmlToMarkdown(rssItem.excerpt) : ''
     const mdLen = md.replace(/\s+/g, ' ').trim().length
 
@@ -155,7 +182,11 @@ export async function fetchArticleContent(
   // or extracted text is too short (e.g. SPA sites where content is in display:none for SEO).
   // This is the last resort after fetchFullText and its internal FlareSolverr retry
   // (which also uses MIN_EXTRACTED_LENGTH) have both failed to produce enough content.
-  if (options?.listingExcerpt) {
+  //
+  // Not for Google News items: their description is a link to the wrapper
+  // plus the publisher's name. Storing that as the body would clear the
+  // error and freeze the article, when a retry could still reach the page.
+  if (options?.listingExcerpt && !isGoogleNewsUrl(url)) {
     const extractedLen = fullText?.replace(/\s+/g, ' ').trim().length ?? 0
     const shouldFallback = !fullText || isBotBlockPage(fullText) || extractedLen < MIN_EXTRACTED_LENGTH
     if (shouldFallback) {

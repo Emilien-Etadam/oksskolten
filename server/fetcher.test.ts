@@ -840,6 +840,43 @@ describe('fetchAllFeeds', () => {
     expect(row.translated_lang).toBeNull()
   })
 
+  it('queues Google News articles stored with only the link as body for retry', async () => {
+    const feed = seedFeed()
+    const wrapper = 'https://news.google.com/rss/articles/CBMiAU_yqLstaletoken?oc=5'
+    // Saved before the fallback excluded Google News: the body is the RSS
+    // description, a link plus the publisher's name, with no error recorded.
+    insertArticle({
+      feed_id: feed.id,
+      title: 'Some headline',
+      url: wrapper,
+      published_at: '2024-01-01T00:00:00Z',
+      full_text: `[Some headline](${wrapper}) Le Point`,
+      excerpt: 'Some headline Le Point',
+      summary: 'Summary built from a link',
+    })
+    const description = `<a href="${wrapper}" target="_blank">Some headline</a>&nbsp;&nbsp;<font color="#6f6f6f">Le Point</font>`
+    const rssXml = rss20Xml('Google News', [
+      { title: 'Some headline', link: wrapper, description },
+    ])
+
+    mockFetch.mockImplementation((url: string | URL) => {
+      const u = url.toString()
+      if (u === feed.rss_url) return Promise.resolve(mockResponse(rssXml, { headers: { 'content-type': 'application/rss+xml' } }))
+      return Promise.resolve(mockResponse('', { status: 404 }))
+    })
+
+    await fetchAllFeeds()
+
+    const { getDb } = await import('./db.js')
+    const row = getDb().prepare('SELECT full_text, excerpt, summary, last_error, last_refresh_attempt_at FROM articles WHERE url = ?').get(wrapper) as { full_text: string | null; excerpt: string | null; summary: string | null; last_error: string | null; last_refresh_attempt_at: string | null }
+    // The link is not a body: drop it and hand the article to the retry queue
+    expect(row.full_text).toBeNull()
+    expect(row.excerpt).toBeNull()
+    expect(row.summary).toBeNull()
+    expect(row.last_error).toBeTruthy()
+    expect(row.last_refresh_attempt_at).not.toBeNull()
+  })
+
   it('matches RSS items to stale articles across URL encoding differences', async () => {
     const feed = seedFeed()
     // Stored URL uses percent-encoded Japanese path.
@@ -1840,6 +1877,33 @@ describe('fetchSingleFeed — content extraction', () => {
     expect(row.full_text).not.toContain('<a ')
     // Should not have a lingering error since fallback succeeded
     expect(row.last_error).toBeNull()
+  })
+
+  it('does not store the Google News description as the body when the wrapper cannot be resolved', async () => {
+    const feed = seedFeed()
+    // Google News items link to a wrapper whose description is only a link
+    // back to that wrapper plus the publisher's name — never article text.
+    const wrapper = 'https://news.google.com/rss/articles/CBMiAU_yqLopaquetoken?oc=5'
+    const description = `<a href="${wrapper}" target="_blank">Some headline</a>&nbsp;&nbsp;<font color="#6f6f6f">Le Point</font>`
+    const rssXml = rss20Xml('Google News', [
+      { title: 'Some headline', link: wrapper, description },
+    ])
+
+    mockFetch.mockImplementation((url: string | URL) => {
+      const u = url.toString()
+      if (u === feed.rss_url) return Promise.resolve(mockResponse(rssXml, { headers: { 'content-type': 'application/rss+xml' } }))
+      // Google answers with a shell that carries neither redirect nor RPC signature
+      if (u.startsWith('https://news.google.com/')) return Promise.resolve({ ...mockResponse('<html><body>Google News</body></html>'), url: u } as Response)
+      return Promise.resolve(mockResponse('', { status: 404 }))
+    })
+
+    await fetchSingleFeed(feed)
+
+    const { getDb } = await import('./db.js')
+    const row = getDb().prepare('SELECT full_text, last_error FROM articles WHERE url = ?').get(wrapper) as { full_text: string | null; last_error: string | null }
+    // No fake body, and an error so the retry queue picks the article up
+    expect(row.full_text).toBeNull()
+    expect(row.last_error).toContain('Google News')
   })
 
   it('falls back to RSS description when extracted content is too short', async () => {
