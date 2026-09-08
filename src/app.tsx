@@ -25,6 +25,7 @@ import { ErrorBoundary } from './components/auth/error-boundary'
 import { HintBanner } from './components/ui/hint-banner'
 import { Toaster } from 'sonner'
 import { FetchProgressProvider } from './contexts/fetch-progress-context'
+import { useArticleAutoRefresh } from './hooks/use-article-auto-refresh'
 import { TooltipProvider } from './components/ui/tooltip'
 
 export interface AppLayoutContext {
@@ -52,6 +53,7 @@ function AppLayout() {
   }, [])
 
   useSwipeDrawer(sidebarOpen, setSidebarOpen)
+  useArticleAutoRefresh()
 
   const { data: profile } = useSWR<{ language: string | null }>('/api/settings/profile', fetcher)
 

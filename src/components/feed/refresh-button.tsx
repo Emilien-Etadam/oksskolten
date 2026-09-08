@@ -22,8 +22,8 @@ import type { FeedWithCounts } from '../../../shared/types'
 export function RefreshButton() {
   const { t } = useI18n()
   const location = useLocation()
-  const { startFeedFetch } = useFetchProgressContext()
-  const { data: feedsData, mutate: mutateFeeds } = useSWR<{ feeds: FeedWithCounts[] }>('/api/feeds', fetcher)
+  const { startFeedFetch, revalidate } = useFetchProgressContext()
+  const { data: feedsData } = useSWR<{ feeds: FeedWithCounts[] }>('/api/feeds', fetcher)
   const [running, setRunning] = useState(false)
 
   const refresh = useCallback(async () => {
@@ -55,9 +55,12 @@ export function RefreshButton() {
       toast.error(t('refresh.failed'))
     } finally {
       setRunning(false)
-      void mutateFeeds()
+      // A single-feed fetch revalidates on its own; the server-side pass
+      // does not, and without this the list stayed as it was while the
+      // toast announced new articles.
+      revalidate()
     }
-  }, [running, location.pathname, startFeedFetch, feedsData, mutateFeeds, t])
+  }, [running, location.pathname, startFeedFetch, feedsData, revalidate, t])
 
   return (
     <IconButton

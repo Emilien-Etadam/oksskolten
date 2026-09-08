@@ -89,6 +89,7 @@ Pull-to-refresh calls `startFeedFetch(feedId)` on individual feed pages to fetch
 | Delete feed (`DELETE /api/feeds/:id`) | `/api/feeds`, `/api/articles` |
 | Update feed (`PATCH /api/feeds/:id`) | `/api/feeds` |
 | Seen/read update (`PATCH .../seen`, `POST .../read`) | `/api/feeds` (to update unread_count) |
+| Manual fetch (refresh icon, context menu, `Fetch all feeds`) | `/api/feeds`, `/api/articles`, `/api/frontpage` |
 
 Revalidation is disabled app-wide (`revalidateIfStale`, `revalidateOnFocus` and
 `revalidateOnReconnect` are all `false`), so a cached response survives until a full
@@ -97,6 +98,14 @@ answer, since the server fills the body in later (retry pass, anti-bot solver, a
 re-clip). `ArticleDetail` therefore refetches its own key once per article when the
 cached copy has no body — otherwise a clip read too early stays blank for the rest of
 the session while the list, keyed separately, already shows the recovered text.
+
+The other exception is the server's scheduled fetch, which the client never hears
+about. `useArticleAutoRefresh` (mounted once in `AppLayout`) polls `/api/feeds` every
+60 seconds while the tab is visible — SWR pauses the interval in a background tab —
+and revalidates the article lists and the front page when a feed's `article_count`
+moves. Unread counts are deliberately left out of that comparison: they change as the
+reader marks articles, and refetching an unread-only list on that would pull articles
+out from under them.
 
 
 ### Feed Metrics
