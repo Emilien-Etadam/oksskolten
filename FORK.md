@@ -439,6 +439,36 @@ the usual 10-minute-backoff resume pass retries them. Unlike auto-translate and
 auto-summarize, the filter has no global toggle: it runs exactly for the feeds
 that define a criterion.
 
+## Reading intelligence (smart folders, rules, top stories, trust, interests)
+
+Five features inspired by [RSSMonster](https://github.com/pietheinstrengholt/rssmonster),
+specified in `docs/spec/87_feature_intelligence.md`. Migrations `0014`–`0017`.
+
+- **Smart folders** — `shared/smart-query.ts` parses the query language
+  (`unread:true`, `is:bookmarked`, `feed:12`, `@week`, `since:3d`, `sort:score`
+  plus free text), `server/db/smart-folders.ts` runs it (Meilisearch for the
+  free text when the index is up, SQL `LIKE` otherwise), `server/routes/smart-folders.ts`
+  is the CRUD. Sidebar section `src/components/smart/smart-folder-list.tsx`,
+  dialog `src/components/smart/smart-folder-dialog.tsx`, route `/smart/:folderId`
+  served by the existing `ArticleList` (it switches the SWR key).
+- **Automated rules** — `server/db/feed-rules.ts` + `server/rules.ts`
+  (compile once, `iu` flags, invalid patterns never match) + `server/routes/rules.ts`
+  (preview and backfill endpoints). Applied in `processArticle()` right after
+  `insertArticle()`. `hide` reuses `filtered_at`; `score` adds to a new
+  `articles.rule_boost` folded into the engagement sum. Settings section
+  `src/pages/settings/sections/rules-section.tsx`.
+- **Top stories** — `server/db/stories.ts` unions the similarity pairs of the
+  window into clusters and keeps those with two or more feeds;
+  `src/pages/stories-page.tsx` at `/stories`.
+- **Trust and quality** — `server/db/trust.ts` (per-feed, score cron) and
+  `server/quality.ts` (per-article, at ingestion and retry). The front page rank
+  became `score + trust × 2 + quality`. Trust column in the feed management table.
+- **Interests and Recommended** — `server/interests.ts` builds the profile
+  (title terms weighted by feedback × idf, islands by Jaccard co-occurrence),
+  rebuilt hourly from the score cron and on demand;
+  `src/pages/settings/sections/interests-section.tsx` shows the islands and
+  mutes terms. `GET /api/articles?sort=recommended` and `/recommended`.
+
 ## Tooling
 
 - **E2E smoke tests**: `npm run test:e2e` (Playwright) builds the app, boots the
@@ -599,6 +629,23 @@ can rewrite a feed's RSS URL, which is not a bulk operation.
 | `src/hooks/use-chat.ts` | dead `abortRef` replaced by a stream-generation guard; `reset()` detaches an in-flight stream |
 | `src/hooks/use-chat.test.ts` | +1 test (reset detaches an in-flight stream) |
 | `src/components/article/article-raw-page.tsx` | appends the Reddit comment thread to the `.md` source view |
+
+| `src/app.tsx` | routes `/recommended`, `/smart/:folderId`, `/stories`; header names and hint banners for them |
+| `src/components/article/article-list.tsx` | `isRecommended` / `smartFolderId` switch the SWR key; no day separators on those lists |
+| `src/components/feed/feed-list.tsx` | Top Stories and Recommended nav items, `<SmartFolderList />` section |
+| `src/components/ui/search-dialog.tsx` | "Save as smart folder" footer action |
+| `src/pages/settings/feeds-tab.tsx` | +`<RulesSection />` |
+| `src/pages/settings/general-tab.tsx` | +`<InterestsSection />` |
+| `src/pages/settings/sections/feed-management-section.tsx` | Trust column (sortable) |
+| `src/lib/demo/mock-api.ts` | empty responses for the intelligence endpoints |
+| `server/db/articles.ts` | `rule_boost` in the score, `sort: 'recommended'`, `addRuleBoost` / `setArticleQuality` / `setArticleInterestScore` |
+| `server/db/frontpage.ts` | rank `score + trust × 2 + quality`, hidden articles excluded |
+| `server/routes/articles.ts` | `sort=recommended` accepted |
+| `server/routes/index.ts` | +4 route modules |
+| `server/fetcher.ts` | quality, interest score and rules run after `insertArticle()`; quality refreshed on retry |
+| `server/index.ts` | trust + interest profile on the score cron |
+| `shared/types.ts` | `trust_score`, `interest_score`, `quality_score` |
+| `src/lib/i18n.ts` | +~70 keys (`smart.*`, `stories.*`, `recommended.*`, `rules.*`, `interests.*`, `settings.feedsColTrust`) |
 
 `src/app.tsx` additionally has 2 lines adjusted and a small effect added (sidebar
 auto-open respects the persisted collapse state).

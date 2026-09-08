@@ -1077,6 +1077,10 @@ Returns similar articles detected via title similarity (bigram Dice coefficient 
 
 Article list and detail responses include `similar_count` (integer) — the number of similar articles from other sources.
 
+#### Reading Intelligence (fork)
+
+Smart folders (`/api/smart-folders`), automated rules (`/api/rules`), top stories (`/api/stories`), the interest profile (`/api/interests`) and `GET /api/articles?sort=recommended` are documented in [87_feature_intelligence.md](./87_feature_intelligence.md#api).
+
 
 #### API Token Endpoints
 

@@ -4,7 +4,7 @@ import useSWR from 'swr'
 import { fetcher, apiPatch } from '../../lib/fetcher'
 import { useI18n } from '../../lib/i18n'
 import { MD_BREAKPOINT } from '../../lib/breakpoints'
-import { Inbox, Plus, ChevronRight, Bookmark, ThumbsUp, Clock, Paperclip, Search, Command, ArrowBigUp, AlertTriangle, MessagesSquare } from 'lucide-react'
+import { Inbox, Plus, ChevronRight, Bookmark, ThumbsUp, Clock, Paperclip, Search, Command, ArrowBigUp, AlertTriangle, MessagesSquare, Flame, Sparkles } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { useFetchProgressContext } from '../../contexts/fetch-progress-context'
@@ -21,6 +21,7 @@ import { SidebarMenu } from '../layout/sidebar-menu'
 import { SidebarNavItem } from '../layout/sidebar-nav-item'
 import { FeedListHeader } from './feed-list-header'
 import { FeedAiFilterDialog } from './feed-ai-filter-dialog'
+import { SmartFolderList } from '../smart/smart-folder-list'
 import { SearchDialog } from '../ui/search-dialog'
 import { CommandPalette } from '../command-palette'
 import { useGlobalShortcuts } from '../../hooks/use-global-shortcuts'
@@ -72,6 +73,8 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
   const isHistory = location.pathname === '/history'
   const isClips = location.pathname === '/clips'
   const isChat = location.pathname.startsWith('/chat')
+  const isStories = location.pathname === '/stories'
+  const isRecommended = location.pathname === '/recommended'
   const selectedFeedId = feedId ? Number(feedId) : null
   const selectedCategoryId = categoryId ? Number(categoryId) : null
   const [aiFilterFeed, setAiFilterFeed] = useState<FeedWithCounts | null>(null)
@@ -485,6 +488,10 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
             <kbd className="hidden md:inline-flex text-[11px] text-muted bg-hover px-1.5 py-1 rounded opacity-0 group-hover/search:opacity-100 transition-opacity items-center gap-0"><span className="w-2.5 h-3 inline-flex items-center justify-center"><Command className="w-2.5 h-2.5" /></span><span className="w-3 h-3 inline-flex items-center justify-center"><ArrowBigUp className="w-2.5 h-2.5" /></span><span className="w-3 h-3 inline-flex items-center justify-center leading-none">K</span></kbd>
           </SidebarNavItem>
 
+          <SidebarNavItem icon={Flame} label={t('stories.title')} selected={isStories} onClick={() => { void navigate('/stories'); onClose() }} />
+
+          <SidebarNavItem icon={Sparkles} label={t('recommended.title')} selected={isRecommended} onClick={() => { void navigate('/recommended'); onClose() }} />
+
           <SidebarNavItem icon={Bookmark} label={t('feeds.bookmarks')} selected={isBookmarks} onClick={() => { void navigate('/bookmarks'); onClose() }} badge={(feedsData?.bookmark_count ?? 0) > 0 ? <UnreadBadge count={feedsData!.bookmark_count} /> : undefined} />
 
           <SidebarNavItem icon={ThumbsUp} label={t('feeds.likes')} selected={isLikes} onClick={() => { void navigate('/likes'); onClose() }} badge={(feedsData?.like_count ?? 0) > 0 ? <UnreadBadge count={feedsData!.like_count} /> : undefined} />
@@ -498,6 +505,8 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
           <SidebarNavItem icon={MessagesSquare} label={t('chat.title')} selected={isChat} onClick={() => { void navigate('/chat'); onClose() }} />
 
           <SidebarNavItem icon={Plus} label={t('modal.addNew')} onClick={() => setFeedModalOpen(true)} className="text-muted hover:text-text" />
+
+          <SmartFolderList onNavigate={onClose} />
 
           <div className="px-2 pt-4 pb-1">
             <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted">{t('feeds.title')}</h2>

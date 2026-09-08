@@ -100,6 +100,16 @@ En amont, l'IA tourne à la demande, un article à la fois. Ce fork ajoute une f
 - **Recherches sociales comme flux** — les feeds personnalisés, profils et recherches Bluesky, ainsi que les hashtags Mastodon, deviennent chacun un flux. La recherche Bluesky demande un mot de passe d'application ; le reste fonctionne sans compte
 - **Articles Reddit, correctement** — le corps provient du JSON du post lui-même, y compris le post parent embarqué d'un crosspost, et les meilleurs commentaires sont affichés sous l'article avec un bouton de traduction à la demande. Les récupérations passent par cinq stratégies d'accès successives, parce que Reddit bloque les requêtes anonymes depuis beaucoup d'IP résidentielles
 
+### Intelligence de lecture
+
+Cinq fonctions empruntées à la couche « intelligente » de RSSMonster, qui tournent sur SQLite et l'index de recherche existant, sans modèle. Voir [`87_feature_intelligence.md`](docs/spec/87_feature_intelligence.md)
+
+- **Dossiers intelligents** — une requête comme `rust unread:true @week` enregistrée comme dossier de la barre latérale ; les nouvelles correspondances y apparaissent d'elles-mêmes. La recherche propose *Enregistrer comme dossier intelligent*
+- **Règles automatiques** — des expressions régulières, par flux ou globales, qui marquent lu, cachent, ajoutent aux favoris, aiment ou modifient le score des nouveaux articles. Test à blanc sur les articles récents avant d'enregistrer, rejeu sur l'historique après
+- **À la une (Top Stories)** — les événements couverts par plusieurs sources sont regroupés en une seule histoire, classée par nombre de sources, les autres couvertures à un clic
+- **Confiance des flux et qualité des articles** — un score de confiance par flux d'après ce que vous en lisez réellement, et un score de qualité par article (corps trop court, titre racoleur ou en capitales, marqueurs promotionnels, densité de liens). Les deux entrent dans le classement de la Une ; la confiance est une colonne triable dans Réglages → Flux
+- **Îlots d'intérêt et Recommandé** — un profil d'intérêt appris de vos j'aime, favoris et lectures, regroupé en îlots de termes qui vont ensemble, que vous pouvez mettre en sourdine ; la liste *Recommandé* classe les articles non lus selon ce profil
+
 ### Gestion et diagnostic des flux
 
 **Réglages → Feeds**, un onglet vide marqué « en développement » en amont, contient maintenant deux sections :

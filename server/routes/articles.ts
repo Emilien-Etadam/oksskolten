@@ -242,7 +242,7 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
     const bookmarked = query.bookmarked === '1'
     const liked = query.liked === '1'
     const read = query.read === '1'
-    const sort = query.sort === 'score' ? 'score' as const : undefined
+    const sort = query.sort === 'score' ? 'score' as const : query.sort === 'recommended' ? 'recommended' as const : undefined
     const noFloor = query.no_floor === '1'
 
     const isClipFeed = feedId != null && getClipFeed()?.id === feedId

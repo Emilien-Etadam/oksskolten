@@ -48,7 +48,7 @@ export interface ArticleListHandle {
 export const ArticleList = forwardRef<ArticleListHandle, object>(function ArticleList(_props, ref) {
   const location = useLocation()
   const navigate = useNavigate()
-  const { feedId: feedIdParam, categoryId: categoryIdParam } = useParams<{ feedId?: string; categoryId?: string }>()
+  const { feedId: feedIdParam, categoryId: categoryIdParam, folderId: folderIdParam } = useParams<{ feedId?: string; categoryId?: string; folderId?: string }>()
   const { settings } = useAppLayout()
   const clipFeedId = useClipFeedId()
 
@@ -57,7 +57,10 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const isLikes = location.pathname === '/likes'
   const isHistory = location.pathname === '/history'
   const isClips = location.pathname === '/clips'
-  const isCollectionView = isBookmarks || isLikes || isHistory || isClips
+  // Fork: the Recommended list (interest profile) and smart folders (saved queries)
+  const isRecommended = location.pathname === '/recommended'
+  const smartFolderId = folderIdParam ? Number(folderIdParam) : undefined
+  const isCollectionView = isBookmarks || isLikes || isHistory || isClips || isRecommended || !!smartFolderId
 
   const { data: feedsData } = useSWR<{ feeds: FeedWithCounts[] }>('/api/feeds', fetcher)
   const feedId = feedIdParam ? Number(feedIdParam) : (isClips && clipFeedId ? clipFeedId : undefined)
@@ -65,7 +68,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const categoryId = categoryIdParam ? Number(categoryIdParam) : undefined
   const [showReadArticles, setShowReadArticles] = useState(false)
   const categoryUnreadOnly = !!categoryId && settings.categoryUnreadOnly === 'on'
-  const unreadOnly = isInbox || (categoryUnreadOnly && !showReadArticles)
+  const unreadOnly = isInbox || isRecommended || (categoryUnreadOnly && !showReadArticles)
   const bookmarkedOnly = isBookmarks
   const likedOnly = isLikes
   const readOnly = isHistory
@@ -85,6 +88,12 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const getKey = (pageIndex: number, previousPageData: ArticlesResponse | null) => {
     if (previousPageData && !previousPageData.has_more) return null
     const params = new URLSearchParams()
+    if (smartFolderId) {
+      params.set('limit', String(PAGE_SIZE))
+      params.set('offset', String(pageIndex * PAGE_SIZE))
+      return `/api/smart-folders/${smartFolderId}/articles?${params.toString()}`
+    }
+    if (isRecommended) params.set('sort', 'recommended')
     if (feedId) params.set('feed_id', String(feedId))
     if (categoryId) params.set('category_id', String(categoryId))
     if (unreadOnly) params.set('unread', '1')
@@ -155,7 +164,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
 
   // /likes and /history are ordered by liked_at / read_at, so publication days
   // would not run in order there — no separators in those two lists.
-  const showDaySeparators = !isLikes && !isHistory
+  const showDaySeparators = !isLikes && !isHistory && !isRecommended && !smartFolderId
 
   const articleIds = useMemo(() => articles.map(a => String(a.id)), [articles])
   const articleUrls = useMemo(() => {
@@ -443,7 +452,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
       }
       flushBatch()
     }
-  }, [feedId, categoryId, flushBatch])
+  }, [feedId, categoryId, smartFolderId, flushBatch])
 
   // Reset autoReadIds, noFloor, showReadArticles, and keyboard focus when feed/category changes
   useEffect(() => {
@@ -451,7 +460,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     setNoFloor(false)
     setShowReadArticles(false)
     setFocusedItemId(null)
-  }, [feedId, categoryId, setFocusedItemId])
+  }, [feedId, categoryId, smartFolderId, setFocusedItemId])
 
   function renderArticle(article: ArticleListItem, index: number) {
     const isAutoRead = autoReadIds.has(article.id)
@@ -583,7 +592,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
             } : undefined}
           />
         ) : (
-          <p className="text-muted text-center py-12">{t('articles.empty')}</p>
+          <p className="text-muted text-center py-12">{t(smartFolderId ? 'smart.empty' : 'articles.empty')}</p>
         )
       )}
 

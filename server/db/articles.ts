@@ -45,6 +45,7 @@ function scoreExpr(prefix: string, opts?: { searchBoost?: boolean }): string {
     + (CASE WHEN ${p}bookmarked_at IS NOT NULL THEN 5 ELSE 0 END)
     + (CASE WHEN ${p}full_text_translated IS NOT NULL THEN 3 ELSE 0 END)
     + (CASE WHEN ${p}read_at IS NOT NULL THEN 2 ELSE 0 END)
+    + COALESCE(${p}rule_boost, 0)
   )`
   const decay = `(1.0 / (1.0 + (julianday('now') - julianday(
     COALESCE(${p}read_at, ${p}published_at, ${p}fetched_at)
@@ -59,6 +60,7 @@ export const SCORED_ARTICLES_WHERE = `(
   OR bookmarked_at IS NOT NULL
   OR read_at IS NOT NULL
   OR full_text_translated IS NOT NULL
+  OR rule_boost != 0
   OR score > 0
 )`
 
@@ -94,7 +96,7 @@ export function getArticles(opts: {
   bookmarked?: boolean
   liked?: boolean
   read?: boolean
-  sort?: 'score'
+  sort?: 'score' | 'recommended'
   limit: number
   offset: number
   smartFloor?: boolean
@@ -180,7 +182,10 @@ export function getArticles(opts: {
   const where = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : ''
   const orderBy = opts.sort === 'score'
     ? 'a.score DESC, a.published_at DESC'
-    : opts.liked ? 'a.liked_at DESC' : opts.read ? 'a.read_at DESC' : 'a.published_at DESC'
+    : opts.sort === 'recommended'
+      // Interest profile first, then source trust and quality as tie-breakers
+      ? 'a.interest_score DESC, (f.trust_score + COALESCE(a.quality_score, 0.5)) DESC, a.published_at DESC'
+      : opts.liked ? 'a.liked_at DESC' : opts.read ? 'a.read_at DESC' : 'a.published_at DESC'
 
   const totalRow = getNamed<{ cnt: number }>(`
     SELECT COUNT(*) AS cnt FROM active_articles a ${where}
@@ -194,7 +199,7 @@ export function getArticles(opts: {
   const articles = allNamed<ArticleListItem>(`
     SELECT a.id, a.feed_id, f.name AS feed_name,
            a.title, a.title_translated, a.url, a.published_at, a.lang, a.summary, a.excerpt, a.og_image, a.seen_at, a.read_at, a.bookmarked_at, a.liked_at,
-           a.score,
+           a.score, a.interest_score, a.quality_score,
            (SELECT COUNT(*) FROM article_similarities WHERE article_id = a.id) AS similar_count,
            (SELECT GROUP_CONCAT(similar_to_id) FROM article_similarities WHERE article_id = a.id) AS similar_ids
     FROM active_articles a
@@ -417,6 +422,22 @@ export function insertArticle(data: {
  */
 export function markArticleRefreshAttempted(articleId: number, when: string): void {
   runNamed('UPDATE articles SET last_refresh_attempt_at = @when WHERE id = @id', { id: articleId, when })
+}
+
+/** Add a rule-driven score boost (may be negative) and refresh the score. */
+export function addRuleBoost(articleId: number, delta: number): void {
+  getDb().prepare('UPDATE articles SET rule_boost = rule_boost + ? WHERE id = ?').run(delta, articleId)
+  updateScore(articleId)
+}
+
+/** Store the heuristic quality score (0..1) of an article. */
+export function setArticleQuality(articleId: number, score: number): void {
+  getDb().prepare('UPDATE articles SET quality_score = ? WHERE id = ?').run(score, articleId)
+}
+
+/** Store the interest-profile match of an article. */
+export function setArticleInterestScore(articleId: number, score: number): void {
+  getDb().prepare('UPDATE articles SET interest_score = ? WHERE id = ?').run(score, articleId)
 }
 
 export function updateArticleContent(
