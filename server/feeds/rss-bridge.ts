@@ -1,12 +1,12 @@
 import { JSDOM } from 'jsdom'
 import { XMLParser } from 'fast-xml-parser'
-import { fetchHtml } from './fetcher/http.js'
-import { fetchViaFlareSolverr } from './fetcher/flaresolverr.js'
-import { getSetting } from './db.js'
-import { getProvider } from './ai/index.js'
-import { DEFAULT_MODELS } from '../shared/models.js'
-import type { LLMProvider } from './ai/index.js'
-import { logger } from './logger.js'
+import { fetchHtml } from '../fetcher/http.js'
+import { fetchViaFlareSolverr } from '../fetcher/flaresolverr.js'
+import { getSetting } from '../db.js'
+import { getProvider } from '../ai/index.js'
+import { DEFAULT_MODELS } from '../../shared/models.js'
+import type { LLMProvider } from '../ai/index.js'
+import { logger } from '../logger.js'
 
 const log = logger.child('rss-bridge')
 
@@ -206,7 +206,7 @@ export async function inferCssSelectorBridge(url: string): Promise<string | null
     // Build CssSelectorBridge URL (includes custom params for our own code)
     const bridgeUrl = buildCssSelectorBridgeUrl(url, selector, { titleSelector, contentSelector })
     // Validate with RSS-Bridge using only the params it understands
-    const { stripCustomBridgeParams } = await import('./fetcher/css-bridge.js')
+    const { stripCustomBridgeParams } = await import('../fetcher/css-bridge.js')
     const validation = await validateBridgeFeed(stripCustomBridgeParams(bridgeUrl), url)
     if (validation === 'invalid') {
       log.info(`CssSelectorBridge validation failed for ${url} (selector="${selector}")`)

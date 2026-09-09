@@ -1,8 +1,8 @@
-import type { RssItem } from './rss.js'
-import { safeFetch } from './ssrf.js'
-import { USER_AGENT, PROBE_TIMEOUT } from './http.js'
-import { normalizeDate } from './util.js'
-import { logger } from '../logger.js'
+import type { RssItem } from '../../fetcher/rss.js'
+import { safeFetch } from '../../fetcher/ssrf.js'
+import { USER_AGENT, PROBE_TIMEOUT } from '../../fetcher/http.js'
+import { normalizeDate } from '../../fetcher/util.js'
+import { logger } from '../../logger.js'
 
 const log = logger.child('social-search')
 

@@ -24,10 +24,11 @@ import {
 import { requireJson } from '../auth.js'
 import { fetchSingleFeed, discoverRssUrl } from '../fetcher.js'
 import { sweepAutoArchiveFeeds, SWEEP_LIMIT_BACKLOG } from '../fetcher/article-images.js'
-import { queryRssBridge, inferCssSelectorBridge } from '../rss-bridge.js'
-import { resolveSocialSearchFeed } from '../fetcher/social-search.js'
-import { resolveGithubStarsFeed } from '../fetcher/github-releases.js'
-import { parseOpml, generateOpml } from '../opml.js'
+import { queryRssBridge, inferCssSelectorBridge } from './rss-bridge.js'
+import { resolveSocialSearchFeed } from './sources/social-search.js'
+import { resolveGithubStarsFeed } from './sources/github-releases.js'
+import { parseOpml, generateOpml } from './opml.js'
+import { categoryRoutes } from './categories-routes.js'
 import { NumericIdParams, parseOrBadRequest } from '../lib/validation.js'
 
 const httpOrHttpsUrl = z
@@ -547,4 +548,9 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
 
     reply.send({ imported, skipped, errors })
   })
+}
+
+export async function registerFeedRoutes(api: FastifyInstance): Promise<void> {
+  await api.register(feedRoutes)
+  await api.register(categoryRoutes)
 }

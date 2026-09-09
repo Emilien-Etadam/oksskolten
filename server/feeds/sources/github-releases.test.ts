@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const mockGetSetting = vi.fn()
 
-vi.mock('../db.js', () => ({
+vi.mock('../../db.js', () => ({
   getSetting: (key: string) => mockGetSetting(key),
 }))
 

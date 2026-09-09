@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const mockSafeFetch = vi.fn()
 
-vi.mock('./ssrf.js', () => ({
+vi.mock('../../fetcher/ssrf.js', () => ({
   safeFetch: (...args: unknown[]) => mockSafeFetch(...args),
 }))
 

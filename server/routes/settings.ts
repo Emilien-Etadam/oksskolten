@@ -12,7 +12,7 @@ import { requireJson, getAuthUser } from '../auth.js'
 import { getAllModelValues, getModelValues } from '../../shared/models.js'
 import { assertSafeUrl } from '../fetcher/ssrf.js'
 import { extractByDotPath } from '../fetcher/article-images.js'
-import { RELEASE_TYPE_VALUES } from '../fetcher/github-releases.js'
+import { RELEASE_TYPE_VALUES } from '../feeds/index.js'
 import { getMonthlyUsage, getDeeplMonthlyUsage } from '../ai/index.js'
 import { parseOrBadRequest } from '../lib/validation.js'
 

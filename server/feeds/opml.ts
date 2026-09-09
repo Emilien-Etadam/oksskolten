@@ -1,5 +1,5 @@
 import { XMLParser } from 'fast-xml-parser'
-import type { Feed, Category } from './db.js'
+import type { Feed, Category } from '../db.js'
 
 interface OpmlOutline {
   '@_text'?: string

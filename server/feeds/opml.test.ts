@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseOpml, generateOpml } from './opml.js'
-import type { Feed, Category } from './db.js'
+import type { Feed, Category } from '../db.js'
 
 describe('parseOpml', () => {
   it('parses standard OPML with categories', () => {

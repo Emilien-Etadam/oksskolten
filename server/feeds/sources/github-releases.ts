@@ -1,7 +1,7 @@
-import type { RssItem } from './rss.js'
-import { normalizeDate } from './util.js'
-import { getSetting } from '../db.js'
-import { logger } from '../logger.js'
+import type { RssItem } from '../../fetcher/rss.js'
+import { normalizeDate } from '../../fetcher/util.js'
+import { getSetting } from '../../db.js'
+import { logger } from '../../logger.js'
 
 const log = logger.child('github-releases')
 

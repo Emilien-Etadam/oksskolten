@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { setupTestDb } from './__tests__/helpers/testDb.js'
-import { upsertSetting } from './db.js'
+import { setupTestDb } from '../__tests__/helpers/testDb.js'
+import { upsertSetting } from '../db.js'
 
 // --- LLM provider mock ---
 
 const mockCreateMessage = vi.fn()
 
-vi.mock('./ai/index.js', () => ({
+vi.mock('../ai/index.js', () => ({
   getProvider: () => ({
     name: 'anthropic',
     requireKey: vi.fn(),
@@ -19,7 +19,7 @@ vi.mock('./ai/index.js', () => ({
 
 const mockFetchHtml = vi.fn()
 
-vi.mock('./fetcher/http.js', () => ({
+vi.mock('../fetcher/http.js', () => ({
   fetchHtml: (...args: unknown[]) => mockFetchHtml(...args),
   USER_AGENT: 'Mozilla/5.0 (compatible; RSSReader/1.0)',
   DEFAULT_TIMEOUT: 15_000,

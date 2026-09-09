@@ -14,8 +14,7 @@ import {
   assignCssBridgePseudoDates,
   fixGenericTitlesAndEnrichExcerpts,
 } from './css-bridge.js'
-import { isBlueskyApiUrl, isBlueskyFeedUrl, fetchBlueskySearch, fetchBlueskyFeed } from './social-search.js'
-import { isGithubStarsUrl, fetchGithubStarredReleases } from './github-releases.js'
+import { isBlueskyApiUrl, isBlueskyFeedUrl, fetchBlueskySearch, fetchBlueskyFeed, isGithubStarsUrl, fetchGithubStarredReleases } from '../feeds/index.js'
 
 export interface RssItem {
   title: string
