@@ -24,9 +24,7 @@ import {
 import { requireJson } from '../auth.js'
 import { fetchSingleFeed, discoverRssUrl } from '../fetcher.js'
 import { sweepAutoArchiveFeeds, SWEEP_LIMIT_BACKLOG } from '../fetcher/article-images.js'
-import { queryRssBridge, inferCssSelectorBridge } from './rss-bridge.js'
-import { resolveSocialSearchFeed } from './sources/social-search.js'
-import { resolveGithubStarsFeed } from './sources/github-releases.js'
+import { resolveFeedSource, type ResolveEvent } from './resolve.js'
 import { parseOpml, generateOpml } from './opml.js'
 import { categoryRoutes } from './categories-routes.js'
 import { NumericIdParams, parseOrBadRequest } from '../lib/validation.js'
@@ -55,6 +53,59 @@ const CreateFeedBody = z
   .refine((data) => !(data.discovered_rss_url && data.force_page_selector), {
     message: 'discovered_rss_url and force_page_selector are mutually exclusive',
   })
+
+type SseSend = ReturnType<typeof startSSE>['send']
+
+function translateCreateResolveEvent(
+  send: SseSend,
+  event: ResolveEvent,
+  state: { directSource: boolean },
+): void {
+  if (event.stage === 'github-stars' || event.stage === 'social') {
+    if (event.status === 'done' && event.found) {
+      state.directSource = true
+      send({ type: 'step', step: 'rss-discovery', status: 'done', found: true })
+    }
+    return
+  }
+  if (state.directSource && event.stage === 'rss-discovery' && event.status === 'skipped') {
+    return
+  }
+  if (event.status === 'start') {
+    send({ type: 'step', step: event.stage, status: 'running' })
+    return
+  }
+  if (event.status === 'done') {
+    send({ type: 'step', step: event.stage, status: 'done', found: event.found })
+    return
+  }
+  send({ type: 'step', step: event.stage, status: 'skipped' })
+}
+
+function translateRedetectResolveEvent(
+  send: SseSend,
+  event: ResolveEvent,
+): void {
+  if (event.stage === 'github-stars' || event.stage === 'social') {
+    if (event.status === 'done' && event.found) {
+      send({ type: 'stage', stage: 'discovery' })
+      send({ type: 'stage-done', stage: 'discovery', found: true })
+    }
+    return
+  }
+  if (event.status === 'skipped') return
+  const stage =
+    event.stage === 'rss-discovery' ? 'discovery'
+    : event.stage === 'rss-bridge' ? 'bridge'
+    : event.stage === 'css-selector' ? 'bridge-llm'
+    : null
+  if (!stage) return
+  if (event.status === 'start') {
+    send({ type: 'stage', stage })
+    return
+  }
+  send({ type: 'stage-done', stage, found: event.found })
+}
 
 const AI_FILTER_MAX_CHARS = 1000
 
@@ -110,14 +161,6 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
         let discoveredTitle: string | null = null
         let requiresJsChallenge = false
 
-        // GitHub stars pages, Bluesky searches and Mastodon hashtag timelines
-        // resolve to a feed without the discovery/bridge pipeline.
-        const skipResolvers = !!(body.discovered_rss_url || body.force_page_selector)
-        const githubStarsFeed = skipResolvers ? null : resolveGithubStarsFeed(body.url)
-        const socialFeedUrl = skipResolvers || githubStarsFeed
-          ? null
-          : await resolveSocialSearchFeed(body.url)
-
         if (body.discovered_rss_url) {
           // Phase 2: user chose "whole site" — use the provided RSS URL directly
           rssUrl = body.discovered_rss_url
@@ -125,62 +168,28 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
           send({ type: 'step', step: 'rss-discovery', status: 'done', found: true })
           send({ type: 'step', step: 'rss-bridge', status: 'skipped' })
           send({ type: 'step', step: 'css-selector', status: 'skipped' })
-        } else if (body.force_page_selector) {
-          // Phase 2: user chose "this page only" — skip to LLM inference
-          send({ type: 'step', step: 'rss-discovery', status: 'skipped' })
-          send({ type: 'step', step: 'rss-bridge', status: 'skipped' })
-          send({ type: 'step', step: 'css-selector', status: 'running' })
-          rssBridgeUrl = await inferCssSelectorBridge(body.url)
-          send({ type: 'step', step: 'css-selector', status: 'done', found: !!rssBridgeUrl })
-        } else if (githubStarsFeed) {
-          // Stars page: the feed is the account's star list, read via GraphQL
-          rssUrl = githubStarsFeed.feedUrl
-          discoveredTitle = githubStarsFeed.title
-          send({ type: 'step', step: 'rss-discovery', status: 'done', found: true })
-          send({ type: 'step', step: 'rss-bridge', status: 'skipped' })
-          send({ type: 'step', step: 'css-selector', status: 'skipped' })
-        } else if (socialFeedUrl) {
-          // Social search/hashtag URL: the feed is known without discovery
-          rssUrl = socialFeedUrl
-          send({ type: 'step', step: 'rss-discovery', status: 'done', found: true })
-          send({ type: 'step', step: 'rss-bridge', status: 'skipped' })
-          send({ type: 'step', step: 'css-selector', status: 'skipped' })
         } else {
-          // Phase 1: normal discovery flow
-          send({ type: 'step', step: 'rss-discovery', status: 'running' })
-          try {
-            const result = await discoverRssUrl(body.url, {
+          const resolveState = { directSource: false }
+          const resolved = await resolveFeedSource(body.url, {
+            skipResolvers: !!body.force_page_selector,
+            forcePageSelector: !!body.force_page_selector,
+            discover: {
               onFlareSolverr: (status, found) => {
                 send({ type: 'step', step: 'flaresolverr', status: status === 'running' ? 'running' : 'done', found })
               },
-            })
-            rssUrl = result.rssUrl
-            discoveredTitle = result.title
-            if (result.usedFlareSolverr) requiresJsChallenge = true
-            send({ type: 'step', step: 'rss-discovery', status: 'done', found: !!rssUrl })
-          } catch {
-            send({ type: 'step', step: 'rss-discovery', status: 'done', found: false })
-          }
+            },
+            onEvent: (event) => translateCreateResolveEvent(send, event, resolveState),
+          })
+          rssUrl = resolved.rssUrl
+          rssBridgeUrl = resolved.rssBridgeUrl
+          discoveredTitle = resolved.title
+          if (resolved.usedFlareSolverr) requiresJsChallenge = true
 
-          // If RSS found, offer a choice instead of proceeding
-          if (rssUrl) {
+          // Discovery hit (not a GitHub/social shortcut): offer a choice instead of creating
+          if (rssUrl && !resolveState.directSource && !body.force_page_selector) {
             send({ type: 'choice_needed', rss_url: rssUrl, rss_title: discoveredTitle })
             sse.end()
             return
-          }
-
-          // Step 2: RSS Bridge fallback
-          send({ type: 'step', step: 'rss-bridge', status: 'running' })
-          rssBridgeUrl = await queryRssBridge(body.url)
-          send({ type: 'step', step: 'rss-bridge', status: 'done', found: !!rssBridgeUrl })
-
-          // Step 3: CssSelectorBridge via LLM
-          if (!rssBridgeUrl) {
-            send({ type: 'step', step: 'css-selector', status: 'running' })
-            rssBridgeUrl = await inferCssSelectorBridge(body.url)
-            send({ type: 'step', step: 'css-selector', status: 'done', found: !!rssBridgeUrl })
-          } else {
-            send({ type: 'step', step: 'css-selector', status: 'skipped' })
           }
         }
 
@@ -326,47 +335,17 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
 
       const sse = startSSE(reply)
 
-      let rssUrl: string | null = null
-      let rssBridgeUrl: string | null = null
-
       // GitHub stars pages and social search/hashtag URLs have no on-page RSS
       // link to discover — they resolve directly, the same way feed creation
       // does. Skipping this check here (unlike the create-feed route) used to
       // send these straight through generic discovery, which correctly finds
       // nothing on e.g. a GitHub stars page and then overwrites rss_url with
       // that nothing — permanently breaking an otherwise-working feed.
-      const githubStarsFeed = resolveGithubStarsFeed(feed.url)
-      const socialFeedUrl = githubStarsFeed ? null : await resolveSocialSearchFeed(feed.url)
-
-      if (githubStarsFeed || socialFeedUrl) {
-        rssUrl = githubStarsFeed ? githubStarsFeed.feedUrl : socialFeedUrl
-        sse.send({ type: 'stage', stage: 'discovery' })
-        sse.send({ type: 'stage-done', stage: 'discovery', found: true })
-      } else {
-        // Step 1: RSS auto-discovery
-        sse.send({ type: 'stage', stage: 'discovery' })
-        try {
-          const result = await discoverRssUrl(feed.url)
-          rssUrl = result.rssUrl
-        } catch {
-          // Discovery failed
-        }
-        sse.send({ type: 'stage-done', stage: 'discovery', found: !!rssUrl })
-
-        // Step 2: RSS Bridge fallback
-        if (!rssUrl) {
-          sse.send({ type: 'stage', stage: 'bridge' })
-          rssBridgeUrl = await queryRssBridge(feed.url)
-          sse.send({ type: 'stage-done', stage: 'bridge', found: !!rssBridgeUrl })
-        }
-
-        // Step 3: CssSelectorBridge via LLM
-        if (!rssUrl && !rssBridgeUrl) {
-          sse.send({ type: 'stage', stage: 'bridge-llm' })
-          rssBridgeUrl = await inferCssSelectorBridge(feed.url)
-          sse.send({ type: 'stage-done', stage: 'bridge-llm', found: !!rssBridgeUrl })
-        }
-      }
+      const resolved = await resolveFeedSource(feed.url, {
+        onEvent: (event) => translateRedetectResolveEvent(sse.send, event),
+      })
+      const rssUrl = resolved.rssUrl
+      const rssBridgeUrl = resolved.rssBridgeUrl
 
       // Update feed with new URLs
       updateFeed(params.id, {

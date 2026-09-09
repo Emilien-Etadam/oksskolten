@@ -14,7 +14,10 @@ import {
   assignCssBridgePseudoDates,
   fixGenericTitlesAndEnrichExcerpts,
 } from './css-bridge.js'
-import { isBlueskyApiUrl, isBlueskyFeedUrl, fetchBlueskySearch, fetchBlueskyFeed, isGithubStarsUrl, fetchGithubStarredReleases } from '../feeds/index.js'
+// Ingestion depends on source definitions, never on routes. Importing from
+// feeds/index.js would cycle: rss.ts → feeds/index → feeds/routes → fetcher.js → ingest → rss.ts.
+import { isBlueskyApiUrl, isBlueskyFeedUrl, fetchBlueskySearch, fetchBlueskyFeed } from '../feeds/sources/social-search.js'
+import { isGithubStarsUrl, fetchGithubStarredReleases } from '../feeds/sources/github-releases.js'
 
 export interface RssItem {
   title: string
