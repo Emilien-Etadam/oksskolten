@@ -30,7 +30,7 @@ const ALLOWLIST: RegExp[] = [
   /^server\/lib\/cleaner\/boilerplate-text\.ts$/,
 
   // Translation provider implementation (Japanese in markdown protection logic)
-  /^server\/providers\/translate\//,
+  /^server\/ai\/providers\/translate\//,
 
   // Binary / non-text assets
   /\.(png|jpg|jpeg|gif|ico|svg|woff2?|ttf|eot|webp|avif)$/,

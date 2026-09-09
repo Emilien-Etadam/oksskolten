@@ -1,0 +1,326 @@
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
+import useSWR from 'swr'
+import { renderMarkdown } from '@/lib/markdown'
+import { isRedditArticleUrl, redditImageLinksToMarkdown } from '../../../../shared/reddit-images'
+import { sanitizeHtml } from '@/lib/sanitize'
+import { markVideoCards } from '@/lib/video-card'
+import { fetcher, apiPost } from '@/lib/fetcher'
+import { queueSeenIds } from '@/lib/offlineQueue'
+import { useSWRConfig } from 'swr'
+import { trackRead } from '@/lib/readTracker'
+import { useArticleActions } from '../hooks/use-article-actions'
+import { useI18n } from '@/i18n'
+import { useRewriteInternalLinks } from '../hooks/use-rewrite-internal-links'
+import { ImageLightbox } from '@/components/ui/image-lightbox'
+import { ChatFab } from '@/components/chat/chat-fab'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { useChatInline, ChatInlinePanel } from '@/components/chat/chat-inline'
+import { useMetrics } from '../hooks/use-metrics'
+import { useSummarize } from '../hooks/use-summarize'
+import { useTranslate } from '../hooks/use-translate'
+import { formatDetailDate } from '@/lib/dateFormat'
+import { useAppLayout } from '@/app'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Callout } from '@/components/ui/callout'
+import { ArticleZapNavigation } from './article-zap-navigation'
+import { ArticleSwipeNavigation } from './article-swipe-navigation'
+import { ArticleToolbar } from './article-toolbar'
+import { ArticleSummarySection } from './article-summary-section'
+import { ArticleTranslationBanner } from './article-translation-banner'
+import { ArticleContentBody } from './article-content-body'
+import { ArticleSimilarBanner } from './article-similar-banner'
+import { ArticleComments } from './article-comments'
+import type { ArticleDetail as ArticleDetailData } from '../../../../shared/types'
+
+interface ArticleDetailProps {
+  articleUrl: string
+  enableZapNavigation?: boolean
+}
+
+export function ArticleDetail({ articleUrl, enableZapNavigation = false }: ArticleDetailProps) {
+  const { settings: { internalLinks, chatPosition, translateTargetLang } } = useAppLayout()
+  const navigate = useNavigate()
+  const { t, tError, isKeyNotSetError, locale } = useI18n()
+  const articleKey = `/api/articles/by-url?url=${encodeURIComponent(articleUrl)}`
+  const { data: article, error, mutate } = useSWR<ArticleDetailData>(articleKey, fetcher)
+  const { mutate: globalMutate } = useSWRConfig()
+
+  // An article with no body is an unfinished answer, not a final one: the
+  // server fills full_text in later (retry pass, anti-bot solver, a re-clip).
+  // Revalidation is disabled app-wide, which would otherwise pin that empty
+  // copy to the cache until a full page reload, so ask once for fresh data.
+  const bodyRefetchedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!article || article.full_text) return
+    if (bodyRefetchedFor.current === articleKey) return
+    bodyRefetchedFor.current = articleKey
+    void mutate()
+  }, [article, articleKey, mutate])
+
+  const isUserLang = article?.lang === (translateTargetLang || locale)
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
+
+  const articleRef = useRef<HTMLElement>(null)
+
+  const metrics = useMetrics()
+  const { summary, summarizing, streamingText, handleSummarize, summaryHtml, streamingHtml, error: summarizeError } = useSummarize(article, metrics)
+  // Only pass translation to the hook if it matches the current locale; stale translations are treated as absent
+  const isTranslationCurrent = article?.translated_lang === (translateTargetLang || locale)
+  const translateInput = useMemo(() =>
+    article ? { id: article.id, full_text_translated: isTranslationCurrent ? article.full_text_translated : null } : undefined,
+    [article, isTranslationCurrent],
+  )
+  const { viewMode, setViewMode, translating, translatingText, fullTextTranslated, handleTranslate, translatingHtml, error: translateError } = useTranslate(translateInput, metrics)
+  const {
+    isBookmarked, isLiked, archivingImages, archivingVideo, deleteConfirmOpen, setDeleteConfirmOpen,
+    toggleBookmark, toggleLike, handleArchiveImages, handleArchiveVideo, handleDelete,
+  } = useArticleActions(article, articleKey)
+  const chat = useChatInline(article?.id ?? 0)
+
+  // Sync translation/summary back into SWR cache so it persists across navigations
+  useEffect(() => {
+    if (fullTextTranslated && article && article.full_text_translated !== fullTextTranslated) {
+      void mutate({ ...article, full_text_translated: fullTextTranslated, translated_lang: translateTargetLang || locale }, false)
+    }
+  }, [fullTextTranslated]) // eslint-disable-line react-hooks/exhaustive-deps -- only sync when translated text changes; article/mutate are refs to current data
+
+  useEffect(() => {
+    if (summary && article && article.summary !== summary) {
+      void mutate({ ...article, summary }, false)
+    }
+  }, [summary]) // eslint-disable-line react-hooks/exhaustive-deps -- only sync when summary changes; article/mutate are refs to current data
+
+  // Record article read on mount
+  const viewedRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (article && viewedRef.current !== article.id) {
+      viewedRef.current = article.id
+      const isFirstSeen = article.seen_at == null
+      if (isFirstSeen) {
+        trackRead(article.id)
+      }
+      apiPost(`/api/articles/${article.id}/read`)
+        .then(() => globalMutate((key: string) => typeof key === 'string' && key.startsWith('/api/feeds')))
+        .catch(async () => {
+          if (isFirstSeen) {
+            await queueSeenIds([article.id])
+          }
+        })
+    }
+  }, [article, globalMutate])
+
+  const content = useMemo(() => {
+    if (!article) return ''
+    let md = ''
+    if (viewMode === 'translated' && !isUserLang) {
+      md = fullTextTranslated || ''
+    } else {
+      md = article.full_text || ''
+    }
+    if (!md) return `<p class="text-muted">${t('article.noContent')}</p>`
+    // Reddit articles stored before ingestion rewrote image links still carry
+    // them as plain URLs — rewrite at render time so their pictures show
+    if (isRedditArticleUrl(article.url)) md = redditImageLinksToMarkdown(md)
+    return markVideoCards(sanitizeHtml(renderMarkdown(md)))
+  }, [article, viewMode, isUserLang, fullTextTranslated, t])
+
+  const { rewrittenHtml: displayContent } = useRewriteInternalLinks(
+    content,
+    article?.url || articleUrl,
+    internalLinks === 'on',
+  )
+
+  // Event delegation: single listener on <article> handles all image clicks & errors
+  const hasArticle = !!article
+  useEffect(() => {
+    const container = articleRef.current
+    if (!container) return
+
+    const handleClick = (e: MouseEvent) => {
+      const img = (e.target as HTMLElement).closest('.prose img') as HTMLImageElement | null
+      if (img) {
+        setLightboxSrc(img.currentSrc || img.src)
+        return
+      }
+
+      const anchor = (e.target as HTMLElement).closest('.prose a') as HTMLAnchorElement | null
+      if (anchor) {
+        e.preventDefault()
+        if (anchor.hasAttribute('data-internal-link')) {
+          const path = anchor.getAttribute('href')
+          if (path) void navigate(path)
+        } else {
+          const href = anchor.getAttribute('href')
+          if (href) window.open(href, '_blank', 'noopener,noreferrer')
+        }
+      }
+    }
+
+    const handleError = (e: Event) => {
+      const el = e.target as HTMLElement
+      if (el.tagName === 'IMG' && el.closest('.prose')) {
+        el.classList.add('error')
+      }
+    }
+
+    container.addEventListener('click', handleClick)
+    container.addEventListener('error', handleError, true)
+
+    return () => {
+      container.removeEventListener('click', handleClick)
+      container.removeEventListener('error', handleError, true)
+    }
+  }, [hasArticle, navigate])
+
+  if (error) {
+    return (
+      <div className="max-w-2xl mx-auto px-6 md:px-10 py-12 text-center">
+        <p className="text-muted">{t('article.notFound')}</p>
+      </div>
+    )
+  }
+
+  if (!article) {
+    return (
+      <div className="max-w-2xl mx-auto px-6 md:px-10 py-8 space-y-4">
+        <Skeleton className="h-8 w-3/4" />
+        <Skeleton className="h-4 w-1/4" />
+        <Skeleton className="h-4 w-1/6 mt-4" />
+        <Skeleton className="h-8 w-1/2 mt-6" />
+        <div className="space-y-3 mt-8">
+          <Skeleton className="h-4" />
+          <Skeleton className="h-4" />
+          <Skeleton className="h-4 w-2/3" />
+        </div>
+      </div>
+    )
+  }
+
+  const hasTranslation = !!fullTextTranslated
+  // Titles-only auto-translate never produces a body translation, so there's no
+  // "original vs. translated" body to toggle between — the title should stay
+  // translated regardless of viewMode. When a body translation does exist, keep
+  // following the toggle as before.
+  const showTranslatedTitle = !isUserLang && !!article.title_translated && (viewMode === 'translated' || !hasTranslation)
+
+  return (
+    <>
+      {enableZapNavigation && <ArticleSwipeNavigation currentArticleId={String(article.id)} />}
+      {enableZapNavigation && (
+        <ArticleZapNavigation
+          currentArticleId={String(article.id)}
+          onBookmarkToggle={toggleBookmark}
+          onOpenExternal={() => window.open(article.url, '_blank')}
+        />
+      )}
+      <article ref={articleRef} className="article-card max-w-2xl mx-auto px-6 md:px-10 py-8">
+      <h1 className="mb-1.5 text-[28px] font-bold leading-[1.3] break-words [overflow-wrap:anywhere]">
+        {showTranslatedTitle ? article.title_translated : article.title}
+      </h1>
+
+      {/* Date */}
+      <p className="text-sm text-muted mb-3">{formatDetailDate(article.published_at, locale)}</p>
+
+      {/* Toolbar */}
+      <ArticleToolbar
+        article={article}
+        chatPosition={chatPosition}
+        chatOpen={chat.open}
+        onChatToggle={chat.toggle}
+        isUserLang={isUserLang}
+        hasTranslation={hasTranslation}
+        translating={translating}
+        onTranslate={handleTranslate}
+        summary={summary}
+        summarizing={summarizing}
+        onSummarize={handleSummarize}
+        isBookmarked={!!isBookmarked}
+        isLiked={isLiked}
+        archivingImages={archivingImages}
+        archivingVideo={archivingVideo}
+        onToggleBookmark={toggleBookmark}
+        onToggleLike={toggleLike}
+        onArchiveImages={handleArchiveImages}
+        onArchiveVideo={handleArchiveVideo}
+        onDelete={() => setDeleteConfirmOpen(true)}
+      />
+
+      {/* Inline Chat Panel */}
+      {chatPosition === 'inline' && chat.open && (
+        <ChatInlinePanel articleId={article.id} onClose={chat.close} />
+      )}
+
+      {/* Summary */}
+      <ArticleSummarySection
+        summary={summary}
+        summarizing={summarizing}
+        streamingText={streamingText}
+        summaryHtml={summaryHtml}
+        streamingHtml={streamingHtml}
+        summarizeError={summarizeError}
+        metricsText={metrics.metrics && !translating ? metrics.formatMetrics() : null}
+      />
+
+      {/* Similar articles */}
+      {article.similar_count != null && article.similar_count > 0 && (
+        <ArticleSimilarBanner articleId={article.id} similarCount={article.similar_count} />
+      )}
+
+
+      {/* Translate error */}
+      {translateError && !translating && (
+        <Callout variant="error">
+          <p className="text-sm text-error">
+            {tError(translateError)}
+            {isKeyNotSetError(translateError) && (
+              <>
+                <Link to="/settings/integration" className="underline text-accent">{t('error.goToSettings')}</Link>
+                {t('error.setApiKeyFromSettings')}
+              </>
+            )}
+          </p>
+        </Callout>
+      )}
+
+      {/* Translation metrics */}
+      {metrics.metrics && !summarizing && !translating && hasTranslation && (
+        <p className="text-xs text-muted mb-4">
+          {metrics.formatMetrics()}
+        </p>
+      )}
+
+      {/* Language banner */}
+      {!isUserLang && hasTranslation && (
+        <ArticleTranslationBanner
+          viewMode={viewMode}
+          onToggle={() => setViewMode(viewMode === 'translated' ? 'original' : 'translated')}
+        />
+      )}
+
+      {/* Content */}
+      <ArticleContentBody
+        translating={translating}
+        translatingText={translatingText}
+        translatingHtml={translatingHtml}
+        displayContent={displayContent}
+      />
+
+      {/* Discussion comments (Reddit posts) */}
+      <ArticleComments articleId={article.id} articleUrl={article.url} />
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+    </article>
+    {chatPosition === 'fab' && article && <ChatFab key={article.id} articleId={article.id} />}
+    {deleteConfirmOpen && (
+      <ConfirmDialog
+        title={t('article.delete')}
+        message={t('article.deleteConfirm')}
+        confirmLabel={t('article.delete')}
+        danger
+        onConfirm={() => { setDeleteConfirmOpen(false); handleDelete() }}
+        onCancel={() => setDeleteConfirmOpen(false)}
+      />
+    )}
+    </>
+  )
+}
