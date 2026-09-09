@@ -1,13 +1,13 @@
 import { useState, useCallback } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import useSWR, { mutate as globalMutate } from 'swr'
-import { fetcher } from '../lib/fetcher'
+import { fetcher } from '@/lib/fetcher'
 import { useI18n } from '@/i18n'
-import { ChatPanel } from '../components/chat/chat-panel'
-import { ChatNewConversation } from '../components/chat/chat-new-conversation'
-import { useDateMode } from '../hooks/use-date-mode'
-import { formatDate, formatRelativeDate } from '../lib/dateFormat'
-import { articleUrlToPath, extractDomain } from '../lib/url'
+import { ChatPanel } from './components/chat-panel'
+import { ChatNewConversation } from './components/chat-new-conversation'
+import { useDateMode } from '@/hooks/use-date-mode'
+import { formatDate, formatRelativeDate } from '@/lib/dateFormat'
+import { articleUrlToPath, extractDomain } from '@/lib/url'
 
 interface Conversation {
   id: string

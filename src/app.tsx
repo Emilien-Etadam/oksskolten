@@ -16,7 +16,7 @@ import { KeyboardNavigationProvider, useKeyboardNavigationContext } from './cont
 import { CategoryTabs } from '@/features/feeds'
 import { isSidebarCollapsed, persistSidebarCollapsed } from './lib/sidebar-collapsed'
 const SettingsPage = lazy(() => import('@/features/settings/settings-page').then(m => ({ default: m.SettingsPage })))
-const ChatPage = lazy(() => import('./pages/chat-page').then(m => ({ default: m.ChatPage })))
+const ChatPage = lazy(() => import('@/features/chat/chat-page').then(m => ({ default: m.ChatPage })))
 const FrontPage = lazy(() => import('@/features/reading/pages/front-page').then(m => ({ default: m.FrontPage })))
 const StoriesPage = lazy(() => import('@/features/reading/pages/stories-page').then(m => ({ default: m.StoriesPage })))
 import { AuthShell } from './lib/auth-shell'

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { ChatMessageBubble } from './chat-message-bubble'
-import type { ChatMessage } from '../../hooks/use-chat'
+import type { ChatMessage } from '@/hooks/use-chat'
 
 describe('ChatMessageBubble', () => {
   it('renders user message as plain text bubble', () => {

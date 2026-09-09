@@ -16,7 +16,7 @@ let mockChatState: {
   reset: ReturnType<typeof vi.fn>
 }
 
-vi.mock('../../hooks/use-chat', () => ({
+vi.mock('@/hooks/use-chat', () => ({
   useChat: () => mockChatState,
 }))
 

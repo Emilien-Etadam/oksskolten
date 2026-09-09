@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { articleUrlToPath, extractDomain } from '../../lib/url'
+import { articleUrlToPath, extractDomain } from '@/lib/url'
 
 interface ChatLinkedArticleProps {
   title: string

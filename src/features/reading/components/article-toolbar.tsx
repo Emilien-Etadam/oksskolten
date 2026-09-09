@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { ActionChip } from '@/components/ui/action-chip'
-import { ChatInlineTrigger } from '@/components/chat/chat-inline'
+import { ChatInlineTrigger } from '@/features/chat'
 import { Bookmark, ThumbsUp, CloudUpload, CloudCheck, Trash2, Languages, Sparkles, Film, FileVideo } from 'lucide-react'
 import { mentionsVideo } from '../../../../shared/video'
 import { useI18n } from '@/i18n'

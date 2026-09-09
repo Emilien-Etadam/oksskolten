@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import { MessagesSquare } from 'lucide-react'
 import { ChatPanel } from './chat-panel'
-import { ActionChip } from '../ui/action-chip'
-import { fetcher } from '../../lib/fetcher'
+import { ActionChip } from '@/components/ui/action-chip'
+import { fetcher } from '@/lib/fetcher'
 import { useI18n } from '@/i18n'
 
 interface ChatInlineProps {

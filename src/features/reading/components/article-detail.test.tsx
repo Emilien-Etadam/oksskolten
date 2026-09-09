@@ -71,9 +71,13 @@ vi.mock('@/components/ui/image-lightbox', () => ({
   ImageLightbox: () => null,
 }))
 
-vi.mock('@/components/chat/chat-fab', () => ({
-  ChatFab: () => null,
-}))
+vi.mock('@/features/chat', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/chat')>()
+  return {
+    ...actual,
+    ChatFab: () => null,
+  }
+})
 
 import { ArticleDetail } from './article-detail'
 

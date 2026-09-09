@@ -1,10 +1,10 @@
 import { useMemo } from 'react'
-import { renderMarkdown, walkLinks } from '../../lib/markdown'
-import { sanitizeHtml } from '../../lib/sanitize'
-import { SanitizedHTML } from '../ui/sanitized-html'
-import type { ChatMessage } from '../../hooks/use-chat'
-import { getModelLabel, getModelPricing } from '../../../shared/models'
-import { articleUrlToPath } from '../../lib/url'
+import { renderMarkdown, walkLinks } from '@/lib/markdown'
+import { sanitizeHtml } from '@/lib/sanitize'
+import { SanitizedHTML } from '@/components/ui/sanitized-html'
+import type { ChatMessage } from '@/hooks/use-chat'
+import { getModelLabel, getModelPricing } from '../../../../shared/models'
+import { articleUrlToPath } from '@/lib/url'
 
 interface ChatMessageBubbleProps {
   message: ChatMessage

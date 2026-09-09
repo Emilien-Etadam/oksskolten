@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { MessagesSquare } from 'lucide-react'
 import useSWR from 'swr'
 import { ChatPanel } from './chat-panel'
-import { fetcher } from '../../lib/fetcher'
+import { fetcher } from '@/lib/fetcher'
 
 interface ChatFabProps {
   articleId: number
