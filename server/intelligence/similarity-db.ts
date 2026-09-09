@@ -1,4 +1,4 @@
-import { getDb } from './connection.js'
+import { getDb } from '../db/connection.js'
 
 export interface SimilarArticle {
   id: number

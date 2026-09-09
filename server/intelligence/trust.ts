@@ -1,4 +1,4 @@
-import { getDb } from './connection.js'
+import { getDb } from '../db/connection.js'
 
 /** Window over which a source's recent value is judged */
 const TRUST_WINDOW_DAYS = 30

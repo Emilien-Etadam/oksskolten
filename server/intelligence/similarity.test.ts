@@ -15,17 +15,17 @@ const {
   mockInsertSimilarity: vi.fn(),
 }))
 
-vi.mock('./search/client.js', () => ({
+vi.mock('../search/client.js', () => ({
   meiliSearch: mockMeiliSearch,
 }))
-vi.mock('./search/sync.js', () => ({
+vi.mock('../search/sync.js', () => ({
   isSearchReady: mockIsSearchReady,
 }))
-vi.mock('./db.js', () => ({
+vi.mock('../db.js', () => ({
   getArticlesByIds: mockGetArticlesByIds,
   markArticleSeen: mockMarkArticleSeen,
 }))
-vi.mock('./db/similarities.js', () => ({
+vi.mock('./similarity-db.js', () => ({
   insertSimilarity: mockInsertSimilarity,
 }))
 

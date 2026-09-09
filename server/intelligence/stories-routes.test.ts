@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setupTestDb } from '../__tests__/helpers/testDb.js'
 import { buildApp } from '../__tests__/helpers/buildApp.js'
-import { createFeed, insertArticle, insertSimilarity } from '../db.js'
+import { createFeed, insertArticle } from '../db.js'
+import { insertSimilarity } from './similarity-db.js'
 import type { FastifyInstance } from 'fastify'
 
 let app: FastifyInstance

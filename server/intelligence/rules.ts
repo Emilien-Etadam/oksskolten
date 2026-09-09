@@ -5,9 +5,9 @@ import {
   type FeedRule,
   type RuleField,
   type RuleAction,
-} from './db/feed-rules.js'
-import { markArticleSeen, markArticleBookmarked, markArticleLiked, updateArticleContent, addRuleBoost } from './db/articles.js'
-import { logger } from './logger.js'
+} from './rules-db.js'
+import { markArticleSeen, markArticleBookmarked, markArticleLiked, updateArticleContent, addRuleBoost } from '../db/articles.js'
+import { logger } from '../logger.js'
 
 const log = logger.child('rules')
 

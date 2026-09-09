@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { setupTestDb } from '../__tests__/helpers/testDb.js'
 import { buildApp } from '../__tests__/helpers/buildApp.js'
 import { createFeed, insertArticle, markArticleLiked } from '../db.js'
-import { _resetInterestsForTests } from '../interests.js'
+import { _resetInterestsForTests } from './interests.js'
 import type { FastifyInstance } from 'fastify'
 
 let app: FastifyInstance

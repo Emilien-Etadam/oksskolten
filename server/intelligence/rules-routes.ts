@@ -10,8 +10,8 @@ import {
   deleteFeedRule,
   RULE_FIELDS,
   RULE_ACTIONS,
-} from '../db/feed-rules.js'
-import { isValidPattern, applyRuleToExisting, previewRule, MAX_PATTERN_LENGTH } from '../rules.js'
+} from './rules-db.js'
+import { isValidPattern, applyRuleToExisting, previewRule, MAX_PATTERN_LENGTH } from './rules.js'
 
 const FieldSchema = z.enum(RULE_FIELDS as [string, ...string[]])
 const ActionSchema = z.enum(RULE_ACTIONS as [string, ...string[]])

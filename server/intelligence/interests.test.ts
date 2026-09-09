@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { setupTestDb } from './__tests__/helpers/testDb.js'
-import { createFeed, insertArticle, recordArticleRead, markArticleLiked, markArticleSeen, getArticles, getDb } from './db.js'
+import { setupTestDb } from '../__tests__/helpers/testDb.js'
+import { createFeed, insertArticle, recordArticleRead, markArticleLiked, markArticleSeen, getArticles, getDb } from '../db.js'
 import { tokenize, rebuildInterestProfile, scoreInterest, getInterestIslands, setInterestMuted, recalculateInterestScores, scoreNewArticle, _resetInterestsForTests } from './interests.js'
 
 beforeEach(() => {

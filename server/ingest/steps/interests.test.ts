@@ -6,7 +6,7 @@ const { mockScoreNewArticle } = vi.hoisted(() => ({
   mockScoreNewArticle: vi.fn(),
 }))
 
-vi.mock('../../interests.js', () => ({
+vi.mock('../../intelligence/index.js', () => ({
   scoreNewArticle: mockScoreNewArticle,
 }))
 

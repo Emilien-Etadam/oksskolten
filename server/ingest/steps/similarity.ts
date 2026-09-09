@@ -1,4 +1,4 @@
-import { detectAndStoreSimilarArticles } from '../../similarity.js'
+import { detectAndStoreSimilarArticles } from '../../intelligence/index.js'
 import type { EnrichStep } from './types.js'
 
 export const similarity: EnrichStep = {

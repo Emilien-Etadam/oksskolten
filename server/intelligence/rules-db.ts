@@ -1,4 +1,4 @@
-import { getDb, runNamed } from './connection.js'
+import { getDb, runNamed } from '../db/connection.js'
 
 export type RuleField = 'title' | 'url' | 'content' | 'any'
 export type RuleAction = 'mark_read' | 'hide' | 'bookmark' | 'like' | 'score'

@@ -13,9 +13,9 @@
  * of the profile terms it mentions, muted terms counting against it. The
  * Recommended list is that score, descending.
  */
-import { getDb } from './db/connection.js'
-import { setArticleInterestScore } from './db/articles.js'
-import { logger } from './logger.js'
+import { getDb } from '../db/connection.js'
+import { setArticleInterestScore } from '../db/articles.js'
+import { logger } from '../logger.js'
 
 const log = logger.child('interests')
 

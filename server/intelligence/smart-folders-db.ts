@@ -1,5 +1,5 @@
-import { getDb, runNamed, getNamed, allNamed } from './connection.js'
-import type { ArticleListItem } from './types.js'
+import { getDb, runNamed, getNamed, allNamed } from '../db/connection.js'
+import type { ArticleListItem } from '../db/types.js'
 import { parseSmartQuery, smartQuerySince, type SmartQuery } from '../../shared/smart-query.js'
 
 export interface SmartFolder {

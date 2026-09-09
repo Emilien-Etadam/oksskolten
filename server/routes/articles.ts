@@ -35,10 +35,10 @@ import {
   getClipFeed,
   insertArticle,
   deleteArticle,
-  getSimilarArticles,
   getDb,
   type ArticleDetail,
 } from '../db.js'
+import { getSimilarArticles } from '../intelligence/index.js'
 import type { MeiliArticleDoc } from '../search/client.js'
 import { buildMeiliFilter, meiliSearch } from '../search/client.js'
 import { isSearchReady, syncArticleToSearch } from '../search/sync.js'

@@ -1,5 +1,5 @@
 import { setArticleQuality } from '../../db.js'
-import { scoreArticleQuality } from '../../quality.js'
+import { scoreArticleQuality } from '../../intelligence/index.js'
 import type { EnrichStep } from './types.js'
 
 export const quality: EnrichStep = {

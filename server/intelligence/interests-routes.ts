@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { requireJson } from '../auth.js'
 import { parseOrBadRequest } from '../lib/validation.js'
-import { getInterestIslands, setInterestMuted, maybeRebuildInterestProfile } from '../interests.js'
+import { getInterestIslands, setInterestMuted, maybeRebuildInterestProfile } from './interests.js'
 
 const TermParams = z.object({ term: z.string().min(1) })
 const MuteBody = z.object({ muted: z.boolean({ message: 'muted must be a boolean' }) })

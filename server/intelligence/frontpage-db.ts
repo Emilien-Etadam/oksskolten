@@ -1,5 +1,5 @@
-import { getDb } from './connection.js'
-import { getCategories } from './categories.js'
+import { getDb } from '../db/connection.js'
+import { getCategories } from '../db/categories.js'
 import type { ArticleListItem } from '../../shared/types.js'
 
 export interface FrontPageSection {

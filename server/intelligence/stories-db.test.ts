@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setupTestDb } from '../__tests__/helpers/testDb.js'
-import { createFeed, insertArticle, markArticleSeen, insertSimilarity } from '../db.js'
-import { getTopStories } from './stories.js'
+import { createFeed, insertArticle, markArticleSeen } from '../db.js'
+import { insertSimilarity } from './similarity-db.js'
+import { getTopStories } from './stories-db.js'
 
 beforeEach(() => setupTestDb())
 

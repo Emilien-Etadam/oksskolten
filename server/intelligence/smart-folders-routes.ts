@@ -9,7 +9,7 @@ import {
   updateSmartFolder,
   deleteSmartFolder,
   getSmartFolderArticles,
-} from '../db/smart-folders.js'
+} from './smart-folders-db.js'
 import { parseSmartQuery, smartQuerySince } from '../../shared/smart-query.js'
 import { buildMeiliFilter, meiliSearch } from '../search/client.js'
 import { isSearchReady } from '../search/sync.js'

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { parseOrBadRequest } from '../lib/validation.js'
-import { getTopStories } from '../db/stories.js'
+import { getTopStories } from './stories-db.js'
 
 const coerceOptionalNumber = z.preprocess(
   (val) => { const n = Number(val); return Number.isNaN(n) ? undefined : n },

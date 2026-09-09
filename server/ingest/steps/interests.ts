@@ -1,4 +1,4 @@
-import { scoreNewArticle } from '../../interests.js'
+import { scoreNewArticle } from '../../intelligence/index.js'
 import type { EnrichStep } from './types.js'
 
 export const interests: EnrichStep = {

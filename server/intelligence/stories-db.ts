@@ -1,5 +1,5 @@
-import { getDb } from './connection.js'
-import type { ArticleListItem } from './types.js'
+import { getDb } from '../db/connection.js'
+import type { ArticleListItem } from '../db/types.js'
 
 export interface StorySource {
   feed_id: number

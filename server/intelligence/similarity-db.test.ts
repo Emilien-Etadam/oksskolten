@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setupTestDb } from '../__tests__/helpers/testDb.js'
-import { insertSimilarity, getSimilarArticles, findReadSimilarArticle } from './similarities.js'
-import { getDb } from './connection.js'
+import { insertSimilarity, getSimilarArticles, findReadSimilarArticle } from './similarity-db.js'
+import { getDb } from '../db/connection.js'
 
 function seedFeedAndArticles() {
   const db = getDb()

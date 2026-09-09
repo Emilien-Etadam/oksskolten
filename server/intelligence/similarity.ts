@@ -1,8 +1,8 @@
-import { meiliSearch } from './search/client.js'
-import { isSearchReady } from './search/sync.js'
-import { getArticlesByIds, markArticleSeen } from './db.js'
-import { insertSimilarity } from './db/similarities.js'
-import { logger } from './logger.js'
+import { meiliSearch } from '../search/client.js'
+import { isSearchReady } from '../search/sync.js'
+import { getArticlesByIds, markArticleSeen } from '../db.js'
+import { insertSimilarity } from './similarity-db.js'
+import { logger } from '../logger.js'
 
 const log = logger.child('similarity')
 
