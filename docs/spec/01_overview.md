@@ -18,6 +18,7 @@ Typical RSS readers only display the title and summary provided by the feed, req
 > - [84_feature_keyboard_navigation.md](./84_feature_keyboard_navigation.md) — Keyboard Navigation
 > - [85_feature_ollama.md](./85_feature_ollama.md) — Ollama LLM Provider
 > - [86_feature_github_releases.md](./86_feature_github_releases.md) — GitHub Starred Releases
+> - [87_feature_intelligence.md](./87_feature_intelligence.md) — Reading Intelligence (smart folders, rules, top stories, trust, interests)
 > - [90_perf_retry_backoff.md](./90_perf_retry_backoff.md) — Exponential Backoff for Article Retry
 > - [91_perf_score_recalculation.md](./91_perf_score_recalculation.md) — Score Recalculation Optimization
 

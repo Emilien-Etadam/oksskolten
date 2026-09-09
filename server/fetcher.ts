@@ -7,6 +7,7 @@ import {
   getRetryStats,
   getSetting,
   insertArticle,
+  setArticleQuality,
   markArticleRefreshAttempted,
   normalizeUrl,
   updateArticleContent,
@@ -20,6 +21,9 @@ import {
 
 import { Semaphore, CONCURRENCY, errorMessage } from './fetcher/util.js'
 import { detectAndStoreSimilarArticles } from './similarity.js'
+import { applyRulesToArticle } from './rules.js'
+import { scoreArticleQuality } from './quality.js'
+import { scoreNewArticle } from './interests.js'
 import { type FetchProgressEvent, emitProgress, markFeedDone } from './fetcher/progress.js'
 import { fetchFullText, isBotBlockPage, convertHtmlToMarkdown, markdownToExcerpt, ensureLeadImage, MIN_EXTRACTED_LENGTH } from './fetcher/content.js'
 import { type FetchRssResult, type RssItem, fetchAndParseRss, RateLimitError } from './fetcher/rss.js'
@@ -282,6 +286,9 @@ async function processArticle(task: ArticleTask): Promise<boolean> {
         og_image: content.ogImage,
         last_error: content.lastError,
       })
+      setArticleQuality(articleId, scoreArticleQuality({ title: task.title, text: content.fullText, url: task.url }).score)
+      scoreNewArticle(articleId, task.title)
+      applyRulesToArticle(articleId, task.feed_id, { title: task.title, url: task.url, content: content.fullText })
       maybeEnqueueAutoTranslate(articleId, content.fullText, effectiveLang)
       enqueueAiFilter(articleId, task.feed_id)
       // Fire-and-forget: detect similar articles asynchronously
@@ -300,6 +307,10 @@ async function processArticle(task: ArticleTask): Promise<boolean> {
       og_image: content.ogImage,
       last_error: content.lastError,
     })
+    // A repaired body changes the quality verdict
+    if (content.fullText) {
+      setArticleQuality(task.article.id, scoreArticleQuality({ title: task.article.title, text: content.fullText, url: task.article.url }).score)
+    }
     maybeEnqueueAutoTranslate(task.article.id, content.fullText, effectiveLang)
   }
   const extractedLen = content.fullText?.replace(/\s+/g, ' ').trim().length ?? 0

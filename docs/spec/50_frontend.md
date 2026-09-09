@@ -13,6 +13,9 @@
 /likes                         → Liked articles list
 /history                       → Read articles list (read_at IS NOT NULL)
 /clips                         → Clipped articles list
+/recommended                   → Unread articles ranked by the interest profile
+/stories                       → Top stories (events covered by several sources)
+/smart/:folderId               → Smart folder (saved query) articles list
 /feeds/:feedId                 → Articles by feed (clip feeds also use this route)
 /categories/:categoryId        → Articles by category
 /settings                      → Redirect to /settings/general

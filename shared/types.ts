@@ -30,6 +30,8 @@ export interface Feed {
   ai_filter?: string | null
   /** 1 = archive article images automatically at fetch time (default 0: on open) */
   archive_images?: number
+  /** Recent reading value of the source, 0..1 (see server/db/trust.ts) */
+  trust_score?: number
   created_at: string
 }
 
@@ -81,6 +83,10 @@ export interface ArticleListItem {
   bookmarked_at: string | null
   liked_at: string | null
   score?: number
+  /** Match against the interest profile; orders the Recommended list */
+  interest_score?: number
+  /** Heuristic quality 0..1, null before ingestion scored it */
+  quality_score?: number | null
   similar_count?: number
   /** Comma-separated ids of similar articles (bidirectional pairs), list queries only */
   similar_ids?: string | null

@@ -110,6 +110,7 @@ CREATE TABLE feeds (
   disabled              INTEGER NOT NULL DEFAULT 0,   -- 1=auto-disabled (5 consecutive failures)
   requires_js_challenge INTEGER NOT NULL DEFAULT 0,   -- 1=site requires bot verification (JS challenge) bypass
   archive_images        INTEGER NOT NULL DEFAULT 0,   -- 1=archive article images automatically at fetch time
+  trust_score           REAL NOT NULL DEFAULT 0,      -- Recent reading value of the source, 0..1 (87_feature_intelligence.md)
   etag                  TEXT,                         -- Previous response ETag (for conditional requests)
   last_modified         TEXT,                         -- Previous response Last-Modified (for conditional requests)
   last_content_hash     TEXT,                         -- SHA-256 of previous response body (for servers without ETag)
@@ -158,6 +159,40 @@ CREATE INDEX idx_articles_liked_at ON articles(liked_at);
 CREATE INDEX idx_articles_category_published ON articles(category_id, published_at DESC);
 CREATE INDEX idx_articles_feed_score ON articles(feed_id, score DESC);
 CREATE INDEX idx_articles_category_score ON articles(category_id, score DESC);
+CREATE INDEX idx_articles_interest ON articles(interest_score);
+
+-- Fork additions (87_feature_intelligence.md); articles also carry
+-- rule_boost REAL DEFAULT 0, quality_score REAL, interest_score REAL DEFAULT 0
+CREATE TABLE smart_folders (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT NOT NULL,
+  query      TEXT NOT NULL,                        -- shared/smart-query.ts language
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE feed_rules (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  feed_id         INTEGER REFERENCES feeds(id) ON DELETE CASCADE,  -- NULL = every feed
+  field           TEXT NOT NULL DEFAULT 'title',    -- 'title' | 'url' | 'content' | 'any'
+  pattern         TEXT NOT NULL,                    -- regular expression, flags iu
+  action          TEXT NOT NULL,                    -- 'mark_read' | 'hide' | 'bookmark' | 'like' | 'score'
+  value           REAL,                             -- score delta for 'score'
+  enabled         INTEGER NOT NULL DEFAULT 1,
+  match_count     INTEGER NOT NULL DEFAULT 0,
+  last_matched_at TEXT,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX idx_feed_rules_feed ON feed_rules(feed_id);
+
+CREATE TABLE interest_terms (
+  term       TEXT PRIMARY KEY,
+  weight     REAL NOT NULL DEFAULT 0,               -- 0..1, normalized to the strongest term
+  island     INTEGER NOT NULL DEFAULT 0,            -- co-occurrence cluster, 0 = strongest
+  muted      INTEGER NOT NULL DEFAULT 0,            -- 1 = counts against the interest score
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
 CREATE TABLE settings (
   key   TEXT PRIMARY KEY,
@@ -261,6 +296,7 @@ engagement = (liked_at ? 10 : 0)
            + (bookmarked_at ? 5 : 0)
            + (full_text_ja ? 3 : 0)    -- translated
            + (read_at ? 2 : 0)
+           + rule_boost                -- fork: sum of the 'score' rules that matched
 
 decay = 1.0 / (1.0 + days_since_activity × 0.05)
   where days_since_activity = julianday('now') - julianday(COALESCE(read_at, published_at, fetched_at))

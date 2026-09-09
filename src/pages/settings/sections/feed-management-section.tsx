@@ -42,11 +42,11 @@ function formatPerWeek(value: number): string {
   return value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)
 }
 
-type SortKey = 'name' | 'category' | 'articles' | 'unread' | 'perWeek' | 'latest' | 'status'
+type SortKey = 'name' | 'category' | 'articles' | 'unread' | 'perWeek' | 'trust' | 'latest' | 'status'
 type SortDir = 'asc' | 'desc'
 
 /** Sort keys that read most naturally as "largest first" on the initial click */
-const DESC_FIRST: SortKey[] = ['articles', 'unread', 'perWeek', 'latest']
+const DESC_FIRST: SortKey[] = ['articles', 'unread', 'perWeek', 'trust', 'latest']
 
 function compare(a: FeedWithCounts, b: FeedWithCounts, key: SortKey): number {
   switch (key) {
@@ -60,6 +60,8 @@ function compare(a: FeedWithCounts, b: FeedWithCounts, key: SortKey): number {
       return a.unread_count - b.unread_count
     case 'perWeek':
       return a.articles_per_week - b.articles_per_week
+    case 'trust':
+      return (a.trust_score ?? 0) - (b.trust_score ?? 0)
     case 'latest':
       return new Date(a.latest_published_at ?? 0).getTime() - new Date(b.latest_published_at ?? 0).getTime()
     case 'status':
@@ -413,6 +415,7 @@ export function FeedManagementSection() {
                 <SortableHeader label={t('settings.feedsColArticles')} sortKey="articles" active={sortKey} dir={sortDir} onSort={handleSort} className="hidden sm:table-cell text-right" />
                 <SortableHeader label={t('settings.feedsColUnread')} sortKey="unread" active={sortKey} dir={sortDir} onSort={handleSort} className="text-right" />
                 <SortableHeader label={t('settings.feedsColPerWeek')} sortKey="perWeek" active={sortKey} dir={sortDir} onSort={handleSort} className="hidden md:table-cell text-right" />
+                <SortableHeader label={t('settings.feedsColTrust')} sortKey="trust" active={sortKey} dir={sortDir} onSort={handleSort} className="hidden md:table-cell text-right" />
                 <SortableHeader label={t('settings.feedsColLatest')} sortKey="latest" active={sortKey} dir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />
                 <SortableHeader label={t('settings.feedsColStatus')} sortKey="status" active={sortKey} dir={sortDir} onSort={handleSort} />
               </tr>
@@ -460,6 +463,9 @@ export function FeedManagementSection() {
                     <td className="px-3 py-2 hidden md:table-cell text-right text-muted tabular-nums">
                       {feed.articles_per_week > 0 ? formatPerWeek(feed.articles_per_week) : '—'}
                     </td>
+                    <td className="px-3 py-2 hidden md:table-cell text-right text-muted tabular-nums" title={t('settings.feedsTrustHint')}>
+                      {feed.trust_score ? `${Math.round(feed.trust_score * 100)}%` : '—'}
+                    </td>
                     <td className="px-3 py-2 hidden lg:table-cell text-muted whitespace-nowrap">
                       {feed.latest_published_at
                         ? formatRelativeDate(feed.latest_published_at, locale, { justNow: t('date.justNow') })
@@ -473,7 +479,7 @@ export function FeedManagementSection() {
               })}
               {visible.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-3 py-8 text-center text-sm text-muted">
+                  <td colSpan={9} className="px-3 py-8 text-center text-sm text-muted">
                     {t('settings.feedsNoMatch')}
                   </td>
                 </tr>

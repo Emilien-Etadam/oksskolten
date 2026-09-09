@@ -105,6 +105,16 @@ Upstream runs AI on demand, one article at a time. This fork adds a persistent b
 - **Social searches as feeds** — Bluesky custom feeds, profiles and searches, plus Mastodon hashtags, each become a feed. Bluesky search needs an app password; the rest work without an account
 - **Reddit posts, properly** — the body comes from the post's own JSON, including the embedded parent of a crosspost, and the top comments are rendered below the article with an on-demand translate button. Fetches escalate through five access strategies, because Reddit blocks anonymous requests from many residential IPs
 
+### Reading intelligence
+
+Five features borrowed from RSSMonster's smart layer, all running on SQLite and the existing search index, no model involved. See [`87_feature_intelligence.md`](docs/spec/87_feature_intelligence.md)
+
+- **Smart folders** — save a query such as `rust unread:true @week` as a sidebar folder; new matches appear on their own. The search dialog offers *Save as smart folder* for the current search
+- **Automated rules** — regular-expression rules, per feed or global, that mark new articles read, hide them, bookmark or like them, or change their score. Dry-run a pattern over recent articles before saving, replay it over the backlog after
+- **Top stories** — events covered by several of your sources are folded into one story, ranked by how many sources covered it, with the other coverage one click away
+- **Feed trust and article quality** — a per-feed trust score from what you actually read of it, and a per-article quality score (thin body, clickbait or shouting title, promotional markers, link density). Both feed the front page ranking; trust is a sortable column in Settings → Feeds
+- **Interest islands and Recommended** — an interest profile learned from what you like, bookmark and open, grouped into islands of co-occurring terms you can mute; the *Recommended* list ranks unread articles against it
+
 ### Feed management and diagnostics
 
 **Settings → Feeds**, an empty "under development" placeholder upstream, now holds two sections:

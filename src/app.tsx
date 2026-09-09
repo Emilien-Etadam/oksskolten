@@ -20,6 +20,7 @@ import { isSidebarCollapsed, persistSidebarCollapsed } from './lib/sidebar-colla
 const SettingsPage = lazy(() => import('./pages/settings-page').then(m => ({ default: m.SettingsPage })))
 const ChatPage = lazy(() => import('./pages/chat-page').then(m => ({ default: m.ChatPage })))
 const FrontPage = lazy(() => import('./pages/front-page').then(m => ({ default: m.FrontPage })))
+const StoriesPage = lazy(() => import('./pages/stories-page').then(m => ({ default: m.StoriesPage })))
 import { AuthShell } from './lib/auth-shell'
 import { ErrorBoundary } from './components/auth/error-boundary'
 import { HintBanner } from './components/ui/hint-banner'
@@ -134,10 +135,12 @@ export function useAppLayout() {
 }
 
 function ArticleListPage() {
-  const { feedId, categoryId } = useParams<{ feedId?: string; categoryId?: string }>()
+  const { feedId, categoryId, folderId } = useParams<{ feedId?: string; categoryId?: string; folderId?: string }>()
   const location = useLocation()
   const { t } = useI18n()
   const isInbox = location.pathname === '/inbox'
+  const isRecommended = location.pathname === '/recommended'
+  const { data: smartFoldersData } = useSWR<{ folders: Array<{ id: number; name: string }> }>(folderId ? '/api/smart-folders' : null, fetcher)
   const isBookmarks = location.pathname === '/bookmarks'
   const isLikes = location.pathname === '/likes'
   const isHistory = location.pathname === '/history'
@@ -155,6 +158,10 @@ function ArticleListPage() {
           ? t('feeds.inbox')
           : isClips
             ? t('feeds.clips')
+            : isRecommended
+              ? t('recommended.title')
+              : folderId
+                ? smartFoldersData?.folders.find(f => f.id === Number(folderId))?.name ?? null
             : feedId
           ? feedsData?.feeds.find(f => f.id === Number(feedId))?.name ?? null
           : categoryId
@@ -175,6 +182,8 @@ function ArticleListPage() {
       {isLikes && <HintBanner storageKey="hint-dismissed-likes">{t('hint.likes')}</HintBanner>}
       {isHistory && <HintBanner storageKey="hint-dismissed-history">{t('hint.history')}</HintBanner>}
       {isClips && <HintBanner storageKey="hint-dismissed-clips">{t('hint.clips')}</HintBanner>}
+      {isRecommended && <HintBanner storageKey="hint-dismissed-recommended">{t('hint.recommended')}</HintBanner>}
+      {folderId && <HintBanner storageKey="hint-dismissed-smart">{t('hint.smart')}</HintBanner>}
       <ArticleList ref={articleListRef} />
     </PageLayout>
   )
@@ -211,6 +220,18 @@ function ChatPageWrapper() {
     >
       <Suspense>
         <ChatPage />
+      </Suspense>
+    </PageLayout>
+  )
+}
+
+function StoriesPageWrapper() {
+  const { t } = useI18n()
+  return (
+    <PageLayout feedName={t('stories.title')}>
+      <HintBanner storageKey="hint-dismissed-stories">{t('hint.stories')}</HintBanner>
+      <Suspense>
+        <StoriesPage />
       </Suspense>
     </PageLayout>
   )
@@ -257,7 +278,7 @@ function ArticleDetailPage() {
 
 // Determine the "page type" for animation decisions
 function getPageType(pathname: string): 'detail' | 'list' {
-  if (pathname === '/' || pathname === '/inbox' || pathname === '/bookmarks' || pathname === '/likes' || pathname === '/history' || pathname === '/clips' || pathname.startsWith('/feeds/') || pathname.startsWith('/categories/') || pathname.startsWith('/settings') || pathname.startsWith('/chat')) {
+  if (pathname === '/' || pathname === '/inbox' || pathname === '/bookmarks' || pathname === '/likes' || pathname === '/history' || pathname === '/clips' || pathname === '/stories' || pathname === '/recommended' || pathname.startsWith('/smart/') || pathname.startsWith('/feeds/') || pathname.startsWith('/categories/') || pathname.startsWith('/settings') || pathname.startsWith('/chat')) {
     return 'list'
   }
   return 'detail'
@@ -334,6 +355,9 @@ function AnimatedRoutes() {
             <Route path="/likes" element={<ArticleListPage />} />
             <Route path="/history" element={<ArticleListPage />} />
             <Route path="/clips" element={<ArticleListPage />} />
+            <Route path="/recommended" element={<ArticleListPage />} />
+            <Route path="/smart/:folderId" element={<ArticleListPage />} />
+            <Route path="/stories" element={<StoriesPageWrapper />} />
             <Route path="/feeds/:feedId" element={<ArticleListPage />} />
             <Route path="/categories/:categoryId" element={<ArticleListPage />} />
             <Route path="/settings" element={<Navigate to="/settings/general" replace />} />

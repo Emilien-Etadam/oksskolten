@@ -8,7 +8,8 @@ import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
 import multipart from '@fastify/multipart'
 import cron, { type ScheduledTask } from 'node-cron'
-import { runMigrations, getSetting, upsertSetting, getOrCreateJwtSecret, ensureClipFeed, recalculateScores, purgeExpiredArticles, shrinkMemory } from './db.js'
+import { runMigrations, getSetting, upsertSetting, getOrCreateJwtSecret, ensureClipFeed, recalculateScores, recalculateFeedTrust, purgeExpiredArticles, shrinkMemory } from './db.js'
+import { maybeRebuildInterestProfile } from './interests.js'
 import { logger } from './logger.js'
 import { findProjectRoot } from './paths.js'
 
@@ -206,6 +207,14 @@ cronTasks.push(cron.schedule(SCORE_RECALC_SCHEDULE, async () => {
     }
   } catch (err) {
     log.error('[cron] Score recalculation error:', err)
+  }
+  // Feed trust and the interest profile ride the same schedule: trust every
+  // tick (one UPDATE), the profile at most hourly (see interests.ts).
+  try {
+    recalculateFeedTrust()
+    if (maybeRebuildInterestProfile()) log.info('[cron] Interest profile rebuilt')
+  } catch (err) {
+    log.error('[cron] Trust / interest recalculation error:', err)
   }
 }))
 

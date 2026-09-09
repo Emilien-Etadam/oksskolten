@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useSWR from 'swr'
-import { X, Bookmark, ThumbsUp, Circle, CalendarDays, CalendarRange, CalendarFold } from 'lucide-react'
+import { X, Bookmark, ThumbsUp, Circle, CalendarDays, CalendarRange, CalendarFold, FolderPlus } from 'lucide-react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Dialog, DialogPortal, DialogOverlay, DialogTitle } from './dialog'
 import { fetcher } from '../../lib/fetcher'
 import { searchArticles } from '../../lib/search'
+import { SmartFolderDialog } from '../smart/smart-folder-dialog'
+import { apiPost } from '../../lib/fetcher'
 
 /** Maximum number of search results returned per page */
 const SEARCH_RESULTS_LIMIT = 20
@@ -46,6 +48,15 @@ export function SearchDialog({ onClose }: SearchDialogProps) {
   const [filterLiked, setFilterLiked] = useState(false)
   const [filterUnread, setFilterUnread] = useState(false)
   const [datePeriod, setDatePeriod] = useState<'today' | 'week' | 'month' | null>(null)
+  const [saveAsFolder, setSaveAsFolder] = useState(false)
+  // The current search, in the smart folder query language
+  const smartQuery = [
+    query.trim(),
+    filterUnread ? 'unread:true' : '',
+    filterBookmarked ? 'is:bookmarked' : '',
+    filterLiked ? 'is:liked' : '',
+    datePeriod ? `@${datePeriod}` : '',
+  ].filter(Boolean).join(' ')
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const abortRef = useRef<AbortController>(undefined)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
@@ -308,12 +319,35 @@ export function SearchDialog({ onClose }: SearchDialogProps) {
           </CommandList>
 
           {/* Footer hint (desktop only) */}
-          <div className="hidden md:block px-4 py-2 border-t border-border text-[11px] text-muted text-center">
-            {t('search.hint')}
+          <div className="hidden md:flex items-center px-4 py-2 border-t border-border text-[11px] text-muted">
+            <span className="flex-1 text-center">{t('search.hint')}</span>
+            {smartQuery && (
+              <button
+                type="button"
+                onClick={() => setSaveAsFolder(true)}
+                className="inline-flex items-center gap-1 text-accent hover:underline shrink-0"
+              >
+                <FolderPlus size={12} strokeWidth={1.5} />
+                {t('smart.saveFromSearch')}
+              </button>
+            )}
           </div>
         </Command>
         </DialogPrimitive.Content>
       </DialogPortal>
+      {saveAsFolder && (
+        <SmartFolderDialog
+          open
+          mode="create"
+          initial={{ name: query.trim(), query: smartQuery }}
+          onOpenChange={open => { if (!open) setSaveAsFolder(false) }}
+          onSave={async draft => {
+            const created = await apiPost('/api/smart-folders', draft) as { id: number }
+            onClose()
+            void navigate(`/smart/${created.id}`)
+          }}
+        />
+      )}
     </Dialog>
   )
 }

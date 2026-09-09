@@ -197,6 +197,13 @@ export async function demoFetcher(url: string): Promise<unknown> {
     return {}
   }
 
+  // Fork: intelligence endpoints have no demo data yet; keep their pages empty
+  if (path === '/api/smart-folders') return { folders: [] }
+  if (path.startsWith('/api/smart-folders/')) return { articles: [], total: 0, has_more: false }
+  if (path === '/api/stories') return { stories: [] }
+  if (path === '/api/rules') return { rules: [] }
+  if (path === '/api/interests') return { islands: [] }
+
   // Fallback: return empty object for unknown GETs
   return {}
 }
