@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { highlightThemeFamilies } from '../../data/highlightThemes'
 import { articleFonts, FONT_SAMPLE_EN, FONT_SAMPLE_LOCALIZED, getSystemFontLabel } from '../../data/articleFonts'
 import { layouts, type LayoutName } from '../../data/layouts'

@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import useSWR from 'swr'
 import { Layers } from 'lucide-react'
 import { fetcher } from '../../lib/fetcher'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { articleUrlToPath } from '../../lib/url'
 
 interface SimilarArticle {

@@ -1,7 +1,7 @@
 import useSWR from 'swr'
 import { Link } from 'react-router-dom'
 import { fetcher } from '../lib/fetcher'
-import { useI18n } from '../lib/i18n'
+import { useI18n } from '@/i18n'
 import { useAppLayout } from '../app'
 import { ArticleCard } from '../components/article/article-card'
 import { Skeleton } from '../components/ui/skeleton'

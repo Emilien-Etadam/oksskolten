@@ -1,7 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { createElement } from 'react'
-import { LocaleContext, useI18n } from './i18n'
+import { LocaleContext, useI18n } from '@/i18n'
+import { dict } from './messages/index.js'
+import { auth } from './messages/auth.js'
+import { chat } from './messages/chat.js'
+import { common } from './messages/common.js'
+import { feeds } from './messages/feeds.js'
+import { intelligence } from './messages/intelligence.js'
+import { reading } from './messages/reading.js'
+import { settings } from './messages/settings.js'
 
 function makeWrapper(locale: 'ja' | 'en') {
   return ({ children }: { children: React.ReactNode }) =>
@@ -37,5 +45,17 @@ describe('useI18n', () => {
   it('exposes locale value', () => {
     const { result } = renderHook(() => useI18n(), { wrapper: makeWrapper('ja') })
     expect(result.current.locale).toBe('ja')
+  })
+})
+
+describe('message dictionary', () => {
+  it('has no duplicate keys across domain files', () => {
+    const sum = [common, reading, feeds, intelligence, chat, auth, settings]
+      .reduce((n, part) => n + Object.keys(part).length, 0)
+    expect(sum).toBe(Object.keys(dict).length)
+  })
+
+  it('contains 770 keys', () => {
+    expect(Object.keys(dict).length).toBe(770)
   })
 })

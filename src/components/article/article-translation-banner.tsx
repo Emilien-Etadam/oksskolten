@@ -1,5 +1,5 @@
 import { Globe } from 'lucide-react'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 
 type ViewMode = 'translated' | 'original'
 

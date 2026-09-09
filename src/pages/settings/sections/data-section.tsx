@@ -1,6 +1,6 @@
 import { useState, useRef, useMemo } from 'react'
 import { useSWRConfig } from 'swr'
-import { useI18n } from '../../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { importOpml, fetchOpmlBlob, previewOpml } from '../../../lib/fetcher'
 import type { OpmlPreviewResponse, OpmlPreviewFeed } from '../../../lib/fetcher'
 import { Upload, Download } from 'lucide-react'

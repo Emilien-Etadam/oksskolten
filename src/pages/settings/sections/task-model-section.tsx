@@ -15,7 +15,7 @@ import type { ModelGroup } from '../../../data/aiModels'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectLabel, SelectItem } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import type { Settings } from '../../../hooks/use-settings'
-import type { TranslateFn } from '../../../lib/i18n'
+import type { TranslateFn } from '@/i18n'
 
 type TFunc = TranslateFn
 type MessageKey = Parameters<TFunc>[0]

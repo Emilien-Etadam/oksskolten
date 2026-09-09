@@ -4,7 +4,7 @@ import { MessagesSquare } from 'lucide-react'
 import { ChatPanel } from './chat-panel'
 import { ActionChip } from '../ui/action-chip'
 import { fetcher } from '../../lib/fetcher'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 
 interface ChatInlineProps {
   articleId: number

@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { IconButton } from '@/components/ui/icon-button'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 
 interface FeedListHeaderProps {
   onClose: () => void

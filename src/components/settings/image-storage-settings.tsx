@@ -5,7 +5,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { IconButton } from '../ui/icon-button'
 import { Input } from '../ui/input'
 import { fetcher, apiPatch, apiPost } from '../../lib/fetcher'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 
 interface ImageStorageData {
   'images.enabled': string | null

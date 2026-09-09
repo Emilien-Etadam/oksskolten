@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiPost, ApiError } from '../../lib/fetcher'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { articleUrlToPath } from '../../lib/url'
 import { Dialog, DialogContent, DialogTitle } from '../ui/dialog'
 import { Input } from '../ui/input'

@@ -1,4 +1,4 @@
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { useAppLayout } from '../../app'
 import { Separator } from '@/components/ui/separator'
 import { ProviderConfigSection } from './sections/provider-config-section'

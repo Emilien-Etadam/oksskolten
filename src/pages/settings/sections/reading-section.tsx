@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useI18n, type TranslateFn } from '../../../lib/i18n'
+import { useI18n, type TranslateFn } from '@/i18n'
 import { PreviewCard } from '../../../components/settings/preview-card'
 import { useAppLayout } from '../../../app'
 import { RadioGroup } from '@/components/ui/radio-group'

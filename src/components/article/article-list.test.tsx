@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Routes, Route, Outlet } from 'react-router-dom'
-import { LocaleContext } from '../../lib/i18n'
+import { LocaleContext } from '@/i18n'
 import { KeyboardNavigationProvider } from '../../contexts/keyboard-navigation-context'
 import type { ArticleListItem } from '../../../shared/types'
 

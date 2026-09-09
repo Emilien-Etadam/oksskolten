@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import useSWR from 'swr'
-import { useI18n } from '../../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { fetcher, apiPatch } from '../../../lib/fetcher'
 import { AvatarPicker } from '../../../components/settings/avatar-picker'
 import { Input } from '@/components/ui/input'

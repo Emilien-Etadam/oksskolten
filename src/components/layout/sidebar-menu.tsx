@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import useSWR from 'swr'
 import { Settings, Sun, Moon, Monitor, Palette, LogOut, Check } from 'lucide-react'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { fetcher } from '../../lib/fetcher'
 import { logoutClient } from '../../lib/auth'
 import { Avatar } from '../settings/avatar-picker'

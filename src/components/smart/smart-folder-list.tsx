@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import useSWR from 'swr'
 import { FolderSearch, Plus, Pencil, Trash2 } from 'lucide-react'
 import { fetcher, apiPost, apiPatch, apiDelete } from '../../lib/fetcher'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { SmartFolderDialog, type SmartFolderDraft } from './smart-folder-dialog'
 import { ConfirmDialog } from '../ui/confirm-dialog'
 import {

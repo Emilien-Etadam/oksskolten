@@ -3,7 +3,7 @@ import useSWR from 'swr'
 import { toast } from 'sonner'
 import { Loader2, RefreshCw, VolumeX } from 'lucide-react'
 import { fetcher, apiPost, apiPatch } from '../../../lib/fetcher'
-import { useI18n } from '../../../lib/i18n'
+import { useI18n } from '@/i18n'
 
 export interface InterestTerm {
   term: string

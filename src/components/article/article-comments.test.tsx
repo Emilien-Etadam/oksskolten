@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { LocaleContext } from '../../lib/i18n'
+import { LocaleContext } from '@/i18n'
 import { ArticleComments, hasCommentsProvider } from './article-comments'
 
 let swrCommentsData: unknown

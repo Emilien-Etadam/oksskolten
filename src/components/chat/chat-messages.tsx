@@ -2,7 +2,7 @@ import { type RefObject } from 'react'
 import { Link } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import { ChatMessageBubble } from './chat-message-bubble'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import type { ChatMessage } from '../../hooks/use-chat'
 
 interface ToolStatus {

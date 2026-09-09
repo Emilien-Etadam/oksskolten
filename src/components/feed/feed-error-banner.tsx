@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { CheckCircle2, XCircle, Circle, ChevronRight, Search, RefreshCw, Loader2 } from 'lucide-react'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { STAGES, classifyError, reDetectSSE } from '../../lib/feed-error'
 
 /**

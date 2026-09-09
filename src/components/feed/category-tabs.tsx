@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import useSWR from 'swr'
 import { NavLink } from 'react-router-dom'
 import { fetcher } from '../../lib/fetcher'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import type { FeedWithCounts } from '../../../shared/types'
 
 interface CategoriesResponse {

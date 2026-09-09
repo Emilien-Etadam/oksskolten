@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react'
 import { Pencil, CheckCheck, Trash2, FolderInput, RefreshCw, Search, Filter, ImageDown, Check } from 'lucide-react'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import {
   ContextMenu,
   ContextMenuTrigger,

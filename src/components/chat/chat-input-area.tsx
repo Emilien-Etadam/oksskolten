@@ -1,6 +1,6 @@
 import { useRef, type KeyboardEvent } from 'react'
 import { Send, Loader2 } from 'lucide-react'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 
 const MAX_HEIGHT_INLINE = 120
 const MAX_HEIGHT_FULL = 150

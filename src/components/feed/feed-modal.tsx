@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { Dialog, DialogContent, DialogTitle } from '../ui/dialog'
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden'
 import { IconButton } from '../ui/icon-button'

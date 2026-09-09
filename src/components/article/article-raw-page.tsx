@@ -1,6 +1,6 @@
 import useSWR from 'swr'
 import { fetcher } from '../../lib/fetcher'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { hasCommentsProvider, type ArticleComment } from './article-comments'
 import type { Article } from '../../../shared/types'
 

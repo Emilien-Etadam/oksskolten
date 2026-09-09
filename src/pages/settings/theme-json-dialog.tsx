@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { parseThemeJson, themeToJson } from '../../lib/theme-json'
 import type { Theme } from '../../data/themes'

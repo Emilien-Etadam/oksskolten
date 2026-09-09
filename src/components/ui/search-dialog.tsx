@@ -13,7 +13,7 @@ import { apiPost } from '../../lib/fetcher'
 const SEARCH_RESULTS_LIMIT = 20
 import { articleUrlToPath } from '../../lib/url'
 import { formatRelativeDate } from '../../lib/dateFormat'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import {
   Command,
   CommandInput,

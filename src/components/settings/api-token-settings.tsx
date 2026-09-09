@@ -2,7 +2,7 @@ import { useState } from 'react'
 import useSWR from 'swr'
 import { Key, Plus, Trash2, Copy, Check } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { fetcher, apiPost, apiDelete } from '../../lib/fetcher'
 
 interface ApiToken {

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, Outlet } from 'react-router-dom'
 import { SWRConfig } from 'swr'
-import { LocaleContext } from '../../lib/i18n'
+import { LocaleContext } from '@/i18n'
 import { TooltipProvider } from '../ui/tooltip'
 import type { FeedWithCounts, Category } from '../../../shared/types'
 

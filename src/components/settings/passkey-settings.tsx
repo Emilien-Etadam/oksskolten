@@ -3,7 +3,7 @@ import useSWR from 'swr'
 import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/browser'
 import { Fingerprint, Plus, Trash2 } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { fetcher, apiDelete } from '../../lib/fetcher'
 
 interface AuthMethods {

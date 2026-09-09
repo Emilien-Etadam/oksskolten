@@ -9,9 +9,9 @@ const JAPANESE_RE =
 
 const ALLOWLIST: RegExp[] = [
   // i18n translation files
-  /^src\/lib\/i18n\.ts$/,
+  /^src\/i18n\/messages\//,
   /^src\/lib\/demo\/i18n\.ts$/,
-  /^src\/lib\/i18n\.test\.ts$/,
+  /^src\/i18n\/index\.test\.ts$/,
 
   // Test files — assertions often contain Japanese text
   /\.test\.tsx?$/,

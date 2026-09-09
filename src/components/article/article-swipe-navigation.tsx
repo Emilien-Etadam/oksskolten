@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useKeyboardNavigationContext } from '../../contexts/keyboard-navigation-context'
 import { useExtendArticleList } from '../../hooks/use-extend-article-list'
 import { useIsTouchDevice } from '../../hooks/use-is-touch-device'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { articleUrlToPath } from '../../lib/url'
 import { dayKeyOf, useDayLabel } from './day-separator'
 

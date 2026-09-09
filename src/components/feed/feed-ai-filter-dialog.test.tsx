@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { LocaleContext } from '../../lib/i18n'
+import { LocaleContext } from '@/i18n'
 import { FeedAiFilterDialog } from './feed-ai-filter-dialog'
 
 function renderDialog(props: Partial<Parameters<typeof FeedAiFilterDialog>[0]> = {}) {

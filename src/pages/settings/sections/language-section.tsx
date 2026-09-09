@@ -1,4 +1,4 @@
-import { useI18n, type Locale } from '../../../lib/i18n'
+import { useI18n, type Locale } from '@/i18n'
 import { apiPatch } from '../../../lib/fetcher'
 import { RadioGroup } from '@/components/ui/radio-group'
 

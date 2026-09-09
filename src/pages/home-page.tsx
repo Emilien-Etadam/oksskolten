@@ -4,8 +4,8 @@ import { Send } from 'lucide-react'
 import useSWR from 'swr'
 import { useChat } from '../hooks/use-chat'
 import { ChatPanel } from '../components/chat/chat-panel'
-import { useI18n, isMessageKey } from '../lib/i18n'
-import type { TranslateFn } from '../lib/i18n'
+import { useI18n, isMessageKey } from '@/i18n'
+import type { TranslateFn } from '@/i18n'
 import { fetcher } from '../lib/fetcher'
 
 const RANDOM_GREETING_COUNT = 5

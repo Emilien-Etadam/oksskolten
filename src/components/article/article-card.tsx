@@ -1,6 +1,6 @@
 import { useState, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { isReadInSession } from '../../lib/readTracker'
 import { extractDomain, articleUrlToPath } from '../../lib/url'
 import { formatDate, formatRelativeDate } from '../../lib/dateFormat'

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { LocaleContext } from '../../lib/i18n'
+import { LocaleContext } from '@/i18n'
 import { CategoryTabs } from './category-tabs'
 
 let swrCategoriesData: { categories: Array<{ id: number; name: string }> } | undefined

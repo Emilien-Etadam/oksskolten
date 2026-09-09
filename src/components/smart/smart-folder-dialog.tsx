@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { parseSmartQuery, smartQueryHasFilters } from '../../../shared/smart-query'
 import {
   Dialog,

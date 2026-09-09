@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom'
 import useSWR, { mutate as globalMutate } from 'swr'
 import { useChat } from '../../hooks/use-chat'
 import { fetcher } from '../../lib/fetcher'
-import { useI18n, isMessageKey } from '../../lib/i18n'
+import { useI18n, isMessageKey } from '@/i18n'
 import { ChatPanel } from './chat-panel'
 import { ChatInputArea } from './chat-input-area'
 

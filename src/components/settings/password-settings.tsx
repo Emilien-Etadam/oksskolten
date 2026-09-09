@@ -4,7 +4,7 @@ import { AlertTriangle, Check, Pencil } from 'lucide-react'
 import { Input } from '../ui/input'
 import { FormField } from '../ui/form-field'
 import { PasswordStrength } from '../ui/password-strength'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { fetcher, apiPost } from '../../lib/fetcher'
 import { getAuthToken, setAuthToken } from '../../lib/auth'
 

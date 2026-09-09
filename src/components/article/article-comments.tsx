@@ -5,7 +5,7 @@ import { fetcher, authHeaders } from '../../lib/fetcher'
 import { renderMarkdown } from '../../lib/markdown'
 import { isRedditArticleUrl } from '../../../shared/reddit-images'
 import { sanitizeHtml } from '../../lib/sanitize'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 
 export interface ArticleComment {
   author: string

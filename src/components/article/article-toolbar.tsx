@@ -3,7 +3,7 @@ import { ActionChip } from '../ui/action-chip'
 import { ChatInlineTrigger } from '../chat/chat-inline'
 import { Bookmark, ThumbsUp, CloudUpload, CloudCheck, Trash2, Languages, Sparkles, Film, FileVideo } from 'lucide-react'
 import { mentionsVideo } from '../../../shared/video'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import type { ArticleDetail } from '../../../shared/types'
 
 interface ArticleToolbarProps {

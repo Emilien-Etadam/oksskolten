@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { themes as builtinThemes } from '../../data/themes'
 import { PreviewCard } from '../../components/settings/preview-card'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'

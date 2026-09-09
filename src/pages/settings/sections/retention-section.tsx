@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
-import { useI18n } from '../../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { fetcher, apiPatch, apiPost } from '../../../lib/fetcher'
 import { RadioGroup } from '@/components/ui/radio-group'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'

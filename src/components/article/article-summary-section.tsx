@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Callout } from '../ui/callout'
 import { Skeleton } from '../ui/skeleton'
 import { SanitizedHTML } from '../ui/sanitized-html'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 
 interface ArticleSummarySectionProps {
   summary: string | null

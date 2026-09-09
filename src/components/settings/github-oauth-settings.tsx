@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import useSWR from 'swr'
 import { AlertTriangle, Copy, Check, Info, ChevronDown, ExternalLink } from 'lucide-react'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { Input } from '../ui/input'
 import { fetcher, apiPost } from '../../lib/fetcher'
 

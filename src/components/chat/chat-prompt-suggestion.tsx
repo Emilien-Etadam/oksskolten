@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import useSWR from 'swr'
 import { fetcher } from '../../lib/fetcher'
-import { useI18n, isMessageKey } from '../../lib/i18n'
+import { useI18n, isMessageKey } from '@/i18n'
 
 const ROTATION_INTERVAL = 3000
 
