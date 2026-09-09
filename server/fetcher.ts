@@ -5,5 +5,5 @@ export type { FetchedContent, ArticleTask, ArticleContext, EnrichStep } from './
 export { normalizeDate } from './fetcher/util.js'
 export { type FetchProgressEvent, fetchProgress, getFeedState } from './fetcher/progress.js'
 export { discoverRssUrl } from './fetcher/rss.js'
-export { detectLanguage, summarizeArticle, streamSummarizeArticle, translateArticle, streamTranslateArticle } from './fetcher/ai.js'
-export type { AiTextResult, AiBillingMode } from './fetcher/ai.js'
+export { detectLanguage, summarizeArticle, streamSummarizeArticle, translateArticle, streamTranslateArticle } from './ai/index.js'
+export type { AiTextResult, AiBillingMode } from './ai/index.js'

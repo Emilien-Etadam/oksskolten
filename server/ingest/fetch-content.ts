@@ -1,7 +1,7 @@
 import { errorMessage } from '../fetcher/util.js'
 import { fetchFullText, isBotBlockPage, convertHtmlToMarkdown, markdownToExcerpt, ensureLeadImage, MIN_EXTRACTED_LENGTH } from '../fetcher/content.js'
 import { isGoogleNewsUrl } from '../fetcher/google-news.js'
-import { detectLanguage } from '../fetcher/ai.js'
+import { detectLanguage } from '../ai/index.js'
 import { logger } from '../logger.js'
 
 const log = logger.child('fetcher')

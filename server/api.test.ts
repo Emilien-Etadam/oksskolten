@@ -19,6 +19,13 @@ vi.mock('./fetcher.js', async () => {
   }
 })
 
+vi.mock('./ai/tasks.js', () => ({
+  summarizeArticle: vi.fn().mockResolvedValue({ summary: 'summary text', inputTokens: 10, outputTokens: 5 }),
+  streamSummarizeArticle: vi.fn(),
+  translateArticle: vi.fn().mockResolvedValue({ fullTextTranslated: '翻訳テキスト', inputTokens: 10, outputTokens: 5 }),
+  streamTranslateArticle: vi.fn(),
+}))
+
 let app: FastifyInstance
 
 beforeEach(async () => {

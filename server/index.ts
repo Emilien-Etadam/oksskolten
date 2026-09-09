@@ -16,7 +16,7 @@ import { findProjectRoot } from './paths.js'
 const log = logger
 import { getDb } from './db/connection.js'
 import { registerApi } from './api.js'
-import { registerChatApi } from './chatRoutes.js'
+import { registerChatApi } from './ai/index.js'
 import { authRoutes } from './authRoutes.js'
 import { passkeyRoutes } from './passkeyRoutes.js'
 import { oauthRoutes } from './oauthRoutes.js'

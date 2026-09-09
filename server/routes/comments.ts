@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { getArticleById } from '../db/articles.js'
-import { translateSnippet } from '../fetcher/ai.js'
+import { translateSnippet } from '../ai/index.js'
 import { redditJsonUrl, fetchRedditJson, redditImageLinksToMarkdown, type RedditListing } from '../fetcher/reddit.js'
 
 export { redditJsonUrl }

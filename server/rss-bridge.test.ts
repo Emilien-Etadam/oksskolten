@@ -6,7 +6,7 @@ import { upsertSetting } from './db.js'
 
 const mockCreateMessage = vi.fn()
 
-vi.mock('./providers/llm/index.js', () => ({
+vi.mock('./ai/index.js', () => ({
   getProvider: () => ({
     name: 'anthropic',
     requireKey: vi.fn(),

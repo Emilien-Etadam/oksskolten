@@ -7,8 +7,8 @@ import type { FastifyInstance } from 'fastify'
 const mockTranslateSnippet = vi.fn()
 const mockFlareSolverr = vi.fn()
 
-vi.mock('../fetcher/ai.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../fetcher/ai.js')>()
+vi.mock('../ai/index.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../ai/index.js')>()
   return {
     ...actual,
     translateSnippet: (text: string) => mockTranslateSnippet(text),

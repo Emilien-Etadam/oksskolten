@@ -13,8 +13,7 @@ import { getAllModelValues, getModelValues } from '../../shared/models.js'
 import { assertSafeUrl } from '../fetcher/ssrf.js'
 import { extractByDotPath } from '../fetcher/article-images.js'
 import { RELEASE_TYPE_VALUES } from '../fetcher/github-releases.js'
-import { getMonthlyUsage } from '../providers/translate/google-translate.js'
-import { getDeeplMonthlyUsage } from '../providers/translate/deepl.js'
+import { getMonthlyUsage, getDeeplMonthlyUsage } from '../ai/index.js'
 import { parseOrBadRequest } from '../lib/validation.js'
 
 const ProfileBody = z.object({
@@ -640,7 +639,7 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
   // --- Ollama endpoints ---
 
   async function ollamaFetch(path: string): Promise<Response> {
-    const { getOllamaBaseUrl, getOllamaCustomHeaders } = await import('../providers/llm/ollama.js')
+    const { getOllamaBaseUrl, getOllamaCustomHeaders } = await import('../ai/index.js')
     const baseUrl = getOllamaBaseUrl().replace(/\/+$/, '')
     const headers = getOllamaCustomHeaders()
     return fetch(`${baseUrl}${path}`, { headers, signal: AbortSignal.timeout(5_000) })
@@ -691,7 +690,7 @@ export async function settingsRoutes(api: FastifyInstance): Promise<void> {
   // --- vLLM endpoints ---
 
   async function vllmFetch(path: string): Promise<Response> {
-    const { getVllmBaseUrl, getVllmApiKey } = await import('../providers/llm/vllm.js')
+    const { getVllmBaseUrl, getVllmApiKey } = await import('../ai/index.js')
     const baseUrl = getVllmBaseUrl().replace(/\/+$/, '')
     const apiKey = getVllmApiKey()
     const headers: Record<string, string> = {}

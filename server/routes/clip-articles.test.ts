@@ -39,14 +39,18 @@ vi.mock('../fetcher.js', async () => {
   }
 })
 
-vi.mock('../fetcher/ai-queue.js', () => ({
-  enqueueAutoTranslate: vi.fn(),
-  enqueueAutoSummarize: vi.fn(),
-  enqueueAiFilter: vi.fn(),
-  isAutoTranslateEnabled: vi.fn(() => false),
-  isAutoSummarizeEnabled: vi.fn(() => false),
-  translateArticleTitle: vi.fn(),
-}))
+vi.mock('../ai/index.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../ai/index.js')>()
+  return {
+    ...actual,
+    enqueueAutoTranslate: vi.fn(),
+    enqueueAutoSummarize: vi.fn(),
+    enqueueAiFilter: vi.fn(),
+    isAutoTranslateEnabled: vi.fn(() => false),
+    isAutoSummarizeEnabled: vi.fn(() => false),
+    translateArticleTitle: vi.fn(),
+  }
+})
 
 vi.mock('../anthropic.js', () => ({
   anthropic: { messages: { stream: vi.fn(), create: vi.fn() } },

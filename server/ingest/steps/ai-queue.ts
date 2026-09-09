@@ -1,5 +1,5 @@
 import { getSetting } from '../../db.js'
-import { enqueueAutoTranslate, enqueueAutoSummarize, isAutoTranslateEnabled, isAutoSummarizeEnabled } from '../../fetcher/ai-queue.js'
+import { enqueueAutoTranslate, enqueueAutoSummarize, isAutoTranslateEnabled, isAutoSummarizeEnabled } from '../../ai/index.js'
 import { DEFAULT_LANGUAGE } from '../../../shared/lang.js'
 import type { EnrichStep } from './types.js'
 

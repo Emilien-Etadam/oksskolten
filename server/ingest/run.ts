@@ -8,7 +8,7 @@ import {
 
 import { Semaphore, CONCURRENCY } from '../fetcher/util.js'
 import { type FetchProgressEvent, emitProgress, markFeedDone } from '../fetcher/progress.js'
-import { resumePendingAiTasks } from '../fetcher/ai-queue.js'
+import { resumePendingAiTasks } from '../ai/index.js'
 import { sweepAutoArchiveFeeds } from '../fetcher/article-images.js'
 import { logger } from '../logger.js'
 import { collectFeedTasks } from './feed-loop.js'

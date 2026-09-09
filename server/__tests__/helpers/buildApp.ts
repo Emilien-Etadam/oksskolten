@@ -3,7 +3,7 @@ import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
 import multipart from '@fastify/multipart'
 import { registerApi } from '../../api.js'
-import { registerChatApi } from '../../chatRoutes.js'
+import { registerChatApi } from '../../ai/index.js'
 import { authRoutes } from '../../authRoutes.js'
 import { passkeyRoutes } from '../../passkeyRoutes.js'
 

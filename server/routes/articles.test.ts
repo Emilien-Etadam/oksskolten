@@ -35,8 +35,15 @@ vi.mock('../anthropic.js', () => ({
   anthropic: { messages: { stream: vi.fn(), create: vi.fn() } },
 }))
 
-vi.mock('../fetcher/ai-queue.js', () => ({
+vi.mock('../ai/queue.js', () => ({
   translateArticleTitle: vi.fn(),
+}))
+
+vi.mock('../ai/tasks.js', () => ({
+  summarizeArticle: vi.fn().mockResolvedValue({ summary: 'summary text', inputTokens: 10, outputTokens: 5, billingMode: 'standard', model: 'haiku' }),
+  streamSummarizeArticle: (...args: unknown[]) => mockStreamSummarize(...args),
+  translateArticle: vi.fn().mockResolvedValue({ fullTextTranslated: '翻訳テキスト', inputTokens: 10, outputTokens: 5, billingMode: 'standard', model: 'sonnet' }),
+  streamTranslateArticle: (...args: unknown[]) => mockStreamTranslate(...args),
 }))
 
 // ---------------------------------------------------------------------------

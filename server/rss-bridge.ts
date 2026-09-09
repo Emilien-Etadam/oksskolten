@@ -3,9 +3,9 @@ import { XMLParser } from 'fast-xml-parser'
 import { fetchHtml } from './fetcher/http.js'
 import { fetchViaFlareSolverr } from './fetcher/flaresolverr.js'
 import { getSetting } from './db.js'
-import { getProvider } from './providers/llm/index.js'
+import { getProvider } from './ai/index.js'
 import { DEFAULT_MODELS } from '../shared/models.js'
-import type { LLMProvider } from './providers/llm/provider.js'
+import type { LLMProvider } from './ai/index.js'
 import { logger } from './logger.js'
 
 const log = logger.child('rss-bridge')

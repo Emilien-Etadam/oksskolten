@@ -16,7 +16,7 @@ const {
   mockGetSetting: vi.fn(),
 }))
 
-vi.mock('../../fetcher/ai-queue.js', () => ({
+vi.mock('../../ai/index.js', () => ({
   enqueueAutoTranslate: mockEnqueueAutoTranslate,
   enqueueAutoSummarize: mockEnqueueAutoSummarize,
   isAutoTranslateEnabled: mockIsAutoTranslateEnabled,
