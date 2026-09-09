@@ -1,8 +1,9 @@
 # Fork Additions
 
 This fork tracks [babarot/oksskolten](https://github.com/babarot/oksskolten) and keeps
-divergence minimal: additions live in new files, with only tiny insertion points in
-upstream files.
+divergence minimal: additions live in new files, and every upstream file the fork
+touches is listed, with what it needs from it, under [Upstream files
+touched](#upstream-files-touched) at the end.
 
 ## Le Monde theme (pure add-on)
 
@@ -582,72 +583,146 @@ can rewrite a feed's RSS URL, which is not a bulk operation.
 
 ## Upstream files touched
 
-| File | Change |
+Measured against the upstream commit this fork branched from
+(`bdb22ac`, babarot/oksskolten `main` of 2026-07-12, still upstream's head
+at the time of writing):
+
+| | |
 |---|---|
-| `src/app.tsx` | +2 lines (import + `<CategoryTabs />`) |
-| `src/components/article/article-detail.tsx` | +2 lines (import + `<ArticleSwipeNavigation />`) |
-| `src/components/layout/page-layout.tsx` | +2 lines (import + `<BottomNav />`), +`rightSlot={<RefreshButton />}` on the list header |
-| `src/components/layout/header.tsx` | +`rightSlot` prop, rendered in place of the list header's right spacer |
-| `src/lib/i18n.ts` | +1 key (`article.markAsRead`) |
+| New files | 115 (+13,680 lines) |
+| Upstream files modified | 96 (+4,664 / −596 lines) |
+| Upstream files deleted | 0 |
 
-| `src/components/article/article-card.tsx` | `onMarkRead` prop + button in the 5 card variants; list-card title wraps, larger thumbnail and fallback favicon |
-| `src/components/article/swipeable-article-card.tsx` | `onMarkRead` pass-through |
-| `src/components/article/article-list.tsx` | +1 line (`onMarkRead: markRead` in card props) |
-| `server/index.ts` | CSP script-src hashes for inline bootstrap scripts |
-| `tailwind.config.ts` + `src/index.css` | logo font swapped to local Palatino stack |
-| `server/lib/cleaner/selectors.ts` | `'next-'` partial pattern narrowed to the next/prev link spellings |
-| `server/lib/cleaner/index.ts` | `postClean()` rolls back a pass that empties the body |
-| `server/fetcher/rss.ts` | +2 lines (import + GitHub stars branch in the API-feed dispatch) |
-| `server/routes/feeds.ts` | +1 import, GitHub stars resolver branch before RSS discovery; same resolver check added to `/re-detect` |
-| `server/routes/feeds.test.ts` | +2 tests: `/re-detect` on a GitHub stars feed |
-| `server/routes/settings.ts` | +2 preference keys (`github.release_types`, `reading.auto_translate_scope`), `github` entry in `PROVIDER_KEY_MAP` |
-| `src/hooks/use-settings.ts` | `github.release_types` and `reading.auto_translate_scope` threaded through the settings hook |
-| `src/pages/settings/integration-tab.tsx` | +2 lines (import + `<GithubSection />`) |
-| `src/pages/settings/sections/reading-section.tsx` | Translation Scope radio group, shown when Auto-Translation is on |
-| `src/lib/i18n.ts` | +15 keys (`github.*`), +4 keys (`settings.autoTranslateScope*`) |
-| `src/pages/settings-page.tsx` | placeholder for the `viewer` tab swapped for a lazy `<FeedsTab />` |
-| `src/hooks/use-feed-bulk-actions.ts` | +`handleBulkEnable` (bulk re-enable of disabled feeds) |
-| `src/components/feed/feed-error-banner.tsx` | `classifyError` / `reDetectSSE` moved to `src/lib/feed-error.ts` and imported back |
-| `src/components/feed/feed-modal.tsx` | +`initialStep` prop (opens on a given step, hides the back arrow) |
-| `src/components/article/article-list.tsx` | per-day sections in the render loop, publishes `articleDates` to the nav context |
-| `src/lib/dateFormat.ts` | `formatRelativeDate` counts calendar days; +`calendarDaysAgo` |
-| `server/fetcher.ts` | +1 import, removed Reddit posts filtered out of the new-article tasks, article URL passed to similarity detection, hero-image fallback step at the end of `fetchArticleContent` |
-| `server/fetcher/markdown-utils.ts` | +`ensureLeadImage()` (og:image restored as the lead when extraction lost it) |
-| `server/fetcher/article-images.ts` | +`archiveFeedImages()` / `sweepAutoArchiveFeeds()` (per-feed auto-archive sweep) |
-| `server/db/feeds.ts` | `archive_images` in `updateFeed()`, +`getAutoArchiveFeeds()` |
-| `server/db/articles.ts` | +`getUnarchivedArticlesByFeed()` |
-| `server/routes/feeds.ts` | `archive_images` accepted by `PATCH /api/feeds/:id`, backlog sweep kicked when switched on |
-| `src/components/feed/feed-context-menu.tsx` | +Auto-archive images toggle item |
-| `src/components/feed/feed-list.tsx` | +2 props wiring the toggle to `PATCH /api/feeds/:id` |
-| `server/fetcher/content.ts` | +2 imports, Google News wrapper resolved at the top of `fetchFullText()`, embedded-content hop before the solver fallback |
-| `server/fetcher/http.ts` | browser-UA retry on 403/503, +`BROWSER_USER_AGENT` (moved from `reddit.ts`) |
-| `server/similarity.ts` | same-feed skip relaxed for cross-subreddit Reddit duplicates |
-| `src/contexts/keyboard-navigation-context.tsx` | +`articleDates` (sessionStorage-backed, like ids and URLs) |
-| `src/hooks/use-extend-article-list.ts` | carries `dates` through the extension payload |
-| `src/lib/i18n.ts` | +35 keys (`settings.feeds*`), `feedError.httpError` placeholder fixed |
-| `src/pages/chat-page.tsx` | +2 lines (import + `<ChatNewConversation>` wrapper around the list view) |
-| `src/hooks/use-chat.ts` | dead `abortRef` replaced by a stream-generation guard; `reset()` detaches an in-flight stream |
-| `src/hooks/use-chat.test.ts` | +1 test (reset detaches an in-flight stream) |
-| `src/components/article/article-raw-page.tsx` | appends the Reddit comment thread to the `.md` source view |
+The −596 is the whole of what the fork rewrites in upstream code. Everything else
+is additive, so an upstream merge should only ever conflict inside the files below.
 
-| `src/app.tsx` | routes `/recommended`, `/smart/:folderId`, `/stories`; header names and hint banners for them |
-| `src/components/article/article-list.tsx` | `isRecommended` / `smartFolderId` switch the SWR key; no day separators on those lists |
-| `src/components/feed/feed-list.tsx` | Top Stories and Recommended nav items, `<SmartFolderList />` section |
-| `src/components/ui/search-dialog.tsx` | "Save as smart folder" footer action |
-| `src/pages/settings/feeds-tab.tsx` | +`<RulesSection />` |
-| `src/pages/settings/general-tab.tsx` | +`<InterestsSection />` |
-| `src/pages/settings/sections/feed-management-section.tsx` | Trust column (sortable) |
-| `src/lib/demo/mock-api.ts` | empty responses for the intelligence endpoints |
-| `server/db/articles.ts` | `rule_boost` in the score, `sort: 'recommended'`, `addRuleBoost` / `setArticleQuality` / `setArticleInterestScore` |
-| `server/db/frontpage.ts` | rank `score + trust × 2 + quality`, hidden articles excluded |
-| `server/routes/articles.ts` | `sort=recommended` accepted |
-| `server/routes/index.ts` | +4 route modules |
-| `server/fetcher.ts` | quality, interest score and rules run after `insertArticle()`; quality refreshed on retry |
-| `server/index.ts` | trust + interest profile on the score cron |
-| `shared/types.ts` | `trust_score`, `interest_score`, `quality_score` |
-| `src/lib/i18n.ts` | +~70 keys (`smart.*`, `stories.*`, `recommended.*`, `rules.*`, `interests.*`, `settings.feedsColTrust`) |
+### Syncing with upstream
 
-`src/app.tsx` additionally has 2 lines adjusted and a small effect added (sidebar
-auto-open respects the persisted collapse state).
+```sh
+git remote add upstream https://github.com/babarot/oksskolten
+git fetch upstream main
+git merge upstream/main
+```
 
-Everything else is new files, so merges from upstream should stay conflict-free.
+A shallow clone (`--depth`) hides the shared history and makes the two branches look
+unrelated (`refusing to merge unrelated histories`); run `git fetch --unshallow`
+first. When a merge conflicts, this table says what the fork needs from each file.
+
+### Server
+
+| File | +/− | Fork change |
+|---|---|---|
+| `server/db/articles.ts` | +108/−27 | `rule_boost` in the score expression and the scored-articles filter; rows rejected by a feed's AI filter (`filtered_at`) excluded from lists; `sort: 'recommended'`; `title_translated`, `interest_score`, `quality_score`, `similar_ids` and `videos_archived_at` added to the selects; `getArticleByUrl()` tries the normalized, raw and percent-decoded forms; `updateArticleContent()` accepts `title`, `title_translated` and the AI-queue pending/filtered timestamps; the retry pass also picks up clips whose body is only shell chrome; +`addRuleBoost()`, `setArticleQuality()`, `setArticleInterestScore()`, `getUnarchivedArticlesByFeed()`, `markVideosArchived()`, `clearVideosArchived()` |
+| `server/db/feeds.ts` | +16/−1 | `ai_filter` and `archive_images` accepted by `updateFeed()`; +`getAutoArchiveFeeds()` |
+| `server/db/index.ts` | +5/−2 | re-exports for the functions above and for the new `trust.ts` / `stories.ts` modules |
+| `server/fetcher.ts` | +102/−12 | removed Reddit posts filtered out of the new-article tasks; Google News articles stored without a body queued for retry; article URL passed to similarity detection; hero-image fallback (`ensureLeadImage`) at the end of `fetchArticleContent()`; after `insertArticle()`: quality score, interest score, rules, AI filter and auto-translate/summarize enqueued; quality refreshed and translation re-enqueued on retry; pending AI work resumed at startup; per-feed image sweep after a fetch |
+| `server/fetcher/ai.ts` | +200/−15 | `detectLanguage()` rewritten on `franc-min` (any language; upstream only told ja from en); per-call provider override; a leading `<think>…</think>` block stripped from answers; +title translation task; +`evaluateArticleRelevance()` for the per-feed AI filter |
+| `server/fetcher/article-images.ts` | +71/−1 | +`archiveFeedImages()` / `sweepAutoArchiveFeeds()` (per-feed auto-archive sweep) |
+| `server/fetcher/content.ts` | +134/−18 | Google News wrapper resolved at the top of `fetchFullText()`; embedded-content hop (iframe / document viewer) before the solver fallback; +`isBotBlockPage()`; `cleanerConfig` threaded through the options; `ensureLeadImage` re-exported |
+| `server/fetcher/contentWorker.ts` | +29/−9 | Turndown rule turning a video-player `<iframe>` into a poster→watch-page link card; multi-line link collapsing moved to `shared/markdown-links.ts` |
+| `server/fetcher/flaresolverr.ts` | +27/−5 | solver budget configurable (`FLARESOLVERR_TIMEOUT_MS`, default unchanged at 60 s); HTTP, solver and network failures logged instead of swallowed |
+| `server/fetcher/http.ts` | +32/−0 | browser-UA retry on 403/503; +`BROWSER_USER_AGENT` (moved from `reddit.ts`) |
+| `server/fetcher/markdown-utils.ts` | +71/−0 | +`ensureLeadImage()` (og:image restored as the lead when extraction lost it) |
+| `server/fetcher/rss.ts` | +21/−0 | GitHub stars branch in the API-feed dispatch |
+| `server/index.ts` | +28/−2 | CSP `script-src` hashes computed from the inline scripts of `dist/index.html`; feed trust + interest profile recalculated on the score cron |
+| `server/lib/cleaner/index.ts` | +29/−2 | `postClean()` rolls back (and logs) a pass that empties the body |
+| `server/lib/cleaner/selectors.ts` | +10/−1 | `'next-'` partial pattern narrowed to the next/prev link spellings |
+| `server/providers/llm/vllm.ts` | +8/−2 | `chat_template_kwargs: { enable_thinking: false }` on both calls (Qwen3-style reasoning models) |
+| `server/routes/articles.ts` | +218/−10 | `sort=recommended`; an empty AI answer raised as a provider error instead of stored; `POST /from-url` answers within `CLIP_FETCH_BUDGET_MS` and finishes the fetch in the background (`content_pending`); title translated alongside the body; `videoArchivingEnabled` on the detail; +`archive-video` / `unarchive-video` endpoints |
+| `server/routes/feeds.ts` | +70/−20 | `ai_filter` and `archive_images` on `PATCH /api/feeds/:id`, backlog sweep kicked when auto-archive is switched on; GitHub stars and social-search resolvers before RSS discovery, on create and on `/re-detect` |
+| `server/routes/index.ts` | +12/−0 | +6 route modules registered (front page, comments, smart folders, rules, stories, interests) |
+| `server/routes/settings.ts` | +26/−1 | +preference keys `reading.auto_translate`, `reading.auto_translate_concurrency`, `reading.auto_translate_scope`, `reading.auto_summarize`, `github.release_types`, `videos.*`; `fr` and `zh` in the language check; `github` in `PROVIDER_KEY_MAP` |
+| `server/rss-bridge.ts` | +13/−1 | relative feed URL from RSS-Bridge resolved against the bridge instance |
+| `server/similarity.ts` | +35/−7 | same-feed skip relaxed for cross-subreddit Reddit duplicates; article URL taken into account |
+
+### Client
+
+| File | +/− | Fork change |
+|---|---|---|
+| `src/app.tsx` | +47/−9 | `<CategoryTabs />` mounted from `ArticleListPage`; routes `/recommended`, `/smart/:folderId`, `/stories` with their header names and hint banners; sidebar auto-open respects the persisted collapse state |
+| `src/components/article/article-card.tsx` | +82/−89 | `onMarkRead` prop + button in the 5 card variants; `groupCount` badge (crosspost groups); list card: title wraps, larger thumbnail moved to the row's right end, favicon fallback |
+| `src/components/article/article-detail.tsx` | +36/−6 | `<ArticleSwipeNavigation />` and `<ArticleComments />` mounted; translated title shown when one exists; Reddit image links rewritten at render; video cards; one refetch when the body is still empty; archive-video wiring |
+| `src/components/article/article-list.tsx` | +157/−55 | `onMarkRead` passed to cards; per-day sections in the render loop, `articleDates` published to the nav context; `isRecommended` / `smartFolderId` switch the SWR key (no day separators there); list kept current after a refresh |
+| `src/components/article/article-raw-page.tsx` | +31/−2 | Reddit comment thread appended to the `.md` source view |
+| `src/components/article/article-toolbar.tsx` | +22/−1 | archive-video chip (idle / archiving / archived) |
+| `src/components/article/article-zap-navigation.tsx` | +3/−0 | extends the list when navigation nears its end |
+| `src/components/article/swipeable-article-card.tsx` | +41/−3 | `onMarkRead` / `groupCount` pass-through; a right swipe marks the article read without opening it |
+| `src/components/feed/article-step.tsx` | +6/−1 | toast when a clip is saved before its content arrived |
+| `src/components/feed/feed-context-menu.tsx` | +22/−1 | +AI filter and Auto-archive images items |
+| `src/components/feed/feed-error-banner.tsx` | +2/−82 | `classifyError` / `reDetectSSE` moved to `src/lib/feed-error.ts` and imported back |
+| `src/components/feed/feed-list.tsx` | +32/−2 | context-menu props wired to `PATCH /api/feeds/:id`; Top Stories and Recommended nav items; `<SmartFolderList />` section |
+| `src/components/feed/feed-modal.tsx` | +12/−7 | +`initialStep` prop (opens on a given step, hides the back arrow) |
+| `src/components/layout/header.tsx` | +5/−2 | +`rightSlot` prop, rendered in place of the list header's right spacer |
+| `src/components/layout/page-layout.tsx` | +4/−1 | `<BottomNav />` mounted; `rightSlot={<RefreshButton />}` on the list header |
+| `src/components/ui/search-dialog.tsx` | +37/−3 | "Save as smart folder" footer action |
+| `src/contexts/keyboard-navigation-context.tsx` | +16/−0 | +`articleDates` (sessionStorage-backed, like ids and URLs) |
+| `src/hooks/use-article-actions.ts` | +16/−0 | +`handleArchiveVideo` |
+| `src/hooks/use-chat.ts` | +11/−6 | dead `abortRef` replaced by a stream-generation guard; `reset()` detaches an in-flight stream |
+| `src/hooks/use-feed-bulk-actions.ts` | +19/−1 | +`handleBulkEnable` (bulk re-enable of disabled feeds) |
+| `src/hooks/use-fetch-progress.ts` | +7/−3 | +`isArticleListKey()` (front page revalidated with the lists); `revalidate` exported |
+| `src/hooks/use-settings.ts` | +47/−2 | `reading.auto_translate`, `reading.auto_translate_concurrency`, `reading.auto_summarize`, `reading.auto_translate_scope`, `github.release_types` threaded through the hook |
+| `src/index.css` | +12/−1 | `typeface-tex-gyre-pagella` import dropped (local Palatino stack, see `tailwind.config.ts`); `.prose video` sizing |
+| `src/lib/dateFormat.ts` | +24/−6 | `formatRelativeDate` counts calendar days; +`calendarDaysAgo` |
+| `src/lib/demo/demo-store.ts` | +3/−0 | new article fields in the demo seed |
+| `src/lib/demo/mock-api.ts` | +7/−0 | empty responses for the intelligence endpoints |
+| `src/lib/i18n.ts` | +198/−3 | +151 keys (`article.*`, `github.*`, `settings.*`, `feeds.*`, `smart.*`, `stories.*`, `recommended.*`, `rules.*`, `interests.*`, `modal.*`); `feedError.httpError` placeholder fixed |
+| `src/lib/markdown.ts` | +75/−105 | `<picture>` rewrite without nested `[\s\S]*?` regexes (Firefox "too much recursion"); `walkLinks` / multi-line link collapsing moved to `shared/markdown-links.ts` |
+| `src/pages/chat-page.tsx` | +6/−3 | `<ChatNewConversation>` wrapper around the list view |
+| `src/pages/settings-page.tsx` | +5/−5 | placeholder for the `viewer` tab swapped for a lazy `<FeedsTab />` |
+| `src/pages/settings/data-tab.tsx` | +3/−0 | `<VideoArchiveSection />` |
+| `src/pages/settings/general-tab.tsx` | +3/−0 | `<InterestsSection />` |
+| `src/pages/settings/integration-tab.tsx` | +3/−0 | `<GithubSection />` |
+| `src/pages/settings/sections/provider-config-section.tsx` | +18/−5 | French in the language list; Ollama / vLLM model lists revalidated after a save or a successful connection test |
+| `src/pages/settings/sections/reading-section.tsx` | +47/−0 | Translation Scope radio group, shown when Auto-Translation is on |
+
+### Shared and configuration
+
+| File | +/− | Fork change |
+|---|---|---|
+| `shared/types.ts` | +17/−0 | `Feed.ai_filter` / `archive_images` / `trust_score`; `ArticleListItem.title_translated` / `interest_score` / `quality_score` / `similar_ids`; `ArticleDetail.videos_archived_at` / `videoArchivingEnabled` / `filtered_at` |
+| `package.json` | +4/−1 | +`franc-min`, +`@playwright/test`, `test:e2e` script |
+| `package-lock.json` | +114/−2 | lockfile for the above |
+| `vitest.config.ts` | +3/−1 | `shared/**/*.test.ts` run in the server project |
+| `tailwind.config.ts` | +3/−2 | logo font swapped to a local Palatino stack |
+| `.env.example` | +12/−0 | fork variables documented (solver timeout and concurrency, clip budget, `yt-dlp`, Reddit, Bluesky) |
+| `.gitignore` | +2/−0 | `.e2e-data/`, `test-results/` |
+
+### Tests
+
+One row per upstream test file, with the number of tests the fork adds to it.
+
+| File | Tests added |
+|---|---|
+| `server/db.test.ts` | 4 |
+| `server/db/articles.test.ts` | 1 |
+| `server/db/feeds.test.ts` | 2 |
+| `server/fetcher.test.ts` | 10 |
+| `server/fetcher/ai.test.ts` | 6 (language detection expectations updated for `franc`) |
+| `server/fetcher/article-images.test.ts` | 6 |
+| `server/fetcher/content.test.ts` | 4 |
+| `server/fetcher/flaresolverr.test.ts` | 3 |
+| `server/fetcher/http.test.ts` | 4 |
+| `server/lib/cleaner/post-clean-selectors.test.ts` | 7 |
+| `server/providers/llm/vllm.test.ts` | 1 |
+| `server/routes/articles.test.ts` | 2 |
+| `server/routes/clip-articles.test.ts` | 20 |
+| `server/routes/feeds.test.ts` | 5 |
+| `server/rss-bridge.test.ts` | 2 |
+| `server/similarity.test.ts` | 10 |
+| `src/components/article/article-detail.test.tsx` | 6 |
+| `src/components/article/article-list.test.tsx` | 4 |
+| `src/hooks/use-chat.test.ts` | 1 |
+| `src/lib/dateFormat.test.ts` | 3 |
+| `src/lib/markdown.test.ts` | 5 |
+
+### Documentation
+
+| File | Fork change |
+|---|---|
+| `README.md` | language switch, fork notice, "Fork additions" section, note that the published Docker image is upstream's |
+| `docs/spec/01_overview.md`, `10_schema.md`, `20_api.md`, `30_ingestion.md`, `50_frontend.md`, `80_feature_clip.md`, `81_feature_images.md`, `82_feature_chat.md`, `83_feature_similarity.md`, `84_feature_keyboard_navigation.md` | fork behaviour appended to the relevant sections (+326/−12 lines in total); new specs live in `82_feature_video_archive.md`, `86_feature_github_releases.md`, `87_feature_intelligence.md` |
+
+Fork-owned files that later features also touched (`server/db/frontpage.ts`,
+`src/hooks/use-extend-article-list.ts`, `src/pages/settings/feeds-tab.tsx`,
+`src/pages/settings/sections/feed-management-section.tsx`, …) are not listed here:
+they cannot conflict with upstream.
