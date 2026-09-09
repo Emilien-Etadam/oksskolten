@@ -38,7 +38,7 @@ describe('interests step', () => {
   })
 
   it('scores new articles and does not apply to retry', () => {
-    expect(interests.appliesTo).toEqual(['new'])
+    expect(interests.appliesTo).toEqual(['new', 'clip'])
 
     interests.run(ctx('new'))
     expect(mockScoreNewArticle).toHaveBeenCalledWith(7, 'Hello')

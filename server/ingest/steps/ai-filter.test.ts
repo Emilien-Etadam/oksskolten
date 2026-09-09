@@ -44,5 +44,6 @@ describe('ai-filter step', () => {
     expect(mockEnqueueAiFilter).toHaveBeenCalledWith(7, 3)
 
     expect(aiFilter.appliesTo?.includes('retry')).toBe(false)
+    expect(aiFilter.appliesTo?.includes('clip')).toBe(false)
   })
 })

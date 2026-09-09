@@ -3,7 +3,7 @@ import type { EnrichStep } from './types.js'
 
 export const interests: EnrichStep = {
   name: 'interests',
-  appliesTo: ['new'],
+  appliesTo: ['new', 'clip'],
   run(ctx) {
     scoreNewArticle(ctx.articleId, ctx.title)
   },

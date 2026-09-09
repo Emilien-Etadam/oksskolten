@@ -4,7 +4,7 @@ import type { EnrichStep } from './types.js'
 
 export const quality: EnrichStep = {
   name: 'quality',
-  appliesTo: ['new', 'retry'],
+  appliesTo: ['new', 'retry', 'clip'],
   run(ctx) {
     // A repaired body changes the quality verdict
     if (ctx.kind === 'retry' && !ctx.content.fullText) return

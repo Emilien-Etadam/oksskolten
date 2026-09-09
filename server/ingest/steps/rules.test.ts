@@ -38,7 +38,7 @@ describe('rules step', () => {
   })
 
   it('applies feed rules for new articles and does not apply to retry', () => {
-    expect(rules.appliesTo).toEqual(['new'])
+    expect(rules.appliesTo).toEqual(['new', 'clip'])
 
     rules.run(ctx('new'))
     expect(mockApplyRulesToArticle).toHaveBeenCalledWith(7, 3, {

@@ -39,7 +39,7 @@ describe('similarity step', () => {
   })
 
   it('detects similar articles for new items in the background and does not apply to retry', async () => {
-    expect(similarity.appliesTo).toEqual(['new'])
+    expect(similarity.appliesTo).toEqual(['new', 'clip'])
     expect(similarity.background).toBe(true)
 
     await similarity.run(ctx('new'))

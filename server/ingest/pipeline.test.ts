@@ -15,7 +15,8 @@ vi.mock('../logger.js', () => ({
   },
 }))
 
-import { enrichArticle } from './pipeline.js'
+import { clipContext, enrichArticle, processArticle } from './pipeline.js'
+import type { ClipArticle } from './tasks.js'
 
 function content(overrides: Partial<FetchedContent> = {}): FetchedContent {
   return {
@@ -66,6 +67,7 @@ describe('enrichArticle', () => {
     const steps: EnrichStep[] = [
       { name: 'new-only', appliesTo: ['new'], run: () => { order.push('new-only') } },
       { name: 'retry-only', appliesTo: ['retry'], run: () => { order.push('retry-only') } },
+      { name: 'clip-only', appliesTo: ['clip'], run: () => { order.push('clip-only') } },
       { name: 'all', run: () => { order.push('all') } },
     ]
 
@@ -75,6 +77,10 @@ describe('enrichArticle', () => {
     order.length = 0
     await enrichArticle(ctx({ kind: 'retry' }), steps)
     expect(order).toEqual(['retry-only', 'all'])
+
+    order.length = 0
+    await enrichArticle(ctx({ kind: 'clip' }), steps)
+    expect(order).toEqual(['clip-only', 'all'])
   })
 
   it('logs a throwing step and continues with the next one', async () => {
@@ -113,5 +119,55 @@ describe('enrichArticle', () => {
     await vi.waitFor(() => {
       expect(mockWarn).toHaveBeenCalledWith({ step: 'bg', articleId: 9 }, bgError)
     })
+  })
+})
+
+describe('clipContext', () => {
+  const task: ClipArticle = {
+    kind: 'clip',
+    feed_id: 8,
+    title: 'Clipped',
+    url: 'https://example.com/clip',
+    published_at: '2024-02-02T00:00:00Z',
+  }
+
+  it('uses the fetched content when present', () => {
+    const fetched = content({ fullText: 'hello', lang: 'fr', title: 'Page' })
+    expect(clipContext(12, task, fetched, 'fr')).toEqual({
+      articleId: 12,
+      kind: 'clip',
+      feedId: 8,
+      title: 'Clipped',
+      url: 'https://example.com/clip',
+      publishedAt: '2024-02-02T00:00:00Z',
+      content: fetched,
+      lang: 'fr',
+    })
+  })
+
+  it('builds an empty FetchedContent when the fetch failed', () => {
+    const built = clipContext(12, task, null, null)
+    expect(built.content).toEqual({
+      fullText: null,
+      ogImage: null,
+      excerpt: null,
+      lang: null,
+      lastError: null,
+      title: null,
+    })
+    expect(built.lang).toBeNull()
+  })
+})
+
+describe('processArticle', () => {
+  it('throws when given a clip task instead of inserting', async () => {
+    const task: ClipArticle = {
+      kind: 'clip',
+      feed_id: 1,
+      title: 'T',
+      url: 'https://example.com/c',
+      published_at: '2024-01-01T00:00:00Z',
+    }
+    await expect(processArticle(task)).rejects.toThrow(/does not handle clip/)
   })
 })

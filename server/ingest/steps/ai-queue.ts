@@ -5,7 +5,7 @@ import type { EnrichStep } from './types.js'
 
 export const aiQueue: EnrichStep = {
   name: 'ai-queue',
-  appliesTo: ['new', 'retry'],
+  appliesTo: ['new', 'retry', 'clip'],
   run(ctx) {
     if (ctx.content.fullText && isAutoSummarizeEnabled()) {
       enqueueAutoSummarize(ctx.articleId, ctx.content.fullText)

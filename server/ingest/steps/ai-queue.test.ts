@@ -68,7 +68,7 @@ describe('ai-queue step', () => {
   })
 
   it('enqueues summarize and translate for new and retry when enabled', () => {
-    expect(aiQueue.appliesTo).toEqual(['new', 'retry'])
+    expect(aiQueue.appliesTo).toEqual(['new', 'retry', 'clip'])
 
     aiQueue.run(ctx('new'))
     expect(mockEnqueueAutoSummarize).toHaveBeenCalledWith(7, 'body')

@@ -3,7 +3,7 @@ import type { EnrichStep } from './types.js'
 
 export const rules: EnrichStep = {
   name: 'rules',
-  appliesTo: ['new'],
+  appliesTo: ['new', 'clip'],
   run(ctx) {
     applyRulesToArticle(ctx.articleId, ctx.feedId, {
       title: ctx.title,

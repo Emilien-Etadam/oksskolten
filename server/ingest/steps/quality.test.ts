@@ -51,7 +51,7 @@ describe('quality step', () => {
   })
 
   it('always scores new articles and scores retry only when a body is present', () => {
-    expect(quality.appliesTo).toEqual(['new', 'retry'])
+    expect(quality.appliesTo).toEqual(['new', 'retry', 'clip'])
 
     quality.run(ctx('new', { content: content({ fullText: null }) }))
     expect(mockScoreArticleQuality).toHaveBeenCalledWith({

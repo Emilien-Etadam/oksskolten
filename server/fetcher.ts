@@ -23,7 +23,7 @@ export { type FetchProgressEvent, fetchProgress, getFeedState } from './fetcher/
 export { discoverRssUrl } from './fetcher/rss.js'
 export { detectLanguage, summarizeArticle, streamSummarizeArticle, translateArticle, streamTranslateArticle } from './fetcher/ai.js'
 export type { AiTextResult, AiBillingMode } from './fetcher/ai.js'
-export { fetchArticleContent, type FetchedContent } from './ingest/index.js'
+export { fetchArticleContent, type FetchedContent, enrichArticle, clipContext } from './ingest/index.js'
 
 // --- Single feed fetch ---
 

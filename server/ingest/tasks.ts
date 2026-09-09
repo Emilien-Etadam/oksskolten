@@ -16,5 +16,6 @@ export interface RetryArticle {
   article: Article
 }
 
-export type ArticleTask = NewArticle | RetryArticle
+export interface ClipArticle { kind: 'clip'; feed_id: number; title: string; url: string; published_at: string }
+export type ArticleTask = NewArticle | RetryArticle | ClipArticle
 export type TaskKind = ArticleTask['kind']
