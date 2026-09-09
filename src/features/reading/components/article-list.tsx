@@ -1,12 +1,14 @@
-import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef, useMemo, Fragment } from 'react'
+import { useState, useRef, useEffect, useImperativeHandle, forwardRef, useMemo, Fragment } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import useSWR from 'swr'
-import useSWRInfinite from 'swr/infinite'
 import { useSWRConfig } from 'swr'
 import { fetcher } from '@/lib/fetcher'
-import { markSeenOnServer } from '@/lib/markSeenWithQueue'
+import { useArticlePages } from '../hooks/use-article-pages'
+import { useReadOnScroll } from '../hooks/use-read-on-scroll'
+import { useLoadMoreSentinel } from '../hooks/use-load-more-sentinel'
+import { useKeyboardListSync } from '../hooks/use-keyboard-list-sync'
+import { useDayGroups } from '../hooks/use-day-groups'
 import { useI18n } from '@/i18n'
-import { trackRead } from '@/lib/readTracker'
 import { useIsTouchDevice } from '@/hooks/use-is-touch-device'
 import { useClipFeedId } from '@/hooks/use-clip-feed-id'
 import { useAppLayout } from '@/app'
@@ -21,24 +23,10 @@ import { useFetchProgressContext } from '@/contexts/fetch-progress-context'
 import { toast } from 'sonner'
 import { Mascot } from '@/components/ui/mascot'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useKeyboardNavigationContext } from '@/contexts/keyboard-navigation-context'
 import { useKeyboardNavigation } from '@/hooks/use-keyboard-navigation'
 import { apiPatch } from '@/lib/fetcher'
 import type { ArticleListItem, FeedWithCounts } from '../../../../shared/types'
 import type { LayoutName } from '@/data/layouts'
-
-interface ArticlesResponse {
-  articles: ArticleListItem[]
-  total: number
-  has_more: boolean
-  total_without_floor?: number
-  total_all?: number
-}
-
-const PAGE_SIZE = 20
-
-/** How often (ms) to flush the batch of read article IDs to the server */
-const BATCH_FLUSH_INTERVAL = 1500
 
 export interface ArticleListHandle {
   revalidate: () => void
@@ -84,69 +72,22 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const { t } = useI18n()
   const { progress, startFeedFetch } = useFetchProgressContext()
   const { mutate: globalMutate } = useSWRConfig()
-  const getKey = (pageIndex: number, previousPageData: ArticlesResponse | null) => {
-    if (previousPageData && !previousPageData.has_more) return null
-    const params = new URLSearchParams()
-    if (smartFolderId) {
-      params.set('limit', String(PAGE_SIZE))
-      params.set('offset', String(pageIndex * PAGE_SIZE))
-      return `/api/smart-folders/${smartFolderId}/articles?${params.toString()}`
-    }
-    if (isRecommended) params.set('sort', 'recommended')
-    if (feedId) params.set('feed_id', String(feedId))
-    if (categoryId) params.set('category_id', String(categoryId))
-    if (unreadOnly) params.set('unread', '1')
-    if (bookmarkedOnly) params.set('bookmarked', '1')
-    if (likedOnly) params.set('liked', '1')
-    if (readOnly) params.set('read', '1')
-    if (noFloor) params.set('no_floor', '1')
-    params.set('limit', String(PAGE_SIZE))
-    params.set('offset', String(pageIndex * PAGE_SIZE))
-    return `/api/articles?${params.toString()}`
-  }
-
-  const { data, error, size, setSize, isLoading, isValidating, mutate } = useSWRInfinite<ArticlesResponse>(
-    getKey,
-    fetcher,
-    {
-      revalidateFirstPage: isCollectionView,
-    },
-  )
+  const { articles, groupCounts, absorbedIdsRef, data, error, size, setSize, isLoading, isValidating, mutate } = useArticlePages({
+    smartFolderId,
+    isRecommended,
+    feedId,
+    categoryId,
+    unreadOnly,
+    bookmarkedOnly,
+    likedOnly,
+    readOnly,
+    noFloor,
+    isCollectionView,
+  })
 
   useImperativeHandle(ref, () => ({
     revalidate: () => mutate(),
   }), [mutate])
-
-  const allArticles = useMemo(() => data ? data.flatMap(page => page.articles) : [], [data])
-
-  // Group similar articles (e.g. the same story posted on several subreddits):
-  // the first loaded member of a similarity group is shown with a ×N badge and
-  // the later members are hidden; marking or opening the leader marks the
-  // whole group as read.
-  const { articles, groupCounts, absorbedIds } = useMemo(() => {
-    const position = new Map(allArticles.map((a, i) => [a.id, i]))
-    const hidden = new Set<number>()
-    const counts = new Map<number, number>()
-    const absorbed = new Map<number, number[]>()
-    for (const [index, article] of allArticles.entries()) {
-      if (hidden.has(article.id)) continue
-      const similarIds = (article.similar_ids ?? '').split(',').filter(Boolean).map(Number)
-      const later = similarIds.filter(id => (position.get(id) ?? -1) > index && !hidden.has(id))
-      if (later.length > 0) {
-        for (const id of later) hidden.add(id)
-        counts.set(article.id, later.length + 1)
-        absorbed.set(article.id, later)
-      }
-    }
-    return {
-      articles: hidden.size > 0 ? allArticles.filter(a => !hidden.has(a.id)) : allArticles,
-      groupCounts: counts,
-      absorbedIds: absorbed,
-    }
-  }, [allArticles])
-
-  const absorbedIdsRef = useRef(absorbedIds)
-  absorbedIdsRef.current = absorbedIds
   const hasMore = data ? data[data.length - 1]?.has_more ?? false : false
   const isEmpty = data?.[0]?.articles.length === 0
   const totalAll = data?.[0]?.total_all
@@ -158,40 +99,12 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   // ---------------------------------------------------------------------------
   // Keyboard navigation
   // ---------------------------------------------------------------------------
-  const { focusedItemId, setFocusedItemId, setArticleIds, setArticleUrls, setArticleDates, setLastListUrl } = useKeyboardNavigationContext()
+  const { focusedItemId, setFocusedItemId, articleIds, articleMap } = useKeyboardListSync(articles, location.pathname)
   const isKeyboardNavEnabled = keyboardNavigation === 'on' && !isGridLayout
 
   // /likes and /history are ordered by liked_at / read_at, so publication days
   // would not run in order there — no separators in those two lists.
   const showDaySeparators = !isLikes && !isHistory && !isRecommended && !smartFolderId
-
-  const articleIds = useMemo(() => articles.map(a => String(a.id)), [articles])
-  const articleUrls = useMemo(() => {
-    const map: Record<string, string> = {}
-    for (const a of articles) map[String(a.id)] = a.url
-    return map
-  }, [articles])
-  const articleDates = useMemo(() => {
-    const map: Record<string, string | null> = {}
-    for (const a of articles) map[String(a.id)] = a.published_at
-    return map
-  }, [articles])
-
-  useEffect(() => {
-    setArticleIds(articleIds)
-    setArticleUrls(articleUrls)
-    setArticleDates(articleDates)
-  }, [articleIds, articleUrls, articleDates, setArticleIds, setArticleUrls, setArticleDates])
-
-  useEffect(() => {
-    setLastListUrl(location.pathname)
-  }, [location.pathname, setLastListUrl])
-
-  const articleMap = useMemo(() => {
-    const map = new Map<string, ArticleListItem>()
-    for (const a of articles) map.set(String(a.id), a)
-    return map
-  }, [articles])
 
   const isOverlayMode = articleOpenMode === 'overlay'
   // Short debounce after overlay close to prevent Escape from immediately clearing focus
@@ -266,192 +179,24 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     keyBindings: keybindings,
   })
 
-  // ---------------------------------------------------------------------------
-  // Infinite scroll
-  // ---------------------------------------------------------------------------
-  const sentinelRef = useRef<HTMLDivElement>(null)
+  const { loadMoreRef, sentinelCallbackRef } = useLoadMoreSentinel({
+    hasMore,
+    isValidating,
+    size,
+    setSize,
+  })
 
-  // Keep loadMore in a stable ref so the IntersectionObserver callback
-  // always sees the latest values without needing to recreate the observer.
-  const loadMoreRef = useRef(() => {})
-  loadMoreRef.current = () => {
-    if (hasMore && !isValidating) {
-      void setSize(size + 1)
-    }
-  }
-
-  // Stable observer — created once via ref callback when sentinel mounts.
-  const sentinelObserverRef = useRef<IntersectionObserver | null>(null)
-  const sentinelCallbackRef = useCallback((node: HTMLDivElement | null) => {
-    // Cleanup previous
-    sentinelObserverRef.current?.disconnect()
-    sentinelObserverRef.current = null
-    sentinelRef.current = node
-
-    if (!node) return
-    const observer = new IntersectionObserver(
-      entries => { if (entries[0].isIntersecting) loadMoreRef.current() },
-      { rootMargin: '200px' },
-    )
-    observer.observe(node)
-    sentinelObserverRef.current = observer
-  }, [])
-
-  // Re-trigger loading when a fetch completes while sentinel is still visible.
-  // IntersectionObserver only fires on threshold crossings, so if the sentinel
-  // stays within the viewport after new articles render, no event fires and
-  // pagination stalls. This effect covers that gap.
-  useEffect(() => {
-    if (!isValidating && hasMore && sentinelRef.current) {
-      const rect = sentinelRef.current.getBoundingClientRect()
-      if (rect.top < window.innerHeight + 200) {
-        void setSize(prev => prev + 1)
-      }
-    }
-  }, [isValidating, hasMore, setSize])
-
-  // ---------------------------------------------------------------------------
-  // Auto-mark-as-read on scroll
-  //
-  // - IntersectionObserver fires when an article overlaps the header (48px)
-  // - UI updates instantly via React state (autoReadIds)
-  // - API calls are batched and flushed every ~1.5 s
-  // ---------------------------------------------------------------------------
-  const [autoReadIds, setAutoReadIds] = useState<Set<number>>(() => new Set())
-  const observerRef = useRef<IntersectionObserver | null>(null)
-  const batchQueue = useRef(new Set<number>())
-  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const flushBatch = useCallback(() => {
-    if (batchQueue.current.size === 0) return
-    const ids = [...batchQueue.current]
-    batchQueue.current.clear()
-    markSeenOnServer(ids)
-      .then(() => globalMutate(
-        (key: string) => typeof key === 'string' && key.startsWith('/api/feeds'),
-      ))
-      .catch(() => {})
-  }, [globalMutate])
-
-  const scheduleFlush = useCallback(() => {
-    if (flushTimerRef.current) return
-    flushTimerRef.current = setTimeout(() => {
-      flushTimerRef.current = null
-      flushBatch()
-    }, BATCH_FLUSH_INTERVAL)
-  }, [flushBatch])
-
-  // Mark an article as read: instant UI update + queue for server batch
-  const markRead = useCallback((articleId: number) => {
-    setAutoReadIds(prev => {
-      if (prev.has(articleId)) return prev
-      const next = new Set(prev)
-      next.add(articleId)
-      return next
-    })
-    trackRead(articleId)
-    batchQueue.current.add(articleId)
-    scheduleFlush()
-  }, [scheduleFlush])
-
-  // Mark an article and its absorbed similar articles as read together
-  const markReadWithGroup = useCallback((articleId: number) => {
-    markRead(articleId)
-    for (const id of absorbedIdsRef.current.get(articleId) ?? []) {
-      markRead(id)
-    }
-  }, [markRead])
-
-  // Stable ref so the observer callback always sees the latest markRead
-  const markReadRef = useRef(markReadWithGroup)
-  markReadRef.current = markReadWithGroup
-
-  const isAutoMarkEnabled = autoMarkRead === 'on'
   const isTouchDevice = useIsTouchDevice()
   const listRef = useRef<HTMLElement>(null)
 
-  // Create the IntersectionObserver once when auto-mark is enabled.
-  // The observer instance is kept stable — new article nodes from infinite
-  // scroll are added incrementally via a separate effect, avoiding the
-  // disconnect/recreate race that caused missed or phantom read events.
-  useEffect(() => {
-    observerRef.current?.disconnect()
-    observerRef.current = null
-    if (!isAutoMarkEnabled) return
-
-    // Measure actual header height in pixels — iOS Safari rejects rootMargin
-    // values containing calc() or env() that getComputedStyle may return.
-    const headerEl = document.querySelector('[data-header]') as HTMLElement | null
-    const headerH = headerEl ? `${headerEl.offsetHeight}px` : '48px'
-
-    const observer = new IntersectionObserver(
-      entries => {
-        for (const entry of entries) {
-          const el = entry.target as HTMLElement
-          const articleId = Number(el.dataset.articleId)
-          if (!articleId) continue
-          if (el.dataset.articleUnread !== '1') continue
-
-          const rootTop = entry.rootBounds?.top ?? 0
-          if (entry.boundingClientRect.top < rootTop) {
-            markReadRef.current(articleId)
-          }
-        }
-      },
-      {
-        rootMargin: `-${headerH} 0px 0px 0px`,
-        threshold: [0, 1],
-      },
-    )
-
-    observerRef.current = observer
-
-    // Observe all article nodes already in the DOM
-    if (listRef.current) {
-      const nodes = listRef.current.querySelectorAll<HTMLElement>('[data-article-id]')
-      nodes.forEach(node => observer.observe(node))
-    }
-
-    return () => observer.disconnect()
-  }, [isAutoMarkEnabled]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Incrementally observe new article nodes added by infinite scroll.
-  // Uses a MutationObserver to detect inserted DOM nodes so the
-  // IntersectionObserver instance stays stable (no disconnect/recreate).
-  useEffect(() => {
-    const list = listRef.current
-    const io = observerRef.current
-    if (!list || !io || !isAutoMarkEnabled) return
-
-    const mo = new MutationObserver(mutations => {
-      for (const m of mutations) {
-        for (const node of m.addedNodes) {
-          if (!(node instanceof HTMLElement)) continue
-          // The node itself might be an article wrapper
-          if (node.dataset.articleId) {
-            io.observe(node)
-          }
-          // Or it might contain article wrappers (e.g. fragment insert)
-          const children = node.querySelectorAll<HTMLElement>('[data-article-id]')
-          children.forEach(child => io.observe(child))
-        }
-      }
-    })
-
-    mo.observe(list, { childList: true, subtree: true })
-    return () => mo.disconnect()
-  }, [isAutoMarkEnabled])
-
-  // Flush remaining batch on unmount or feed/category change
-  useEffect(() => {
-    return () => {
-      if (flushTimerRef.current) {
-        clearTimeout(flushTimerRef.current)
-        flushTimerRef.current = null
-      }
-      flushBatch()
-    }
-  }, [feedId, categoryId, smartFolderId, flushBatch])
+  const { autoReadIds, setAutoReadIds, markRead, markReadWithGroup, isAutoMarkEnabled } = useReadOnScroll({
+    autoMarkRead,
+    listRef,
+    absorbedIdsRef,
+    feedId,
+    categoryId,
+    smartFolderId,
+  })
 
   // Reset autoReadIds, noFloor, showReadArticles, and keyboard focus when feed/category changes
   useEffect(() => {
@@ -459,7 +204,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     setNoFloor(false)
     setShowReadArticles(false)
     setFocusedItemId(null)
-  }, [feedId, categoryId, smartFolderId, setFocusedItemId])
+  }, [feedId, categoryId, smartFolderId, setFocusedItemId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function renderArticle(article: ArticleListItem, index: number) {
     const isAutoRead = autoReadIds.has(article.id)
@@ -511,19 +256,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     )
   }
 
-  // Grid layouts keep the flat list: sections would break the column flow, and
-  // a sticky header has nothing to unstick against there.
-  const dayGroups = useMemo(() => {
-    if (!showDaySeparators || isGridLayout) return null
-    const groups: { key: string; date: string | null; items: { article: ArticleListItem; index: number }[] }[] = []
-    articles.forEach((article, index) => {
-      const key = dayKeyOf(article.published_at)
-      const last = groups[groups.length - 1]
-      if (last && last.key === key) last.items.push({ article, index })
-      else groups.push({ key, date: article.published_at, items: [{ article, index }] })
-    })
-    return groups
-  }, [articles, showDaySeparators, isGridLayout])
+  const dayGroups = useDayGroups(articles, showDaySeparators, isGridLayout)
 
   return (
     <main ref={listRef} className="max-w-2xl mx-auto" role={!isGridLayout ? 'listbox' : undefined}>
