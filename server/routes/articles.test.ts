@@ -15,6 +15,7 @@ const { mockStreamSummarize, mockStreamTranslate } = vi.hoisted(() => ({
 
 vi.mock('../fetcher.js', async () => {
   const { EventEmitter } = await import('events')
+  const { enrichArticle, clipContext } = await import('../ingest/pipeline.js')
   return {
     fetchAllFeeds: vi.fn(),
     fetchSingleFeed: vi.fn(),
@@ -25,6 +26,8 @@ vi.mock('../fetcher.js', async () => {
     streamTranslateArticle: (...args: unknown[]) => mockStreamTranslate(...args),
     fetchProgress: new EventEmitter(),
     getFeedState: vi.fn(),
+    enrichArticle,
+    clipContext,
   }
 })
 

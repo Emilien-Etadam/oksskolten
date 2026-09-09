@@ -3,6 +3,7 @@ import { setupTestDb } from '../__tests__/helpers/testDb.js'
 import { buildApp } from '../__tests__/helpers/buildApp.js'
 import { parseByteRange } from './articles.js'
 import { createFeed, insertArticle, ensureClipFeed, getArticleById, markImagesArchived, markVideosArchived, markArticleSeen, upsertSetting, getDb } from '../db.js'
+import { createFeedRule } from '../db/feed-rules.js'
 import type { FastifyInstance } from 'fastify'
 import path from 'node:path'
 import os from 'node:os'
@@ -21,6 +22,7 @@ const { mockArchiveArticleImages, mockIsImageArchivingEnabled, mockDeleteArticle
 
 vi.mock('../fetcher.js', async () => {
   const { EventEmitter } = await import('events')
+  const { enrichArticle, clipContext } = await import('../ingest/pipeline.js')
   return {
     fetchAllFeeds: vi.fn(),
     fetchSingleFeed: vi.fn(),
@@ -32,8 +34,19 @@ vi.mock('../fetcher.js', async () => {
     fetchProgress: new EventEmitter(),
     getFeedState: vi.fn(),
     fetchArticleContent: (...args: unknown[]) => mockFetchArticleContent(...args),
+    enrichArticle,
+    clipContext,
   }
 })
+
+vi.mock('../fetcher/ai-queue.js', () => ({
+  enqueueAutoTranslate: vi.fn(),
+  enqueueAutoSummarize: vi.fn(),
+  enqueueAiFilter: vi.fn(),
+  isAutoTranslateEnabled: vi.fn(() => false),
+  isAutoSummarizeEnabled: vi.fn(() => false),
+  translateArticleTitle: vi.fn(),
+}))
 
 vi.mock('../anthropic.js', () => ({
   anthropic: { messages: { stream: vi.fn(), create: vi.fn() } },
@@ -78,6 +91,12 @@ function seedArticle(feedId: number, overrides: Partial<Parameters<typeof insert
     published_at: '2025-01-01T00:00:00Z',
     ...overrides,
   })
+}
+
+/** quality_score is written by enrichment and is not part of the article projection. */
+function qualityScoreOf(articleId: number): number | null {
+  const row = getDb().prepare('SELECT quality_score FROM articles WHERE id = ?').get(articleId) as { quality_score: number | null }
+  return row.quality_score
 }
 
 beforeEach(async () => {
@@ -296,6 +315,28 @@ describe('POST /api/articles/from-url', () => {
     expect(res.statusCode).toBe(500)
     expect(res.json().error).toMatch(/clip feed/i)
   })
+
+  it('enriches a clip that returns content within the budget', async () => {
+    ensureClipFeed()
+    createFeedRule({
+      feed_id: null,
+      field: 'title',
+      pattern: 'Fetched Title',
+      action: 'bookmark',
+    })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/articles/from-url',
+      headers: json,
+      payload: { url: 'https://blog.example.com/enriched' },
+    })
+
+    expect(res.statusCode).toBe(201)
+    const article = res.json().article
+    expect(qualityScoreOf(article.id)).toEqual(expect.any(Number))
+    expect(article.bookmarked_at).not.toBeNull()
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -352,6 +393,14 @@ describe('POST /api/articles/from-url when the page outlives the request', () =>
 
   it('fills the article in when the background fetch finishes', async () => {
     ensureClipFeed()
+    // Matches the title the page hands over, not the hostname placeholder the
+    // row was saved with: enrichment must run on the real title.
+    createFeedRule({
+      feed_id: null,
+      field: 'title',
+      pattern: 'The Real Title',
+      action: 'bookmark',
+    })
     const { finish } = deferredFetch()
 
     const res = await app.inject({
@@ -381,6 +430,10 @@ describe('POST /api/articles/from-url when the page outlives the request', () =>
     expect(lastErrorOf(articleId)).toBeNull()
     // One page fetch in total — the request and the background fill share it.
     expect(mockFetchArticleContent).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => {
+      expect(qualityScoreOf(articleId)).toEqual(expect.any(Number))
+    })
+    expect(getArticleById(articleId)?.bookmarked_at).not.toBeNull()
   })
 
   it('keeps a caller-supplied title when the background fetch finds another', async () => {

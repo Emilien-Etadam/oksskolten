@@ -16,6 +16,25 @@ Oksskolten **fetches HTML directly from the original URL for every article** and
 
 > Only Miniflux optionally has a Readability-based Crawler feature, but it requires manual per-feed activation. Oksskolten performs full-text retrieval by default for all articles.
 
+### Code layout
+
+The pipeline lives under `server/ingest/`. `server/fetcher.ts` is a façade that re-exports that public surface so existing import paths and `vi.mock('../fetcher.js')` stay stable.
+
+```
+server/ingest/
+  index.ts             public surface (re-exported by server/fetcher.ts)
+  run.ts               fetchSingleFeed / fetchAllFeeds
+  tasks.ts             ArticleTask = NewArticle | RetryArticle | ClipArticle
+  feed-loop.ts         collectFeedTasks(feed, opts): RSS -> new-article tasks
+  fetch-content.ts     fetchArticleContent
+  pipeline.ts          processArticle(task) + enrichArticle(ctx)
+  steps/index.ts       ordered list of EnrichStep
+  steps/types.ts       ArticleContext, EnrichStep
+  steps/*.ts           quality, interests, rules, ai-queue, ai-filter, similarity
+```
+
+An `EnrichStep` has `name`, optional `appliesTo` (task kinds), optional `background`, and `run(ctx)`. New enrichment goes in `server/ingest/steps/` plus one line in `steps/index.ts`.
+
 ### Cron Processing Flow
 
 Cron runs at 5-minute intervals (`*/5 * * * *`) and processes only feeds whose `next_check_at` has passed.

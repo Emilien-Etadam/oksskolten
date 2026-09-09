@@ -43,7 +43,7 @@ import type { MeiliArticleDoc } from '../search/client.js'
 import { buildMeiliFilter, meiliSearch } from '../search/client.js'
 import { isSearchReady, syncArticleToSearch } from '../search/sync.js'
 import { requireJson } from '../auth.js'
-import { summarizeArticle, translateArticle, streamSummarizeArticle, streamTranslateArticle, fetchArticleContent } from '../fetcher.js'
+import { summarizeArticle, translateArticle, streamSummarizeArticle, streamTranslateArticle, fetchArticleContent, enrichArticle, clipContext } from '../fetcher.js'
 import type { AiTextResult } from '../fetcher.js'
 import { archiveArticleImages, isImageArchivingEnabled, deleteArticleImages } from '../fetcher/article-images.js'
 import { archiveArticleVideos, isVideoArchivingEnabled, deleteArticleVideos, findArchivableVideos } from '../fetcher/article-videos.js'
@@ -397,27 +397,31 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
         // let the same in-flight fetch fill the body in when it finishes —
         // no work is thrown away and nothing is fetched twice. last_error is
         // set so the retry pass picks the row up if the server dies first.
+        const title = body.title || new URL(body.url).hostname
+        const published_at = new Date().toISOString()
         const articleId = insertArticle({
           feed_id: clipFeed.id,
-          title: body.title || new URL(body.url).hostname,
+          title,
           url: body.url,
-          published_at: new Date().toISOString(),
+          published_at,
           lang: null,
           full_text: null,
           excerpt: null,
           og_image: null,
           last_error: 'content fetch still running when the clip was saved',
         })
+        const task = { kind: 'clip' as const, feed_id: clipFeed.id, title, url: body.url, published_at }
         clipLog.info({ url: body.url, articleId }, 'clip saved before its content arrived; filling in the background')
-        void settled.then(({ content, error }) => {
+        void settled.then(async ({ content, error }) => {
           if (!content) {
             updateArticleContent(articleId, { last_error: error })
             return
           }
+          // The placeholder title was the hostname: take the real one once
+          // the page hands it over, unless the caller supplied their own.
+          const effectiveTitle = !body.title && content.title ? content.title : title
           updateArticleContent(articleId, {
-            // The placeholder title was the hostname: take the real one once
-            // the page hands it over, unless the caller supplied their own.
-            title: !body.title && content.title ? content.title : undefined,
+            title: effectiveTitle !== title ? effectiveTitle : undefined,
             lang: content.lang,
             full_text: content.fullText,
             excerpt: content.excerpt,
@@ -425,6 +429,10 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
             last_error: content.lastError,
           })
           clipLog.info({ url: body.url, articleId, chars: content.fullText?.length ?? 0 }, 'background clip fetch finished')
+          // Enrich on the title the row now carries: rules, interests and
+          // similarity all read it, and the hostname placeholder would match
+          // nothing the reader wrote a rule for.
+          await enrichArticle(clipContext(articleId, { ...task, title: effectiveTitle }, content, content.lang))
         })
         reply.status(201).send({ article: getArticleById(articleId), created: true, content_pending: true })
         return
@@ -432,17 +440,21 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
 
       const { content, error } = early
       const title = body.title || content?.title || new URL(body.url).hostname
+      const published_at = new Date().toISOString()
       const articleId = insertArticle({
         feed_id: clipFeed.id,
         title,
         url: body.url,
-        published_at: new Date().toISOString(),
+        published_at,
         lang: content?.lang ?? null,
         full_text: content?.fullText ?? null,
         excerpt: content?.excerpt ?? null,
         og_image: content?.ogImage ?? null,
         last_error: content ? content.lastError : error,
       })
+
+      const task = { kind: 'clip' as const, feed_id: clipFeed.id, title, url: body.url, published_at }
+      await enrichArticle(clipContext(articleId, task, content, content?.lang ?? null))
 
       const article = getArticleById(articleId)
       reply.status(201).send({ article, created: true })

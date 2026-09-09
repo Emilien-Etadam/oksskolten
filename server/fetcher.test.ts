@@ -646,6 +646,27 @@ describe('fetchSingleFeed', () => {
     const count = getDb().prepare('SELECT COUNT(*) AS cnt FROM articles WHERE feed_id = ?').get(feed.id) as { cnt: number }
     expect(count.cnt).toBe(35)
   })
+
+  it('does not insert a removed Reddit post', async () => {
+    const feed = seedFeed()
+    const removedUrl = 'https://www.reddit.com/r/LocalLLaMA/comments/abc123/some_post/'
+    const rssXml = rss20Xml('Reddit', [
+      { title: '[ Removed by Reddit ]', link: removedUrl },
+      { title: 'Kept Article', link: 'https://example.com/kept' },
+    ])
+    const html = articleHtml()
+
+    mockFetch.mockImplementation((url: string | URL) => {
+      const u = url.toString()
+      if (u === feed.rss_url) return Promise.resolve(mockResponse(rssXml, { headers: { 'content-type': 'application/rss+xml' } }))
+      return Promise.resolve(mockResponse(html))
+    })
+
+    await fetchSingleFeed(feed)
+
+    expect(getArticleByUrl(removedUrl)).toBeUndefined()
+    expect(getArticleByUrl('https://example.com/kept')).toBeDefined()
+  })
 })
 
 // ==========================================================================
@@ -1168,6 +1189,27 @@ describe('fetchAllFeeds', () => {
 
     const updatedFeed = getFeedById(feed.id)
     expect(updatedFeed!.last_error).toBe('string error')
+  })
+
+  it('does not insert a removed Reddit post', async () => {
+    const feed = seedFeed()
+    const removedUrl = 'https://www.reddit.com/r/LocalLLaMA/comments/abc123/some_post/'
+    const rssXml = rss20Xml('Reddit', [
+      { title: '[ Removed by Reddit ]', link: removedUrl },
+      { title: 'Kept Article', link: 'https://example.com/kept' },
+    ])
+    const html = articleHtml()
+
+    mockFetch.mockImplementation((url: string | URL) => {
+      const u = url.toString()
+      if (u === feed.rss_url) return Promise.resolve(mockResponse(rssXml, { headers: { 'content-type': 'application/rss+xml' } }))
+      return Promise.resolve(mockResponse(html))
+    })
+
+    await fetchAllFeeds()
+
+    expect(getArticleByUrl(removedUrl)).toBeUndefined()
+    expect(getArticleByUrl('https://example.com/kept')).toBeDefined()
   })
 })
 
