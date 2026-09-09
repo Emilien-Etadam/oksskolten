@@ -1,22 +1,12 @@
 import {
   getEnabledFeeds,
-  countStaleArticlesByFeed,
-  getArticlesNeedingRefresh,
-  getExistingArticleUrls,
   getRetryArticles,
   getRetryStats,
   getSetting,
   insertArticle,
   setArticleQuality,
-  markArticleRefreshAttempted,
-  normalizeUrl,
   updateArticleContent,
-  updateFeedError,
-  updateFeedRateLimit,
-  updateFeedCacheHeaders,
-  updateFeedSchedule,
   type Feed,
-  type Article,
 } from './db.js'
 
 import { Semaphore, CONCURRENCY, errorMessage } from './fetcher/util.js'
@@ -26,15 +16,14 @@ import { scoreArticleQuality } from './quality.js'
 import { scoreNewArticle } from './interests.js'
 import { type FetchProgressEvent, emitProgress, markFeedDone } from './fetcher/progress.js'
 import { fetchFullText, isBotBlockPage, convertHtmlToMarkdown, markdownToExcerpt, ensureLeadImage, MIN_EXTRACTED_LENGTH } from './fetcher/content.js'
-import { type FetchRssResult, type RssItem, fetchAndParseRss, RateLimitError } from './fetcher/rss.js'
 import { isGoogleNewsUrl } from './fetcher/google-news.js'
-import { computeInterval, computeEmpiricalInterval, sqliteFuture, DEFAULT_INTERVAL } from './fetcher/schedule.js'
 import { DEFAULT_LANGUAGE } from '../shared/lang.js'
 import { detectLanguage } from './fetcher/ai.js'
-import { isRemovedRedditPost } from './fetcher/reddit.js'
 import { enqueueAutoTranslate, enqueueAutoSummarize, enqueueAiFilter, isAutoTranslateEnabled, isAutoSummarizeEnabled, resumePendingAiTasks } from './fetcher/ai-queue.js'
 import { sweepAutoArchiveFeeds } from './fetcher/article-images.js'
 import { logger } from './logger.js'
+import { collectFeedTasks } from './ingest/feed-loop.js'
+import type { ArticleTask } from './ingest/tasks.js'
 
 const log = logger.child('fetcher')
 
@@ -44,87 +33,6 @@ export { type FetchProgressEvent, fetchProgress, getFeedState } from './fetcher/
 export { discoverRssUrl } from './fetcher/rss.js'
 export { detectLanguage, summarizeArticle, streamSummarizeArticle, translateArticle, streamTranslateArticle } from './fetcher/ai.js'
 export type { AiTextResult, AiBillingMode } from './fetcher/ai.js'
-
-/**
- * Replace garbage-extracted articles with the RSS excerpt when one is now
- * available. Some sites (thin SPAs like essay.ink) return so little body
- * HTML that Readability falls back to the OG title alone, leaving stored
- * `full_text` as just a handful of characters. The new-article path
- * already handles this via the `listingExcerpt` fallback in
- * `fetchArticleContent`, but articles saved before that fallback existed,
- * or saved when the RSS excerpt was temporarily missing, stay broken
- * indefinitely because the retry queue only picks up rows with
- * `last_error` set.
- *
- * Piggyback on every regular RSS fetch: for items still in the current
- * feed whose stored body is shorter than `MIN_EXTRACTED_LENGTH`, swap in
- * the markdown-converted RSS excerpt when it's larger than what's stored.
- */
-const GOOGLE_NEWS_LINK_ONLY_ERROR = 'Stored body was the Google News link, not the article'
-
-function refreshStaleArticles(feedId: number, rssItems: RssItem[]): void {
-  const refreshCandidates = getArticlesNeedingRefresh(feedId, MIN_EXTRACTED_LENGTH)
-  if (refreshCandidates.length === 0) return
-  // Match RSS items against candidate articles using the same URL
-  // normalization the rest of the DB layer uses. Without this, a RSS item
-  // with a raw Unicode path won't line up with a stored article whose URL
-  // is percent-encoded (or vice versa) and the article would incorrectly
-  // be treated as rolled off the feed.
-  const itemsByUrl = new Map(rssItems.map(i => [normalizeUrl(i.url), i]))
-  const now = new Date().toISOString()
-  for (const candidate of refreshCandidates) {
-    const currentLen = (candidate.full_text ?? '').replace(/\s+/g, ' ').trim().length
-
-    // A Google News description is only a link back to the wrapper, never a
-    // body. Articles stored before that was taken into account hold exactly
-    // that link as their text, with no error to put them in the retry queue.
-    // Drop the fake body and set the error so the retry pass fetches the
-    // publisher's page for real.
-    if (isGoogleNewsUrl(candidate.url)) {
-      if (candidate.full_text !== null) {
-        updateArticleContent(candidate.id, {
-          full_text: null,
-          excerpt: null,
-          summary: null,
-          full_text_translated: null,
-          translated_lang: null,
-          last_error: GOOGLE_NEWS_LINK_ONLY_ERROR,
-          last_refresh_attempt_at: now,
-        })
-        log.info({ url: candidate.url, prevLen: currentLen }, 'queued Google News article stored without a body for retry')
-      } else {
-        markArticleRefreshAttempted(candidate.id, now)
-      }
-      continue
-    }
-
-    const rssItem = itemsByUrl.get(normalizeUrl(candidate.url))
-    const md = rssItem?.excerpt ? convertHtmlToMarkdown(rssItem.excerpt) : ''
-    const mdLen = md.replace(/\s+/g, ' ').trim().length
-
-    if (md && mdLen > currentLen) {
-      updateArticleContent(candidate.id, {
-        full_text: md,
-        excerpt: markdownToExcerpt(md),
-        // The old full_text was garbage, so any derived summary or
-        // translation produced from it is also garbage. Clear them so
-        // the UI / chat tools regenerate on next access.
-        summary: null,
-        full_text_translated: null,
-        translated_lang: null,
-        last_refresh_attempt_at: now,
-      })
-      log.info({ url: candidate.url, prevLen: currentLen, newLen: mdLen }, 'refreshed stale article with RSS excerpt')
-    } else {
-      // Couldn't improve this one (no RSS excerpt, or excerpt no longer in
-      // the current feed). Record the attempt so the backoff window kicks
-      // in and we don't keep bypassing the RSS HTTP cache for this feed
-      // indefinitely. Use the lightweight helper so we don't trigger a
-      // Meilisearch resync for a no-op update.
-      markArticleRefreshAttempted(candidate.id, now)
-    }
-  }
-}
 
 // --- Article content fetching (shared by feed pipeline & clip) ---
 
@@ -226,24 +134,6 @@ export async function fetchArticleContent(
 
 // --- Article processing ---
 
-interface NewArticle {
-  kind: 'new'
-  feed_id: number
-  title: string
-  url: string
-  published_at: string | null
-  requires_js_challenge?: boolean
-  /** Excerpt from listing page (CSS Bridge content_selector), used as fullText fallback */
-  excerpt?: string
-}
-
-interface RetryArticle {
-  kind: 'retry'
-  article: Article
-}
-
-type ArticleTask = NewArticle | RetryArticle
-
 function maybeEnqueueAutoTranslate(
   articleId: number,
   fullText: string | null,
@@ -326,65 +216,14 @@ export async function fetchSingleFeed(
 ): Promise<void> {
   const semaphore = new Semaphore(CONCURRENCY)
 
-  let rssResult: FetchRssResult
-  try {
-    // Bypass HTTP cache if this feed still has stale garbage-extracted
-    // articles. RSS XML is often unchanged for old items, so a 304 / cache
-    // hit would skip the refresh path and the broken articles would never
-    // get a chance to be repaired.
-    const skipCache = opts?.skipCache || countStaleArticlesByFeed(feed.id, MIN_EXTRACTED_LENGTH) > 0
-    rssResult = await fetchAndParseRss(feed, { ...opts, skipCache })
-    updateFeedError(feed.id, null)
-    updateFeedCacheHeaders(feed.id, rssResult.etag, rssResult.lastModified, rssResult.contentHash)
-  } catch (err) {
-    if (err instanceof RateLimitError) {
-      log.warn(`Feed ${feed.name}: ${err.message}`)
-      updateFeedRateLimit(feed.id, err.retryAfterSeconds)
+  const collected = await collectFeedTasks(feed, opts)
+  switch (collected.status) {
+    case 'rate-limited':
+    case 'error':
+    case 'not-modified':
       return
-    }
-    const msg = errorMessage(err)
-    log.error(`Feed ${feed.name}: ${msg}`)
-    updateFeedError(feed.id, msg)
-    return
   }
-
-  if (rssResult.notModified) {
-    // Reschedule using stored interval (or default)
-    const interval = feed.check_interval ?? DEFAULT_INTERVAL
-    updateFeedSchedule(feed.id, sqliteFuture(interval), interval)
-    log.info(`Feed ${feed.name}: not modified (304)`)
-    return
-  }
-
-  // Compute and store adaptive interval
-  {
-    const empirical = computeEmpiricalInterval(rssResult.items)
-    const interval = computeInterval(rssResult.httpCacheSeconds, rssResult.rssTtlSeconds, empirical)
-    updateFeedSchedule(feed.id, sqliteFuture(interval), interval)
-  }
-
-  const urls = rssResult.items.map(i => i.url)
-  const existing = getExistingArticleUrls(urls)
-  refreshStaleArticles(feed.id, rssResult.items)
-
-  const removedRedditPosts = rssResult.items.filter(item => isRemovedRedditPost(item.url, item.title))
-  if (removedRedditPosts.length > 0) {
-    log.info(`Feed ${feed.name}: skipping ${removedRedditPosts.length} removed Reddit post(s)`)
-  }
-
-  const tasks: ArticleTask[] = rssResult.items
-    // Reddit keeps removed posts in the feed with a placeholder title and a
-    // removal notice for a body — nothing worth storing or reading.
-    .filter(item => !existing.has(item.url) && !isRemovedRedditPost(item.url, item.title))
-    .map(item => ({
-      kind: 'new' as const,
-      feed_id: feed.id,
-      title: item.title,
-      url: item.url,
-      published_at: item.published_at,
-      requires_js_challenge: !!feed.requires_js_challenge,
-      excerpt: item.excerpt,
-    }))
+  const tasks = collected.tasks
 
   if (tasks.length === 0) {
     log.info(`Feed ${feed.name}: no new articles`)
@@ -452,54 +291,18 @@ export async function fetchAllFeeds(
   await Promise.all(
     feeds.map(feed =>
       semaphore.run(async () => {
-        try {
-          const skipCache = countStaleArticlesByFeed(feed.id, MIN_EXTRACTED_LENGTH) > 0
-          const rssResult = await fetchAndParseRss(feed, { skipCache })
-          updateFeedError(feed.id, null)
-          updateFeedCacheHeaders(feed.id, rssResult.etag, rssResult.lastModified, rssResult.contentHash)
-
-          if (rssResult.notModified) {
-            const interval = feed.check_interval ?? DEFAULT_INTERVAL
-            updateFeedSchedule(feed.id, sqliteFuture(interval), interval)
-            log.info(`Feed ${feed.name}: not modified (304)`)
+        const collected = await collectFeedTasks(feed)
+        switch (collected.status) {
+          case 'not-modified':
             feedNewCounts.set(feed.id, 0)
             return
-          }
-
-          // Compute and store adaptive interval
-          {
-            const empirical = computeEmpiricalInterval(rssResult.items)
-            const interval = computeInterval(rssResult.httpCacheSeconds, rssResult.rssTtlSeconds, empirical)
-            updateFeedSchedule(feed.id, sqliteFuture(interval), interval)
-          }
-
-          const urls = rssResult.items.map(i => i.url)
-          const existing = getExistingArticleUrls(urls)
-          refreshStaleArticles(feed.id, rssResult.items)
-
-          const newItems: ArticleTask[] = rssResult.items
-            .filter(item => !existing.has(item.url))
-            .map(item => ({
-              kind: 'new' as const,
-              feed_id: feed.id,
-              title: item.title,
-              url: item.url,
-              published_at: item.published_at,
-              requires_js_challenge: !!feed.requires_js_challenge,
-              excerpt: item.excerpt,
-            }))
-
-          allTasks.push(...newItems)
-          feedNewCounts.set(feed.id, newItems.length)
-        } catch (err) {
-          if (err instanceof RateLimitError) {
-            log.warn(`Feed ${feed.name}: ${err.message}`)
-            updateFeedRateLimit(feed.id, err.retryAfterSeconds)
+          case 'ok':
+            allTasks.push(...collected.tasks)
+            feedNewCounts.set(feed.id, collected.tasks.length)
             return
-          }
-          const msg = errorMessage(err)
-          log.error(`Feed ${feed.name}: ${msg}`)
-          updateFeedError(feed.id, msg)
+          case 'rate-limited':
+          case 'error':
+            return
         }
       }),
     ),
