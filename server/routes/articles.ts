@@ -417,10 +417,11 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
             updateArticleContent(articleId, { last_error: error })
             return
           }
+          // The placeholder title was the hostname: take the real one once
+          // the page hands it over, unless the caller supplied their own.
+          const effectiveTitle = !body.title && content.title ? content.title : title
           updateArticleContent(articleId, {
-            // The placeholder title was the hostname: take the real one once
-            // the page hands it over, unless the caller supplied their own.
-            title: !body.title && content.title ? content.title : undefined,
+            title: effectiveTitle !== title ? effectiveTitle : undefined,
             lang: content.lang,
             full_text: content.fullText,
             excerpt: content.excerpt,
@@ -428,7 +429,10 @@ export async function articleRoutes(api: FastifyInstance): Promise<void> {
             last_error: content.lastError,
           })
           clipLog.info({ url: body.url, articleId, chars: content.fullText?.length ?? 0 }, 'background clip fetch finished')
-          await enrichArticle(clipContext(articleId, task, content, content.lang))
+          // Enrich on the title the row now carries: rules, interests and
+          // similarity all read it, and the hostname placeholder would match
+          // nothing the reader wrote a rule for.
+          await enrichArticle(clipContext(articleId, { ...task, title: effectiveTitle }, content, content.lang))
         })
         reply.status(201).send({ article: getArticleById(articleId), created: true, content_pending: true })
         return

@@ -393,6 +393,14 @@ describe('POST /api/articles/from-url when the page outlives the request', () =>
 
   it('fills the article in when the background fetch finishes', async () => {
     ensureClipFeed()
+    // Matches the title the page hands over, not the hostname placeholder the
+    // row was saved with: enrichment must run on the real title.
+    createFeedRule({
+      feed_id: null,
+      field: 'title',
+      pattern: 'The Real Title',
+      action: 'bookmark',
+    })
     const { finish } = deferredFetch()
 
     const res = await app.inject({
@@ -425,6 +433,7 @@ describe('POST /api/articles/from-url when the page outlives the request', () =>
     await vi.waitFor(() => {
       expect(qualityScoreOf(articleId)).toEqual(expect.any(Number))
     })
+    expect(getArticleById(articleId)?.bookmarked_at).not.toBeNull()
   })
 
   it('keeps a caller-supplied title when the background fetch finds another', async () => {
