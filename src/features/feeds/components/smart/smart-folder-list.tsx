@@ -2,16 +2,16 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import useSWR from 'swr'
 import { FolderSearch, Plus, Pencil, Trash2 } from 'lucide-react'
-import { fetcher, apiPost, apiPatch, apiDelete } from '../../lib/fetcher'
+import { fetcher, apiPost, apiPatch, apiDelete } from '@/lib/fetcher'
 import { useI18n } from '@/i18n'
 import { SmartFolderDialog, type SmartFolderDraft } from './smart-folder-dialog'
-import { ConfirmDialog } from '../ui/confirm-dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import {
   ContextMenu,
   ContextMenuTrigger,
   ContextMenuContent,
   ContextMenuItem,
-} from '../ui/context-menu'
+} from '@/components/ui/context-menu'
 
 export interface SmartFolder {
   id: number

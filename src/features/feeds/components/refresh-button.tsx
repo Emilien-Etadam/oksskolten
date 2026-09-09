@@ -3,12 +3,12 @@ import { useLocation } from 'react-router-dom'
 import useSWR from 'swr'
 import { toast } from 'sonner'
 import { Loader2, RefreshCw } from 'lucide-react'
-import { fetcher } from '../../lib/fetcher'
-import { fetchAllFeeds } from '../../lib/feed-refresh'
+import { fetcher } from '@/lib/fetcher'
+import { fetchAllFeeds } from '@/lib/feed-refresh'
 import { useI18n } from '@/i18n'
-import { useFetchProgressContext } from '../../contexts/fetch-progress-context'
-import { IconButton } from '../ui/icon-button'
-import type { FeedWithCounts } from '../../../shared/types'
+import { useFetchProgressContext } from '@/contexts/fetch-progress-context'
+import { IconButton } from '@/components/ui/icon-button'
+import type { FeedWithCounts } from '../../../../shared/types'
 
 /**
  * Fetch the feeds behind the list currently on screen. Until now the only way

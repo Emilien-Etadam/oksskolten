@@ -6,16 +6,16 @@ import { RefreshButton } from './refresh-button'
 
 // --- Mocks ---
 
-vi.mock('../../lib/fetcher', () => ({ fetcher: vi.fn() }))
+vi.mock('@/lib/fetcher', () => ({ fetcher: vi.fn() }))
 
 const mockFetchAllFeeds = vi.fn()
-vi.mock('../../lib/feed-refresh', () => ({
+vi.mock('@/lib/feed-refresh', () => ({
   fetchAllFeeds: (...args: unknown[]) => mockFetchAllFeeds(...args),
 }))
 
 const mockStartFeedFetch = vi.fn()
 const mockRevalidate = vi.fn()
-vi.mock('../../contexts/fetch-progress-context', () => ({
+vi.mock('@/contexts/fetch-progress-context', () => ({
   useFetchProgressContext: () => ({ startFeedFetch: mockStartFeedFetch, revalidate: mockRevalidate }),
 }))
 

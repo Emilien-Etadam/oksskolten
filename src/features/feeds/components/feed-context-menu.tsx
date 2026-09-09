@@ -10,7 +10,7 @@ import {
   ContextMenuSubTrigger,
   ContextMenuSubContent,
   ContextMenuSeparator,
-} from '../ui/context-menu'
+} from '@/components/ui/context-menu'
 
 interface FeedMenuProps {
   children: ReactNode

@@ -15,7 +15,7 @@ vi.mock('swr', () => ({
   },
 }))
 
-vi.mock('../../lib/fetcher', () => ({
+vi.mock('@/lib/fetcher', () => ({
   fetcher: vi.fn(),
 }))
 

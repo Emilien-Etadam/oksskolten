@@ -6,7 +6,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Dialog, DialogPortal, DialogOverlay, DialogTitle } from './dialog'
 import { fetcher } from '../../lib/fetcher'
 import { searchArticles } from '../../lib/search'
-import { SmartFolderDialog } from '../smart/smart-folder-dialog'
+import { SmartFolderDialog } from '@/features/feeds'
 import { apiPost } from '../../lib/fetcher'
 
 /** Maximum number of search results returned per page */

@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react'
 import useSWR from 'swr'
 import { NavLink } from 'react-router-dom'
-import { fetcher } from '../../lib/fetcher'
+import { fetcher } from '@/lib/fetcher'
 import { useI18n } from '@/i18n'
-import type { FeedWithCounts } from '../../../shared/types'
+import type { FeedWithCounts } from '../../../../shared/types'
 
 interface CategoriesResponse {
   categories: Array<{ id: number; name: string }>

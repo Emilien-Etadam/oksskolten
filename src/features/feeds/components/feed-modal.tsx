@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useI18n } from '@/i18n'
-import { Dialog, DialogContent, DialogTitle } from '../ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden'
-import { IconButton } from '../ui/icon-button'
+import { IconButton } from '@/components/ui/icon-button'
 import { Rss, FolderPlus, Globe, ChevronLeft, X } from 'lucide-react'
 import { FeedStep } from './feed-step'
 import { FolderStep } from './folder-step'
 import { ArticleStep } from './article-step'
-import type { Category } from '../../../shared/types'
+import type { Category } from '../../../../shared/types'
 
 type ModalStep = 'select' | 'feed' | 'folder' | 'article'
 

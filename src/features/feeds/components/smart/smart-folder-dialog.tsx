@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useI18n } from '@/i18n'
-import { parseSmartQuery, smartQueryHasFilters } from '../../../shared/smart-query'
+import { parseSmartQuery, smartQueryHasFilters } from '../../../../../shared/smart-query'
 import {
   Dialog,
   DialogContent,
@@ -8,8 +8,8 @@ import {
   DialogFooter,
   DialogTitle,
   DialogDescription,
-} from '../ui/dialog'
-import { Input } from '../ui/input'
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 
 export interface SmartFolderDraft {
   name: string

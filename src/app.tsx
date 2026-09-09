@@ -13,12 +13,12 @@ import { Header } from './components/layout/header'
 import { ArticleList, type ArticleListHandle, ArticleDetail, ArticleRawPage } from '@/features/reading'
 import { PageLayout } from './components/layout/page-layout'
 import { KeyboardNavigationProvider, useKeyboardNavigationContext } from './contexts/keyboard-navigation-context'
-import { CategoryTabs } from './components/feed/category-tabs'
+import { CategoryTabs } from '@/features/feeds'
 import { isSidebarCollapsed, persistSidebarCollapsed } from './lib/sidebar-collapsed'
 const SettingsPage = lazy(() => import('./pages/settings-page').then(m => ({ default: m.SettingsPage })))
 const ChatPage = lazy(() => import('./pages/chat-page').then(m => ({ default: m.ChatPage })))
-const FrontPage = lazy(() => import('@/features/reading').then(m => ({ default: m.FrontPage })))
-const StoriesPage = lazy(() => import('@/features/reading').then(m => ({ default: m.StoriesPage })))
+const FrontPage = lazy(() => import('@/features/reading/pages/front-page').then(m => ({ default: m.FrontPage })))
+const StoriesPage = lazy(() => import('@/features/reading/pages/stories-page').then(m => ({ default: m.StoriesPage })))
 import { AuthShell } from './lib/auth-shell'
 import { ErrorBoundary } from './components/auth/error-boundary'
 import { HintBanner } from './components/ui/hint-banner'

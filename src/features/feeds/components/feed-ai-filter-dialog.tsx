@@ -7,7 +7,7 @@ import {
   DialogFooter,
   DialogTitle,
   DialogDescription,
-} from '../ui/dialog'
+} from '@/components/ui/dialog'
 
 const MAX_CHARS = 1000
 

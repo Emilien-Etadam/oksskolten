@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render } from '@testing-library/react'
 import { FeedMetricsBar } from './feed-metrics-bar'
-import type { FeedWithCounts } from '../../../shared/types'
+import type { FeedWithCounts } from '../../../../shared/types'
 
 let swrData: { avg_content_length: number | null } | undefined
 
@@ -9,7 +9,7 @@ vi.mock('swr', () => ({
   default: () => ({ data: swrData }),
 }))
 
-vi.mock('../../lib/fetcher', () => ({
+vi.mock('@/lib/fetcher', () => ({
   fetcher: vi.fn(),
 }))
 

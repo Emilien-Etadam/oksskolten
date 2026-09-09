@@ -37,8 +37,9 @@ vi.mock('swr', async () => {
   }
 })
 
-vi.mock('@/components/feed/feed-metrics-bar', () => ({
+vi.mock('@/features/feeds', () => ({
   FeedMetricsBar: ({ feed }: any) => <div data-testid="metrics-bar">{feed.name}</div>,
+  FeedErrorBanner: () => null,
 }))
 
 vi.mock('@/lib/fetcher', () => ({
@@ -105,9 +106,6 @@ vi.mock('./article-detail', () => ({
   ),
 }))
 
-vi.mock('@/components/feed/feed-error-banner', () => ({
-  FeedErrorBanner: () => null,
-}))
 
 vi.mock('@/components/ui/skeleton', () => ({
   Skeleton: ({ className }: { className?: string }) => <div data-testid="skeleton" className={`animate-pulse ${className ?? ''}`} />,

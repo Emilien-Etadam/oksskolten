@@ -63,7 +63,9 @@ server/
 - **Imports.** The `@/` alias maps to `src/` in `tsconfig.json`, `vite.config.ts`
   and therefore vitest. When a move breaks a relative import, rewrite it as
   `@/features/…`, `@/hooks/…`, `@/lib/…`. Do not rewrite imports the move did
-  not break. Inside a feature, sibling imports stay relative.
+  not break. Inside a feature, sibling imports stay relative. A route-level
+  `lazy()` import targets the page module directly, never a feature barrel
+  that is also imported statically; this is the one sanctioned deep import.
 - **Shared vs feature.** A hook, context or lib used by exactly one feature
   moves into it. Used by two features, by `app.tsx` or by `components/layout`,
   it stays in `src/hooks/`, `src/contexts/`, `src/lib/`. Decide with

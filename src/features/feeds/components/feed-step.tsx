@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
-import { authHeaders } from '../../lib/fetcher'
-import { logoutClient } from '../../lib/auth'
-import { getAuthToken } from '../../lib/auth'
+import { authHeaders } from '@/lib/fetcher'
+import { logoutClient } from '@/lib/auth'
+import { getAuthToken } from '@/lib/auth'
 import { useI18n } from '@/i18n'
-import { Button } from '../ui/button'
-import { Input } from '../ui/input'
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Loader2, Check, X, Minus } from 'lucide-react'
-import type { Category } from '../../../shared/types'
+import type { Category } from '../../../../shared/types'
 
 type TranslateFn = ReturnType<typeof useI18n>['t']
 

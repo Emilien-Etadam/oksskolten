@@ -29,7 +29,7 @@ vi.mock('sonner', () => ({
 }))
 
 // The modal has its own test; here only the wiring matters.
-vi.mock('../../../components/feed/feed-modal', () => ({
+vi.mock('@/features/feeds', () => ({
   FeedModal: ({ initialStep }: { initialStep?: string }) => <div data-testid="feed-modal">{initialStep}</div>,
 }))
 

@@ -9,7 +9,7 @@ vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
 }))
 
-vi.mock('../../lib/fetcher', () => ({
+vi.mock('@/lib/fetcher', () => ({
   apiPost: vi.fn().mockResolvedValue(undefined),
   ApiError: class ApiError extends Error {
     status: number
@@ -23,17 +23,17 @@ vi.mock('../../lib/fetcher', () => ({
   authHeaders: () => ({}),
 }))
 
-vi.mock('../../lib/auth', () => ({
+vi.mock('@/lib/auth', () => ({
   getAuthToken: vi.fn(() => 'test-token'),
   logoutClient: vi.fn(),
 }))
 
-vi.mock('../../lib/url', () => ({
+vi.mock('@/lib/url', () => ({
   articleUrlToPath: (url: string) => `/articles/${encodeURIComponent(url)}`,
 }))
 
-import { apiPost, ApiError } from '../../lib/fetcher'
-import { logoutClient } from '../../lib/auth'
+import { apiPost, ApiError } from '@/lib/fetcher'
+import { logoutClient } from '@/lib/auth'
 
 describe('FeedModal', () => {
   const defaultProps = {

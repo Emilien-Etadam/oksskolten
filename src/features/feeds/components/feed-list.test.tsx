@@ -3,8 +3,8 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, Outlet } from 'react-router-dom'
 import { SWRConfig } from 'swr'
 import { LocaleContext } from '@/i18n'
-import { TooltipProvider } from '../ui/tooltip'
-import type { FeedWithCounts, Category } from '../../../shared/types'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import type { FeedWithCounts, Category } from '../../../../shared/types'
 
 // --- Mocks ---
 const mockNavigate = vi.fn()
@@ -16,14 +16,14 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-vi.mock('../../lib/fetcher', () => ({
+vi.mock('@/lib/fetcher', () => ({
   fetcher: vi.fn(),
   apiPost: vi.fn(() => Promise.resolve()),
   apiPatch: vi.fn(() => Promise.resolve()),
   apiDelete: vi.fn(() => Promise.resolve()),
 }))
 
-vi.mock('../../contexts/fetch-progress-context', () => ({
+vi.mock('@/contexts/fetch-progress-context', () => ({
   useFetchProgressContext: () => ({
     progress: new Map(),
     startFeedFetch: vi.fn(() => Promise.resolve({ totalNew: 0 })),
@@ -36,17 +36,17 @@ vi.mock('./feed-modal', () => ({
   FeedModal: () => null,
 }))
 
-vi.mock('../ui/ConfirmDialog', () => ({
+vi.mock('@/components/ui/confirm-dialog', () => ({
   ConfirmDialog: ({ title }: any) => (
     <div data-testid="confirm-dialog">{title}</div>
   ),
 }))
 
-vi.mock('../ui/ContextMenu', () => ({
+vi.mock('@/components/ui/ContextMenu', () => ({
   ContextMenu: () => <div data-testid="context-menu" />,
 }))
 
-vi.mock('../layout/sidebar-menu', () => ({
+vi.mock('@/components/layout/sidebar-menu', () => ({
   SidebarMenu: () => <div data-testid="sidebar-menu" />,
 }))
 

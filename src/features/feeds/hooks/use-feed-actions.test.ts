@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useFeedActions } from './use-feed-actions'
-import type { FeedWithCounts, Category } from '../../shared/types'
+import type { FeedWithCounts, Category } from '../../../../shared/types'
 
-vi.mock('../lib/fetcher', () => ({
+vi.mock('@/lib/fetcher', () => ({
   apiPost: vi.fn().mockResolvedValue(undefined),
   apiPatch: vi.fn().mockResolvedValue(undefined),
   apiDelete: vi.fn().mockResolvedValue(undefined),
 }))
 
-import { apiPost, apiPatch, apiDelete } from '../lib/fetcher'
+import { apiPost, apiPatch, apiDelete } from '@/lib/fetcher'
 
 function makeFeed(overrides: Partial<FeedWithCounts> = {}): FeedWithCounts {
   return {

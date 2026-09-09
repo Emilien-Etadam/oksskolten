@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { CheckCircle2, XCircle, Circle, ChevronRight, Search, RefreshCw, Loader2 } from 'lucide-react'
 import { useI18n } from '@/i18n'
-import { STAGES, classifyError, reDetectSSE } from '../../lib/feed-error'
+import { STAGES, classifyError, reDetectSSE } from '@/lib/feed-error'
 
 /**
  * Processing phase — drives the animated pipeline visualization.

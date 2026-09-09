@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useSWRConfig } from 'swr'
-import { apiPost, apiPatch, apiDelete } from '../lib/fetcher'
-import type { FeedWithCounts, Category } from '../../shared/types'
+import { apiPost, apiPatch, apiDelete } from '@/lib/fetcher'
+import type { FeedWithCounts, Category } from '../../../../shared/types'
 import type { KeyedMutator } from 'swr'
-import type { FetchResult } from './use-fetch-progress'
+import type { FetchResult } from '@/hooks/use-fetch-progress'
 
 type RenamingState =
   | { type: 'feed'; feed: FeedWithCounts; name: string }

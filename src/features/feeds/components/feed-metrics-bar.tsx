@@ -1,7 +1,7 @@
 import useSWR from 'swr'
-import { fetcher } from '../../lib/fetcher'
+import { fetcher } from '@/lib/fetcher'
 import { useI18n } from '@/i18n'
-import type { FeedWithCounts } from '../../../shared/types'
+import type { FeedWithCounts } from '../../../../shared/types'
 
 /** Number of days without new articles before a feed is considered stale */
 const STALE_FEED_DAYS = 90

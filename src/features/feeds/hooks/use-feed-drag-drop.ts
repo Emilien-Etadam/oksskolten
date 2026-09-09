@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { apiPatch, apiPost } from '../lib/fetcher'
-import type { FeedWithCounts } from '../../shared/types'
+import { apiPatch, apiPost } from '@/lib/fetcher'
+import type { FeedWithCounts } from '../../../../shared/types'
 import type { KeyedMutator } from 'swr'
 
 interface UseFeedDragDropOpts {
