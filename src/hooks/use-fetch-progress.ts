@@ -49,6 +49,11 @@ async function readSSE(
   }
 }
 
+/** SWR keys that list articles: the feed, category and collection lists, and the front page. */
+export function isArticleListKey(key: unknown): boolean {
+  return typeof key === 'string' && (key.includes('/api/articles') || key.includes('/api/frontpage'))
+}
+
 export function useFetchProgress() {
   const [progress, setProgress] = useState<Map<number, FeedProgress>>(new Map())
   const { mutate: globalMutate } = useSWRConfig()
@@ -56,8 +61,7 @@ export function useFetchProgress() {
   const revalidate = useCallback(() => {
     void globalMutate((key: unknown) =>
       typeof key === 'string' && key.includes('/api/feeds'))
-    void globalMutate((key: unknown) =>
-      typeof key === 'string' && key.includes('/api/articles'))
+    void globalMutate(isArticleListKey)
   }, [globalMutate])
 
   const startFeedFetch = useCallback(async (feedId: number): Promise<FetchResult> => {
@@ -139,5 +143,5 @@ export function useFetchProgress() {
     }
   }, [revalidate])
 
-  return { progress, startFeedFetch, subscribeFeedFetch }
+  return { progress, startFeedFetch, subscribeFeedFetch, revalidate }
 }

@@ -14,8 +14,9 @@ vi.mock('../../lib/feed-refresh', () => ({
 }))
 
 const mockStartFeedFetch = vi.fn()
+const mockRevalidate = vi.fn()
 vi.mock('../../contexts/fetch-progress-context', () => ({
-  useFetchProgressContext: () => ({ startFeedFetch: mockStartFeedFetch }),
+  useFetchProgressContext: () => ({ startFeedFetch: mockStartFeedFetch, revalidate: mockRevalidate }),
 }))
 
 const { mockToast } = vi.hoisted(() => ({
@@ -73,6 +74,13 @@ describe('RefreshButton', () => {
     await user.click(screen.getByRole('button', { name: 'Refresh' }))
     await waitFor(() => expect(mockFetchAllFeeds).toHaveBeenCalled())
     expect(mockStartFeedFetch).not.toHaveBeenCalled()
+  })
+
+  it('refreshes the list once the server-side pass is done', async () => {
+    mockFetchAllFeeds.mockResolvedValue({ totalNew: 3 })
+    renderAt('/inbox')
+    await user.click(screen.getByRole('button', { name: 'Refresh' }))
+    await waitFor(() => expect(mockRevalidate).toHaveBeenCalled())
   })
 
   it('reports what the run turned up', async () => {
