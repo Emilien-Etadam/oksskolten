@@ -29,3 +29,4 @@ export { getOllamaBaseUrl, getOllamaCustomHeaders } from './providers/llm/ollama
 export { getVllmBaseUrl, getVllmApiKey } from './providers/llm/vllm.js'
 export { registerChatApi } from './chat/routes.js'
 export { aiArticleRoutes, getTranslateTargetLang } from './routes.js'
+export { aiSettingsRoutes } from './settings-routes.js'
