@@ -25,7 +25,11 @@
   <strong>English</strong> · <a href="README.fr.md">Français</a>
 </p>
 
-> This is a fork of [babarot/oksskolten](https://github.com/babarot/oksskolten). Everything below describes the upstream project; [Fork additions](#fork-additions) lists what this fork adds on top, and [`FORK.md`](FORK.md) documents each addition in detail.
+> Oksskolten started as a fork of [babarot/oksskolten](https://github.com/babarot/oksskolten)
+> and diverged from it in September 2026 (upstream base `bdb22ac`). It is
+> maintained independently; upstream fixes are ported by hand when they apply.
+> [`FORK.md`](FORK.md) records what had been added on top of upstream at the
+> point of divergence.
 
 ## Why Oksskolten?
 
@@ -76,7 +80,7 @@ Because Oksskolten always has the complete text, AI summarization and translatio
 
 ## Fork additions
 
-Additions live in new files, with only small insertion points in upstream ones, so syncing with upstream stays cheap. [`FORK.md`](FORK.md) covers each item in detail, down to the upstream files touched.
+Everything below was added on top of upstream before the two projects diverged; it is now simply part of Oksskolten. [`FORK.md`](FORK.md) covers each item in detail, down to the upstream files touched.
 
 ### Reading experience
 
