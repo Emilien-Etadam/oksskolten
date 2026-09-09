@@ -1,0 +1,26 @@
+{
+  "name": "Oksskolten",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "meilisearch",
+      "command": "$HOME/bin/meilisearch --db-path $HOME/.meili-data --http-addr 127.0.0.1:7700 --no-analytics --env development",
+      "description": "Full-text search engine. The server rebuilds its index from SQLite on boot, so this data directory is disposable."
+    },
+    {
+      "name": "backend",
+      "command": "npm run dev:server:noauth",
+      "description": "Fastify API + cron scheduler on port 3000 with auth disabled (development only). Migrates the SQLite DB and loads demo seed data on first run."
+    },
+    {
+      "name": "frontend",
+      "command": "npm run dev",
+      "description": "Vite dev server (HMR) on port 5173, proxying /api to the backend on port 3000."
+    }
+  ],
+  "ports": [
+    { "name": "frontend", "port": 5173 },
+    { "name": "backend", "port": 3000 },
+    { "name": "meilisearch", "port": 7700 }
+  ]
+}
