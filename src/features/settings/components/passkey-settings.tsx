@@ -4,7 +4,7 @@ import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/brow
 import { Fingerprint, Plus, Trash2 } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
-import { fetcher, apiDelete } from '../../lib/fetcher'
+import { fetcher, apiDelete } from '@/lib/fetcher'
 
 interface AuthMethods {
   password: { enabled: boolean }

@@ -3,16 +3,16 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ExternalLink } from 'lucide-react'
 import useSWR from 'swr'
 import { useI18n, APP_NAME } from '@/i18n'
-import { PasswordSettings } from '../components/settings/password-settings'
-import { PasskeySettings } from '../components/settings/passkey-settings'
-import { GitHubOAuthSettings } from '../components/settings/github-oauth-settings'
-import { ApiTokenSettings } from '../components/settings/api-token-settings'
-import { ImageStorageSettings } from '../components/settings/image-storage-settings'
-import { GeneralTab } from './settings/general-tab'
-const AppearanceTab = lazy(() => import('./settings/appearance-tab').then(m => ({ default: m.AppearanceTab })))
-const FeedsTab = lazy(() => import('./settings/feeds-tab').then(m => ({ default: m.FeedsTab })))
-import { IntegrationTab } from './settings/integration-tab'
-import { DataTab } from './settings/data-tab'
+import { PasswordSettings } from './components/password-settings'
+import { PasskeySettings } from './components/passkey-settings'
+import { GitHubOAuthSettings } from './components/github-oauth-settings'
+import { ApiTokenSettings } from './components/api-token-settings'
+import { ImageStorageSettings } from './components/image-storage-settings'
+import { GeneralTab } from './tabs/general-tab'
+const AppearanceTab = lazy(() => import('./tabs/appearance-tab').then(m => ({ default: m.AppearanceTab })))
+const FeedsTab = lazy(() => import('./tabs/feeds-tab').then(m => ({ default: m.FeedsTab })))
+import { IntegrationTab } from './tabs/integration-tab'
+import { DataTab } from './tabs/data-tab'
 import { Separator } from '@/components/ui/separator'
 
 declare const __APP_VERSION__: string

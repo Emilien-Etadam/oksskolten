@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import useSWR from 'swr'
 import { AlertTriangle, Check, Pencil } from 'lucide-react'
-import { Input } from '../ui/input'
-import { FormField } from '../ui/form-field'
-import { PasswordStrength } from '../ui/password-strength'
+import { Input } from '@/components/ui/input'
+import { FormField } from '@/components/ui/form-field'
+import { PasswordStrength } from '@/components/ui/password-strength'
 import { useI18n } from '@/i18n'
-import { fetcher, apiPost } from '../../lib/fetcher'
-import { getAuthToken, setAuthToken } from '../../lib/auth'
+import { fetcher, apiPost } from '@/lib/fetcher'
+import { getAuthToken, setAuthToken } from '@/lib/auth'
 
 interface AuthMethods {
   password: { enabled: boolean }

@@ -4,7 +4,7 @@ import { Settings, Sun, Moon, Monitor, Palette, LogOut, Check } from 'lucide-rea
 import { useI18n } from '@/i18n'
 import { fetcher } from '../../lib/fetcher'
 import { logoutClient } from '../../lib/auth'
-import { Avatar } from '../settings/avatar-picker'
+import { Avatar } from '@/features/settings'
 import { useAppLayout } from '../../app'
 import {
   DropdownMenu,

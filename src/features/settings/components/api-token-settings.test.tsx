@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { LocaleContext } from '@/i18n'
-import { TooltipProvider } from '../ui/tooltip'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 // --- SWR mock ---
 const mockMutate = vi.fn()
@@ -20,7 +20,7 @@ vi.mock('swr', () => ({
 const mockApiPost = vi.fn()
 const mockApiDelete = vi.fn()
 
-vi.mock('../../lib/fetcher', () => ({
+vi.mock('@/lib/fetcher', () => ({
   fetcher: vi.fn(),
   apiPost: (...args: unknown[]) => mockApiPost(...args),
   apiDelete: (...args: unknown[]) => mockApiDelete(...args),

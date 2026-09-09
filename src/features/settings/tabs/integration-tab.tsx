@@ -1,9 +1,9 @@
 import { useI18n } from '@/i18n'
-import { useAppLayout } from '../../app'
+import { useAppLayout } from '@/app'
 import { Separator } from '@/components/ui/separator'
-import { ProviderConfigSection } from './sections/provider-config-section'
-import { TaskModelSection } from './sections/task-model-section'
-import { GithubSection } from './sections/github-section'
+import { ProviderConfigSection } from '../sections/provider-config-section'
+import { TaskModelSection } from '../sections/task-model-section'
+import { GithubSection } from '../sections/github-section'
 
 export function IntegrationTab() {
   const { settings } = useAppLayout()

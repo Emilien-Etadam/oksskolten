@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import { Check, X, Trash2 } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
-import { IconButton } from '../ui/icon-button'
-import { Input } from '../ui/input'
-import { fetcher, apiPatch, apiPost } from '../../lib/fetcher'
+import { IconButton } from '@/components/ui/icon-button'
+import { Input } from '@/components/ui/input'
+import { fetcher, apiPatch, apiPost } from '@/lib/fetcher'
 import { useI18n } from '@/i18n'
 
 interface ImageStorageData {
