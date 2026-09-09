@@ -6,7 +6,7 @@ const { mockEnqueueAiFilter } = vi.hoisted(() => ({
   mockEnqueueAiFilter: vi.fn(),
 }))
 
-vi.mock('../../fetcher/ai-queue.js', () => ({
+vi.mock('../../ai/index.js', () => ({
   enqueueAiFilter: mockEnqueueAiFilter,
 }))
 

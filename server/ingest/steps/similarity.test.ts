@@ -6,7 +6,7 @@ const { mockDetect } = vi.hoisted(() => ({
   mockDetect: vi.fn(() => Promise.resolve()),
 }))
 
-vi.mock('../../similarity.js', () => ({
+vi.mock('../../intelligence/index.js', () => ({
   detectAndStoreSimilarArticles: mockDetect,
 }))
 

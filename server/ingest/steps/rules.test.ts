@@ -6,7 +6,7 @@ const { mockApplyRulesToArticle } = vi.hoisted(() => ({
   mockApplyRulesToArticle: vi.fn(),
 }))
 
-vi.mock('../../rules.js', () => ({
+vi.mock('../../intelligence/index.js', () => ({
   applyRulesToArticle: mockApplyRulesToArticle,
 }))
 

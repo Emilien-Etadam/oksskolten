@@ -3,7 +3,7 @@ import { setupTestDb } from '../__tests__/helpers/testDb.js'
 import { buildApp } from '../__tests__/helpers/buildApp.js'
 import { parseByteRange } from './articles.js'
 import { createFeed, insertArticle, ensureClipFeed, getArticleById, markImagesArchived, markVideosArchived, markArticleSeen, upsertSetting, getDb } from '../db.js'
-import { createFeedRule } from '../db/feed-rules.js'
+import { createFeedRule } from '../intelligence/index.js'
 import type { FastifyInstance } from 'fastify'
 import path from 'node:path'
 import os from 'node:os'
@@ -39,14 +39,18 @@ vi.mock('../fetcher.js', async () => {
   }
 })
 
-vi.mock('../fetcher/ai-queue.js', () => ({
-  enqueueAutoTranslate: vi.fn(),
-  enqueueAutoSummarize: vi.fn(),
-  enqueueAiFilter: vi.fn(),
-  isAutoTranslateEnabled: vi.fn(() => false),
-  isAutoSummarizeEnabled: vi.fn(() => false),
-  translateArticleTitle: vi.fn(),
-}))
+vi.mock('../ai/index.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../ai/index.js')>()
+  return {
+    ...actual,
+    enqueueAutoTranslate: vi.fn(),
+    enqueueAutoSummarize: vi.fn(),
+    enqueueAiFilter: vi.fn(),
+    isAutoTranslateEnabled: vi.fn(() => false),
+    isAutoSummarizeEnabled: vi.fn(() => false),
+    translateArticleTitle: vi.fn(),
+  }
+})
 
 vi.mock('../anthropic.js', () => ({
   anthropic: { messages: { stream: vi.fn(), create: vi.fn() } },

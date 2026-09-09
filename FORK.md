@@ -1,9 +1,11 @@
 # Fork Additions
 
-This fork tracks [babarot/oksskolten](https://github.com/babarot/oksskolten) and keeps
-divergence minimal: additions live in new files, and every upstream file the fork
-touches is listed, with what it needs from it, under [Upstream files
-touched](#upstream-files-touched) at the end.
+This file is a record of what the fork had added on top of
+[babarot/oksskolten](https://github.com/babarot/oksskolten) when the two
+projects diverged (September 2026, upstream base `bdb22ac`). It is no longer
+maintained as a sync guide; the code has since been reorganised by domain
+(see `docs/refactor/`). The "Upstream files touched" table at the end
+remains useful for porting an upstream fix by hand.
 
 ## Le Monde theme (pure add-on)
 
@@ -593,20 +595,24 @@ at the time of writing):
 | Upstream files modified | 96 (+4,664 / −596 lines) |
 | Upstream files deleted | 0 |
 
-The −596 is the whole of what the fork rewrites in upstream code. Everything else
-is additive, so an upstream merge should only ever conflict inside the files below.
+The −596 is the whole of what the fork rewrites in upstream code.
 
 ### Syncing with upstream
+
+To port an upstream change by hand:
 
 ```sh
 git remote add upstream https://github.com/babarot/oksskolten
 git fetch upstream main
 git merge upstream/main
+git cherry-pick <sha>
 ```
 
 A shallow clone (`--depth`) hides the shared history and makes the two branches look
 unrelated (`refusing to merge unrelated histories`); run `git fetch --unshallow`
 first. When a merge conflicts, this table says what the fork needs from each file.
+
+Paths are those at the point of divergence; see `docs/spec/30_ingestion.md` and `docs/refactor/` for where the code lives now.
 
 ### Server
 

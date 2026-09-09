@@ -20,7 +20,11 @@
   <a href="README.md">English</a> · <strong>Français</strong>
 </p>
 
-> Ceci est un fork de [babarot/oksskolten](https://github.com/babarot/oksskolten). Tout ce qui suit décrit le projet amont ; [Ajouts du fork](#ajouts-du-fork) liste ce que ce fork ajoute par-dessus, et [`FORK.md`](FORK.md) documente chaque ajout en détail (en anglais).
+> Oksskolten a commencé comme un fork de [babarot/oksskolten](https://github.com/babarot/oksskolten)
+> et a divergé de celui-ci en septembre 2026 (base amont `bdb22ac`). Il est
+> maintenu de manière indépendante ; les correctifs amont sont portés à la main lorsqu'ils s'appliquent.
+> [`FORK.md`](FORK.md) consigne ce qui avait été ajouté par-dessus l'amont au
+> moment de la divergence.
 
 ## Pourquoi Oksskolten ?
 
@@ -71,7 +75,7 @@ Parce qu'Oksskolten dispose toujours du texte complet, les résumés et traducti
 
 ## Ajouts du fork
 
-Les ajouts vivent dans de nouveaux fichiers, avec seulement de petits points d'insertion dans les fichiers amont : la synchronisation avec l'amont reste peu coûteuse. [`FORK.md`](FORK.md) détaille chaque élément, jusqu'aux fichiers amont touchés.
+Tout ce qui suit a été ajouté par-dessus l'amont avant que les deux projets ne divergent ; cela fait désormais simplement partie d'Oksskolten. [`FORK.md`](FORK.md) détaille chaque élément, jusqu'aux fichiers amont touchés.
 
 ### Expérience de lecture
 

@@ -281,7 +281,7 @@ describe('Articles', () => {
       const feed = seedFeed()
       const a1 = seedArticle(feed.id, { url: 'https://example.com/s1' })
       const a2 = seedArticle(feed.id, { url: 'https://example.com/s2' })
-      const { insertSimilarity } = await import('./db/similarities.js')
+      const { insertSimilarity } = await import('./intelligence/index.js')
       insertSimilarity(a1, a2, 0.9)
 
       const { articles } = getArticles({ limit: 100, offset: 0 })

@@ -11,7 +11,7 @@ vi.mock('../../db.js', () => ({
   setArticleQuality: mockSetArticleQuality,
 }))
 
-vi.mock('../../quality.js', () => ({
+vi.mock('../../intelligence/index.js', () => ({
   scoreArticleQuality: mockScoreArticleQuality,
 }))
 

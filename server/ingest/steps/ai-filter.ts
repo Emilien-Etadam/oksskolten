@@ -1,4 +1,4 @@
-import { enqueueAiFilter } from '../../fetcher/ai-queue.js'
+import { enqueueAiFilter } from '../../ai/index.js'
 import type { EnrichStep } from './types.js'
 
 export const aiFilter: EnrichStep = {
