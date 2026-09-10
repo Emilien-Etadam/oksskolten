@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { setupTestDb } from './__tests__/helpers/testDb.js'
-import { buildApp } from './__tests__/helpers/buildApp.js'
-import { getDb } from './db.js'
+import { setupTestDb } from '../__tests__/helpers/testDb.js'
+import { buildApp } from '../__tests__/helpers/buildApp.js'
+import { getDb } from '../db.js'
 import { hashSync } from 'bcryptjs'
 import type { FastifyInstance } from 'fastify'
 

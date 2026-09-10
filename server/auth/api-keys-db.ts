@@ -1,5 +1,5 @@
 import { randomBytes, createHash } from 'node:crypto'
-import { getDb } from './connection.js'
+import { getDb } from '../db/connection.js'
 
 export interface ApiKey {
   id: number

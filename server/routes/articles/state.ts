@@ -9,7 +9,7 @@ import {
   markArticleLiked,
   deleteArticle,
 } from '../../db.js'
-import { requireJson } from '../../auth.js'
+import { requireJson } from '../../auth/index.js'
 import { deleteArticleImages } from '../../fetcher/article-images.js'
 import { deleteArticleVideos } from '../../fetcher/article-videos.js'
 import { NumericIdParams, parseOrBadRequest } from '../../lib/validation.js'

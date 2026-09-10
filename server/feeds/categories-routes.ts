@@ -7,7 +7,7 @@ import {
   deleteCategory,
   markAllSeenByCategory,
 } from '../db.js'
-import { requireJson } from '../auth.js'
+import { requireJson } from '../auth/index.js'
 import { NumericIdParams, parseOrBadRequest } from '../lib/validation.js'
 
 const CreateCategoryBody = z.object({

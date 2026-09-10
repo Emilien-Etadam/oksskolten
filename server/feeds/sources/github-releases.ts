@@ -1,4 +1,4 @@
-import type { RssItem } from '../../fetcher/rss.js'
+import type { RssItem } from '../../fetcher/rss/types.js'
 import { normalizeDate } from '../../fetcher/util.js'
 import { getSetting } from '../../db.js'
 import { logger } from '../../logger.js'

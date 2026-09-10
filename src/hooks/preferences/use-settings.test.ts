@@ -84,7 +84,7 @@ vi.mock('swr', () => ({
 const mockApiPatch = vi.fn()
 const mockAuthHeaders = vi.fn(() => ({ Authorization: 'Bearer test-token' }))
 
-vi.mock('../lib/fetcher', () => ({
+vi.mock('../../lib/fetcher', () => ({
   fetcher: vi.fn(),
   apiPatch: (...args: unknown[]) => mockApiPatch(...args),
   authHeaders: () => mockAuthHeaders(),

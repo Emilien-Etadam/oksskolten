@@ -1,12 +1,12 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { compareSync, hashSync } from 'bcryptjs'
-import { getDb, getSetting } from './db.js'
+import { getDb, getSetting } from '../db.js'
 
 const BCRYPT_ROUNDS = process.env.NODE_ENV === 'test' ? 4 : 12
-import { requireAuth, requireJson } from './auth.js'
-import { isGitHubOAuthEnabled } from './oauthRoutes.js'
-import { parseOrBadRequest } from './lib/validation.js'
+import { requireAuth, requireJson } from './guards.js'
+import { isGitHubOAuthEnabled } from './oauth-routes.js'
+import { parseOrBadRequest } from '../lib/validation.js'
 
 const LoginBody = z.object({
   email: z.string().min(1, 'Email and password are required'),

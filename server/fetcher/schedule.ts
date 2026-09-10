@@ -1,4 +1,4 @@
-import type { RssItem } from './rss.js'
+import type { RssItem } from './rss/types.js'
 
 // --- Constants ---
 

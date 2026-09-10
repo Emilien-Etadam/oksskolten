@@ -7,7 +7,7 @@ import {
   updateScore,
   type ArticleDetail,
 } from '../db.js'
-import { requireJson } from '../auth.js'
+import { requireJson } from '../auth/index.js'
 import { summarizeArticle, translateArticle, streamSummarizeArticle, streamTranslateArticle } from './tasks.js'
 import type { AiTextResult } from './tasks.js'
 import { translateArticleTitle } from './queue.js'

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import type { FastifyRequest, FastifyReply } from 'fastify'
-import { requireAuth, getAuthUser, requireJson } from './auth.js'
+import { requireAuth, getAuthUser, requireJson } from './guards.js'
 
-vi.mock('./db.js', () => ({
+vi.mock('../db.js', () => ({
   getDb: vi.fn(() => ({
     prepare: vi.fn(() => ({
       get: vi.fn(() => ({ token_version: 0 })),
@@ -84,7 +84,7 @@ describe('auth', () => {
       const saved = process.env.AUTH_DISABLED
       delete process.env.AUTH_DISABLED
 
-      const { getDb } = await import('./db.js')
+      const { getDb } = await import('../db.js')
       vi.mocked(getDb).mockReturnValue({
         prepare: vi.fn(() => ({
           get: vi.fn(() => ({ token_version: 1 })),

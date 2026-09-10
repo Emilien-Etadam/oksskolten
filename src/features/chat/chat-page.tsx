@@ -5,7 +5,7 @@ import { fetcher } from '@/lib/fetcher'
 import { useI18n } from '@/i18n'
 import { ChatPanel } from './components/chat-panel'
 import { ChatNewConversation } from './components/chat-new-conversation'
-import { useDateMode } from '@/hooks/use-date-mode'
+import { useDateMode } from '@/hooks/preferences'
 import { formatDate, formatRelativeDate } from '@/lib/dateFormat'
 import { articleUrlToPath, extractDomain } from '@/lib/url'
 

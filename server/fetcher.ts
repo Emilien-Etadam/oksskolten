@@ -4,6 +4,6 @@ export { fetchAllFeeds, fetchSingleFeed, fetchArticleContent, enrichArticle, cli
 export type { FetchedContent, ArticleTask, ArticleContext, EnrichStep } from './ingest/index.js'
 export { normalizeDate } from './fetcher/util.js'
 export { type FetchProgressEvent, fetchProgress, getFeedState } from './fetcher/progress.js'
-export { discoverRssUrl } from './fetcher/rss.js'
+export { discoverRssUrl } from './feeds/discovery.js'
 export { detectLanguage, summarizeArticle, streamSummarizeArticle, translateArticle, streamTranslateArticle } from './ai/index.js'
 export type { AiTextResult, AiBillingMode } from './ai/index.js'

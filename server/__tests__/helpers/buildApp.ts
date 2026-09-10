@@ -4,8 +4,7 @@ import rateLimit from '@fastify/rate-limit'
 import multipart from '@fastify/multipart'
 import { registerApi } from '../../api.js'
 import { registerChatApi } from '../../ai/index.js'
-import { authRoutes } from '../../authRoutes.js'
-import { passkeyRoutes } from '../../passkeyRoutes.js'
+import { authRoutes, passkeyRoutes } from '../../auth/index.js'
 
 export async function buildApp() {
   const app = Fastify()
