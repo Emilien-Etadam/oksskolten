@@ -11,5 +11,9 @@
   "include": [
     "../server/**/*.ts",
     "../shared/**/*.ts"
+  ],
+  "exclude": [
+    "../**/*.test.ts",
+    "../server/__tests__/**"
   ]
 }
