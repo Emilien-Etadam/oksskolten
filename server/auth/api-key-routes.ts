@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { createApiKey, listApiKeys, deleteApiKey } from '../db/apiKeys.js'
-import { requireJson } from '../auth.js'
+import { createApiKey, listApiKeys, deleteApiKey } from './api-keys-db.js'
+import { requireJson } from './guards.js'
 import { parseOrBadRequest, NumericIdParams } from '../lib/validation.js'
 
 const CreateBody = z.object({

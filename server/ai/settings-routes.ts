@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { getSetting, upsertSetting, deleteSetting } from '../db.js'
-import { requireJson } from '../auth.js'
+import { requireJson } from '../auth/index.js'
 import { getMonthlyUsage } from './providers/translate/google-translate.js'
 import { getDeeplMonthlyUsage } from './providers/translate/deepl.js'
 

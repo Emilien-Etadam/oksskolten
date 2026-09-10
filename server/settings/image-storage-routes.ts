@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { getSetting, upsertSetting, deleteSetting } from '../db.js'
-import { requireJson } from '../auth.js'
+import { requireJson } from '../auth/index.js'
 import { assertSafeUrl } from '../fetcher/ssrf.js'
 import { extractByDotPath } from '../fetcher/article-images.js'
 

@@ -21,7 +21,7 @@ import {
   getCategories,
   createCategory,
 } from '../db.js'
-import { requireJson } from '../auth.js'
+import { requireJson } from '../auth/index.js'
 import { fetchSingleFeed } from '../fetcher.js'
 import { discoverRssUrl } from './discovery.js'
 import { sweepAutoArchiveFeeds, SWEEP_LIMIT_BACKLOG } from '../fetcher/article-images.js'

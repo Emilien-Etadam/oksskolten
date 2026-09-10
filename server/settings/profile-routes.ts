@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { getSetting, upsertSetting } from '../db.js'
-import { requireJson, getAuthUser } from '../auth.js'
+import { requireJson, getAuthUser } from '../auth/index.js'
 import { parseOrBadRequest } from '../lib/validation.js'
 
 const ProfileBody = z.object({

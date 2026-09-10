@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { requireJson } from '../auth.js'
+import { requireJson } from '../auth/index.js'
 import { NumericIdParams, parseOrBadRequest } from '../lib/validation.js'
 import {
   getFeedRules,

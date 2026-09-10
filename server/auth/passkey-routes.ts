@@ -10,14 +10,14 @@ import {
 } from '@simplewebauthn/server'
 import type { AuthenticatorTransportFuture, RegistrationResponseJSON, AuthenticationResponseJSON } from '@simplewebauthn/server'
 import { z } from 'zod'
-import { getDb, getSetting, upsertSetting } from './db.js'
-import { requireAuth, getOrigin, getRpID, getCredentialCount } from './auth.js'
-import { isGitHubOAuthEnabled } from './oauthRoutes.js'
-import { TtlStore } from './lib/ttl-store.js'
-import { logger } from './logger.js'
+import { getDb, getSetting, upsertSetting } from '../db.js'
+import { requireAuth, getOrigin, getRpID, getCredentialCount } from './guards.js'
+import { isGitHubOAuthEnabled } from './oauth-routes.js'
+import { TtlStore } from '../lib/ttl-store.js'
+import { logger } from '../logger.js'
 
 const log = logger.child('passkey')
-import { NumericIdParams, parseOrBadRequest } from './lib/validation.js'
+import { NumericIdParams, parseOrBadRequest } from '../lib/validation.js'
 
 const RegisterVerifyBody = z.object({
   challengeId: z.string().optional(),
