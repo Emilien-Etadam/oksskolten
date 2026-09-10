@@ -1,6 +1,4 @@
 import crypto from 'node:crypto'
-import fs from 'node:fs'
-import path from 'node:path'
 import type { FastifyInstance } from 'fastify'
 import {
   generateRegistrationOptions,
@@ -14,10 +12,8 @@ import { getDb, getSetting, upsertSetting } from '../db.js'
 import { requireAuth, getOrigin, getRpID, getCredentialCount } from './guards.js'
 import { isGitHubOAuthEnabled } from './oauth-routes.js'
 import { TtlStore } from '../lib/ttl-store.js'
-import { logger } from '../logger.js'
-
-const log = logger.child('passkey')
 import { NumericIdParams, parseOrBadRequest } from '../lib/validation.js'
+import aaguidData from './aaguids.json' with { type: 'json' }
 
 const RegisterVerifyBody = z.object({
   challengeId: z.string().optional(),
@@ -36,23 +32,11 @@ const PasswordToggleBody = z.object({
 
 const ZERO_AAGUID = '00000000-0000-0000-0000-000000000000'
 
-let aaguidMap: Record<string, string> | null = null
-
-function loadAaguidMap(): Record<string, string> {
-  if (aaguidMap) return aaguidMap
-  try {
-    const filePath = path.join(import.meta.dirname, 'aaguids.json')
-    aaguidMap = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
-  } catch (err) {
-    log.warn({ err }, 'Failed to load aaguids.json, authenticator names will be unavailable')
-    aaguidMap = {}
-  }
-  return aaguidMap!
-}
+const aaguidMap: Record<string, string> = aaguidData
 
 function resolveAuthenticatorName(aaguid: string | null): string | null {
   if (!aaguid || aaguid === ZERO_AAGUID) return null
-  return loadAaguidMap()[aaguid] ?? null
+  return aaguidMap[aaguid] ?? null
 }
 
 // --- Challenge store (in-memory, TTL 60s) ---
