@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { useSWRConfig } from 'swr'
 import { authHeaders } from '../lib/fetcher'
+import { refreshArticleLists } from '../lib/article-list-refresh'
 
 interface FeedProgress {
   fetched: number
@@ -62,6 +63,9 @@ export function useFetchProgress() {
     void globalMutate((key: unknown) =>
       typeof key === 'string' && key.includes('/api/feeds'))
     void globalMutate(isArticleListKey)
+    // The paginated list keeps its cached pages through a global mutate;
+    // the bus reaches the hook's own mutate, which reloads them.
+    refreshArticleLists()
   }, [globalMutate])
 
   const startFeedFetch = useCallback(async (feedId: number): Promise<FetchResult> => {

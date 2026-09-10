@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useSWRConfig } from 'swr'
 import { apiPost, apiPatch, apiDelete } from '@/lib/fetcher'
+import { refreshArticleLists } from '@/lib/article-list-refresh'
 import type { FeedWithCounts, Category } from '../../../../shared/types'
 import type { KeyedMutator } from 'swr'
 import type { FetchResult } from '@/hooks/use-fetch-progress'
@@ -42,6 +43,7 @@ export function useFeedActions({
   const revalidateArticles = useCallback(() => {
     void globalMutate((key: unknown) =>
       typeof key === 'string' && key.includes('/api/articles'))
+    refreshArticleLists()
   }, [globalMutate])
 
   // Auto-focus rename input (only when renaming starts, not on every keystroke)
