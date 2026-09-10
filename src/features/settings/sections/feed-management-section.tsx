@@ -1,10 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import useSWR, { useSWRConfig } from 'swr'
-import { toast } from 'sonner'
-import { ArrowDown, ArrowUp, CheckCheck, FolderInput, Loader2, Plus, Power, RefreshCw, Search, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, CheckCheck, FolderInput, Pencil, Plus, Power, Search, Trash2 } from 'lucide-react'
 import { fetcher } from '../../../lib/fetcher'
-import { fetchAllFeeds } from '../../../lib/feed-refresh'
 import { useI18n } from '@/i18n'
 import { formatRelativeDate } from '../../../lib/dateFormat'
 import { extractDomain } from '../../../lib/url'
@@ -12,6 +10,7 @@ import { useFetchProgressContext } from '../../../contexts/fetch-progress-contex
 import { useFeedSelection } from '../../../hooks/use-feed-selection'
 import { useFeedBulkActions } from '../../../hooks/use-feed-bulk-actions'
 import { FeedModal } from '@/features/feeds'
+import { FeedEditDialog } from '../components/feed-edit-dialog'
 import { Input } from '@/components/ui/input'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
@@ -132,7 +131,7 @@ export function FeedManagementSection() {
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [busy, setBusy] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
-  const [fetchingAll, setFetchingAll] = useState(false)
+  const [editing, setEditing] = useState<FeedWithCounts | null>(null)
 
   const categories = useMemo(() => categoriesData?.categories ?? [], [categoriesData])
   const feeds = useMemo(() => (data?.feeds ?? []).filter(f => f.type !== 'clip'), [data])
@@ -169,19 +168,11 @@ export function FeedManagementSection() {
     void globalMutate((key: unknown) => typeof key === 'string' && key.includes('/api/articles'))
   }
 
-  function handleFetchComplete(result: { totalNew: number; error?: boolean; name?: string }) {
-    const name = result.name ?? ''
-    if (result.error) toast.error(t('toast.fetchError', { name }))
-    else if (result.totalNew > 0) toast.success(t('toast.fetchedArticles', { count: String(result.totalNew), name }))
-    else toast(t('toast.noNewArticles', { name }))
-  }
-
   const {
     bulkDeleteConfirm,
     setBulkDeleteConfirm,
     handleBulkMoveToCategory,
     handleBulkMarkAllRead,
-    handleBulkFetch,
     handleBulkEnable,
     handleBulkDelete,
     handleBulkDeleteConfirm,
@@ -192,25 +183,8 @@ export function FeedManagementSection() {
     clearSelection,
     startFeedFetch,
     onMarkAllRead: revalidateArticles,
-    onFetchComplete: handleFetchComplete,
     onDeleted: revalidateArticles,
   })
-
-  /** One server-side run over every enabled feed, rather than a request per row. */
-  async function handleFetchAll() {
-    if (fetchingAll) return
-    setFetchingAll(true)
-    try {
-      const { totalNew } = await fetchAllFeeds()
-      if (totalNew > 0) toast.success(t('refresh.done', { count: String(totalNew) }))
-      else toast(t('refresh.upToDate'))
-    } catch {
-      toast.error(t('refresh.failed'))
-    } finally {
-      setFetchingAll(false)
-      void mutateFeeds()
-    }
-  }
 
   async function runBulk(action: () => Promise<void>) {
     if (busy) return
@@ -249,15 +223,6 @@ export function FeedManagementSection() {
       <div className="flex items-center justify-between gap-3 mb-1">
         <h2 className="text-base font-semibold text-text">{t('settings.feedsManage')}</h2>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void handleFetchAll()}
-            disabled={fetchingAll}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border border-border text-text hover:bg-hover transition-colors disabled:opacity-50"
-          >
-            {fetchingAll ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            {t('category.fetchAll')}
-          </button>
           <button
             type="button"
             onClick={() => setAddOpen(true)}
@@ -351,15 +316,6 @@ export function FeedManagementSection() {
             <CheckCheck size={14} />
             {t('feeds.bulkMarkAllRead')}
           </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void runBulk(handleBulkFetch)}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border border-border text-text hover:bg-hover transition-colors disabled:opacity-50"
-          >
-            <RefreshCw size={14} className={busy ? 'animate-spin' : ''} />
-            {t('feeds.bulkFetch')}
-          </button>
           {hasDisabledSelected && (
             <button
               type="button"
@@ -418,6 +374,9 @@ export function FeedManagementSection() {
                 <SortableHeader label={t('settings.feedsColTrust')} sortKey="trust" active={sortKey} dir={sortDir} onSort={handleSort} className="hidden md:table-cell text-right" />
                 <SortableHeader label={t('settings.feedsColLatest')} sortKey="latest" active={sortKey} dir={sortDir} onSort={handleSort} className="hidden lg:table-cell" />
                 <SortableHeader label={t('settings.feedsColStatus')} sortKey="status" active={sortKey} dir={sortDir} onSort={handleSort} />
+                <th scope="col" className="w-10 px-3 py-2">
+                  <span className="sr-only">{t('settings.feedsColActions')}</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -474,12 +433,23 @@ export function FeedManagementSection() {
                     <td className="px-3 py-2">
                       <StatusBadge status={status} title={feed.last_error ?? undefined} />
                     </td>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setEditing(feed)}
+                        className="text-muted hover:text-text transition-colors"
+                        aria-label={`${t('settings.feedsEdit')} — ${feed.name}`}
+                        title={t('settings.feedsEdit')}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    </td>
                   </tr>
                 )
               })}
               {visible.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-3 py-8 text-center text-sm text-muted">
+                  <td colSpan={10} className="px-3 py-8 text-center text-sm text-muted">
                     {t('settings.feedsNoMatch')}
                   </td>
                 </tr>
@@ -487,6 +457,14 @@ export function FeedManagementSection() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {editing && (
+        <FeedEditDialog
+          feed={editing}
+          onOpenChange={open => { if (!open) setEditing(null) }}
+          onSaved={() => void mutateFeeds()}
+        />
       )}
 
       {addOpen && (

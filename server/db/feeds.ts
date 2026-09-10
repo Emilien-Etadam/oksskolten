@@ -93,10 +93,17 @@ export function createFeed(data: {
 
 export function updateFeed(
   id: number,
-  data: { name?: string; rss_url?: string | null; rss_bridge_url?: string | null; disabled?: number; category_id?: number | null; requires_js_challenge?: number; ai_filter?: string | null; archive_images?: number },
+  data: { name?: string; url?: string; rss_url?: string | null; rss_bridge_url?: string | null; disabled?: number; category_id?: number | null; requires_js_challenge?: number; ai_filter?: string | null; archive_images?: number },
 ): Feed | undefined {
   const feed = getFeedById(id)
   if (!feed) return undefined
+
+  // Pointing a feed at another URL invalidates everything the old one left
+  // behind: a conditional request built from its ETag would answer 304 for a
+  // document the new URL never served, and its error backoff has no bearing on
+  // the new address.
+  const urlChanged = (data.url !== undefined && data.url !== feed.url) ||
+    (data.rss_url !== undefined && data.rss_url !== feed.rss_url)
 
   const fields: string[] = []
   const params: Record<string, unknown> = { id }
@@ -104,6 +111,10 @@ export function updateFeed(
   if (data.name !== undefined) {
     fields.push('name = @name')
     params.name = data.name
+  }
+  if (data.url !== undefined) {
+    fields.push('url = @url')
+    params.url = data.url
   }
   if (data.rss_url !== undefined) {
     fields.push('rss_url = @rss_url')
@@ -120,7 +131,9 @@ export function updateFeed(
   if (data.disabled !== undefined) {
     fields.push('disabled = @disabled')
     params.disabled = data.disabled
-    if (data.disabled === 0) {
+    // The URL-change reset below clears the same two columns; SET may not
+    // assign a column twice.
+    if (data.disabled === 0 && !urlChanged) {
       fields.push('error_count = 0')
       fields.push("last_error = NULL")
     }
@@ -136,6 +149,12 @@ export function updateFeed(
   if (data.archive_images !== undefined) {
     fields.push('archive_images = @archive_images')
     params.archive_images = data.archive_images
+  }
+
+  // Clearing next_check_at makes the feed due on the next scheduled pass.
+  if (urlChanged) {
+    fields.push('etag = NULL', 'last_modified = NULL', 'last_content_hash = NULL')
+    fields.push('last_error = NULL', 'error_count = 0', 'next_check_at = NULL')
   }
 
   if (fields.length === 0) return feed

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setupTestDb } from '../__tests__/helpers/testDb.js'
 import { buildApp } from '../__tests__/helpers/buildApp.js'
-import { createFeed } from '../db.js'
+import { createFeed, getFeedById, updateFeedCacheHeaders, updateFeedError } from '../db.js'
 import type { FastifyInstance } from 'fastify'
 
 // ---------------------------------------------------------------------------
@@ -731,6 +731,104 @@ describe('PATCH /api/feeds/:id archive_images', () => {
       url: `/api/feeds/${feed.id}`,
       payload: { archive_images: 2 },
     })
+    expect(res.statusCode).toBe(400)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// PATCH /api/feeds/:id — feed URLs
+// ---------------------------------------------------------------------------
+
+describe('PATCH /api/feeds/:id urls', () => {
+  it('updates the site and RSS URLs', async () => {
+    const feed = seedFeed({ url: 'https://old.example.com', rss_url: 'https://old.example.com/feed.xml' })
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/feeds/${feed.id}`,
+      payload: { url: 'https://new.example.com', rss_url: 'https://new.example.com/rss' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json().url).toBe('https://new.example.com')
+    expect(res.json().rss_url).toBe('https://new.example.com/rss')
+  })
+
+  it('clears the conditional-request cache and the error state when the RSS URL changes', async () => {
+    const feed = seedFeed({ url: 'https://example.com', rss_url: 'https://example.com/feed.xml' })
+    updateFeedCacheHeaders(feed.id, 'W/"etag"', 'Wed, 01 Jan 2025 00:00:00 GMT', 'hash')
+    updateFeedError(feed.id, 'boom')
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/feeds/${feed.id}`,
+      payload: { rss_url: 'https://example.com/atom.xml' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const updated = getFeedById(feed.id)!
+    expect(updated.etag).toBeNull()
+    expect(updated.last_modified).toBeNull()
+    expect(updated.last_content_hash).toBeNull()
+    expect(updated.last_error).toBeNull()
+    expect(updated.error_count).toBe(0)
+    expect(updated.next_check_at).toBeNull()
+  })
+
+  it('keeps the cache when the URLs are unchanged', async () => {
+    const feed = seedFeed({ url: 'https://example.com', rss_url: 'https://example.com/feed.xml' })
+    updateFeedCacheHeaders(feed.id, 'W/"etag"', null, 'hash')
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/feeds/${feed.id}`,
+      payload: { name: 'Renamed', rss_url: 'https://example.com/feed.xml' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const updated = getFeedById(feed.id)!
+    expect(updated.name).toBe('Renamed')
+    expect(updated.etag).toBe('W/"etag"')
+  })
+
+  it('re-enables a feed and clears its error state in one call', async () => {
+    const feed = seedFeed({ url: 'https://example.com', rss_url: 'https://example.com/feed.xml' })
+    updateFeedError(feed.id, 'boom')
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/feeds/${feed.id}`,
+      payload: { disabled: 0, rss_url: 'https://example.com/atom.xml' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    const updated = getFeedById(feed.id)!
+    expect(updated.disabled).toBe(0)
+    expect(updated.last_error).toBeNull()
+    expect(updated.error_count).toBe(0)
+  })
+
+  it('rejects a URL that is not http(s)', async () => {
+    const feed = seedFeed()
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/feeds/${feed.id}`,
+      payload: { rss_url: 'ftp://example.com/feed.xml' },
+    })
+
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('rejects a malformed URL', async () => {
+    const feed = seedFeed()
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/feeds/${feed.id}`,
+      payload: { url: 'not a url' },
+    })
+
     expect(res.statusCode).toBe(400)
   })
 })

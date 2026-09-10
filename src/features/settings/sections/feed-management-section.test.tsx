@@ -147,11 +147,44 @@ describe('FeedManagementSection', () => {
     expect(mockApiPost).toHaveBeenCalledTimes(1)
   })
 
-  it('fetches the selected feeds', async () => {
+  // Fetching lives on the list side (refresh button, pull-to-refresh, sidebar),
+  // where the articles it brings in are on screen; from here the list is not.
+  it('offers no fetch action', async () => {
     renderSection()
+    expect(screen.queryByRole('button', { name: 'Fetch all feeds' })).toBeNull()
+
     await user.click(screen.getByLabelText('Beta News'))
-    await user.click(screen.getByRole('button', { name: 'Fetch articles' }))
-    expect(mockStartFeedFetch).toHaveBeenCalledWith(2)
+    expect(screen.queryByRole('button', { name: 'Fetch articles' })).toBeNull()
+  })
+
+  it('edits a feed name and its URLs', async () => {
+    mockApiPatch.mockResolvedValue({})
+    renderSection()
+
+    await user.click(screen.getByRole('button', { name: /Edit feed — Beta News/ }))
+    const dialog = await screen.findByRole('dialog')
+
+    const rssInput = within(dialog).getByLabelText('Feed URL (RSS/Atom)')
+    await user.clear(rssInput)
+    await user.type(rssInput, 'https://beta.example.com/atom.xml')
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+
+    expect(mockApiPatch).toHaveBeenCalledWith('/api/feeds/2', {
+      name: 'Beta News',
+      url: 'https://beta-news.example.com',
+      rss_url: 'https://beta.example.com/atom.xml',
+    })
+  })
+
+  it('does not save a feed URL that is not http(s)', async () => {
+    renderSection()
+
+    await user.click(screen.getByRole('button', { name: /Edit feed — Beta News/ }))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('Feed URL (RSS/Atom)'), 'ftp://beta.example.com/feed')
+
+    expect(within(dialog).getByRole('button', { name: 'Save changes' }).hasAttribute('disabled')).toBe(true)
+    expect(mockApiPatch).not.toHaveBeenCalled()
   })
 
   it('offers re-enable only when a disabled feed is selected', async () => {
