@@ -1,0 +1,26 @@
+{
+  "name": "Oksskolten",
+  "install": "npm ci && ( test -x ./meilisearch || curl -sL https://install.meilisearch.com | sh )",
+  "terminals": [
+    {
+      "name": "meilisearch",
+      "command": "./meilisearch --http-addr 127.0.0.1:7700 --no-analytics --db-path ./data/meili_data",
+      "description": "Meilisearch full-text search engine (optional; search returns 503 until ready)."
+    },
+    {
+      "name": "server",
+      "command": "npm run dev:server:noauth",
+      "description": "Fastify API + cron fetcher on port 3000. Auth disabled for local dev (NODE_ENV=development only)."
+    },
+    {
+      "name": "frontend",
+      "command": "npm run dev -- --host 0.0.0.0 --port 5173",
+      "description": "Vite dev server (SPA) on port 5173, proxies /api to the server."
+    }
+  ],
+  "ports": [
+    { "name": "server", "port": 3000 },
+    { "name": "frontend", "port": 5173 },
+    { "name": "meilisearch", "port": 7700 }
+  ]
+}
