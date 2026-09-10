@@ -27,6 +27,11 @@ vi.mock('../fetcher.js', () => ({
     mockDiscoverRssUrl(url, opts),
 }))
 
+vi.mock('./discovery.js', () => ({
+  discoverRssUrl: (url: string, opts?: { onFlareSolverr?: (status: string, found?: boolean) => void }) =>
+    mockDiscoverRssUrl(url, opts),
+}))
+
 vi.mock('./rss-bridge.js', () => ({
   queryRssBridge: (url: string) => mockQueryRssBridge(url),
   inferCssSelectorBridge: (url: string) => mockInferCssSelectorBridge(url),

@@ -1,4 +1,4 @@
-import type { RssItem } from '../../fetcher/rss.js'
+import type { RssItem } from '../../fetcher/rss/types.js'
 import { safeFetch } from '../../fetcher/ssrf.js'
 import { USER_AGENT, PROBE_TIMEOUT } from '../../fetcher/http.js'
 import { normalizeDate } from '../../fetcher/util.js'

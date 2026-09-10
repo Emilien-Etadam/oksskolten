@@ -1,4 +1,4 @@
-import { discoverRssUrl } from '../fetcher.js'
+import { discoverRssUrl } from './discovery.js'
 import { queryRssBridge, inferCssSelectorBridge } from './rss-bridge.js'
 import { resolveSocialSearchFeed } from './sources/social-search.js'
 import { resolveGithubStarsFeed } from './sources/github-releases.js'

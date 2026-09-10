@@ -14,7 +14,8 @@ import {
 
 import { errorMessage } from '../fetcher/util.js'
 import { convertHtmlToMarkdown, markdownToExcerpt, MIN_EXTRACTED_LENGTH } from '../fetcher/content.js'
-import { type FetchRssResult, type RssItem, fetchAndParseRss, RateLimitError } from '../fetcher/rss.js'
+import { fetchAndParseRss } from '../fetcher/rss/fetch.js'
+import { type FetchRssResult, type RssItem, RateLimitError } from '../fetcher/rss/types.js'
 import { isGoogleNewsUrl } from '../fetcher/google-news.js'
 import { computeInterval, computeEmpiricalInterval, sqliteFuture, DEFAULT_INTERVAL } from '../fetcher/schedule.js'
 import { isRemovedRedditPost } from '../fetcher/reddit.js'

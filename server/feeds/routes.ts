@@ -22,7 +22,8 @@ import {
   createCategory,
 } from '../db.js'
 import { requireJson } from '../auth.js'
-import { fetchSingleFeed, discoverRssUrl } from '../fetcher.js'
+import { fetchSingleFeed } from '../fetcher.js'
+import { discoverRssUrl } from './discovery.js'
 import { sweepAutoArchiveFeeds, SWEEP_LIMIT_BACKLOG } from '../fetcher/article-images.js'
 import { resolveFeedSource, type ResolveEvent } from './resolve.js'
 import { parseOpml, generateOpml } from './opml.js'
