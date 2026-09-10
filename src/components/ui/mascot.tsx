@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { MascotChoice } from '../../hooks/use-mascot'
+import type { MascotChoice } from '@/hooks/preferences'
 
 type Palette = Record<string, string>
 

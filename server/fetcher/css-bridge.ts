@@ -1,6 +1,6 @@
 import { JSDOM } from 'jsdom'
 import { fetchViaFlareSolverr } from './flaresolverr.js'
-import type { RssItem } from './rss.js'
+import type { RssItem } from './rss/types.js'
 import { GENERIC_LINK_TEXT } from '../lib/cleaner/boilerplate-text.js'
 import { logger } from '../logger.js'
 

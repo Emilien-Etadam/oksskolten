@@ -1,6 +1,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
-import { getDb } from './db.js'
-import { validateApiKey } from './db/apiKeys.js'
+import { getDb } from '../db.js'
+import { validateApiKey } from './api-keys-db.js'
 
 declare module 'fastify' {
   interface FastifyRequest {

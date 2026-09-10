@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { randomUUID } from 'node:crypto'
 import type { Message, TextBlock } from './types.js'
-import { requireAuth, requireJson } from '../../auth.js'
+import { requireAuth, requireJson } from '../../auth/index.js'
 import { startSSE } from '../../lib/sse.js'
 import { StringIdParams, parseOrBadRequest } from '../../lib/validation.js'
 

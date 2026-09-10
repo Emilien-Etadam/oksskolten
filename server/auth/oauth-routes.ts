@@ -2,10 +2,10 @@ import crypto from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { GitHub, generateState } from 'arctic'
-import { getDb, getSetting, upsertSetting } from './db.js'
-import { requireAuth, getOrigin, getCredentialCount } from './auth.js'
-import { TtlStore } from './lib/ttl-store.js'
-import { parseOrBadRequest } from './lib/validation.js'
+import { getDb, getSetting, upsertSetting } from '../db.js'
+import { requireAuth, getOrigin, getCredentialCount } from './guards.js'
+import { TtlStore } from '../lib/ttl-store.js'
+import { parseOrBadRequest } from '../lib/validation.js'
 
 const AuthorizeBody = z.object({
   origin: z.string().optional(),

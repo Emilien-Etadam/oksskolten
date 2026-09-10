@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet, useParams, useLocation,
 import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback, lazy, Suspense } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import useSWR, { SWRConfig } from 'swr'
-import { useSettings, type Settings } from './hooks/use-settings'
+import { useSettings, type Settings } from '@/hooks/preferences'
 import { fetcher } from './lib/fetcher'
 import { LocaleContext, APP_NAME, type Locale, useI18n } from '@/i18n'
 import { MD_BREAKPOINT } from './lib/breakpoints'

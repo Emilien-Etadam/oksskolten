@@ -43,6 +43,10 @@ vi.mock('../fetcher.js', async () => {
   }
 })
 
+vi.mock('./discovery.js', () => ({
+  discoverRssUrl: (...args: unknown[]) => mockDiscoverRssUrl(...args),
+}))
+
 vi.mock('./rss-bridge.js', () => ({
   queryRssBridge: (...args: unknown[]) => mockQueryRssBridge(...args),
   inferCssSelectorBridge: (...args: unknown[]) => mockInferCssSelectorBridge(...args),

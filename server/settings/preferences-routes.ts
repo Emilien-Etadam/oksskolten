@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { z } from 'zod'
 import { getSetting, upsertSetting, deleteSetting } from '../db.js'
-import { requireJson } from '../auth.js'
+import { requireJson } from '../auth/index.js'
 import { PREF_KEYS, PREF_ALLOWED, PROVIDER_MODEL_PAIRS, validateProviderModel } from './preferences.js'
 
 export async function preferencesRoutes(api: FastifyInstance): Promise<void> {

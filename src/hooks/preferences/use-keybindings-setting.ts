@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { DEFAULT_KEY_BINDINGS, type KeyBindings } from './use-keyboard-navigation'
+import { DEFAULT_KEY_BINDINGS, type KeyBindings } from '../use-keyboard-navigation'
 
 const STORAGE_KEY = 'keybindings'
 

@@ -12,7 +12,7 @@ import {
 } from '../../db.js'
 import type { MeiliArticleDoc } from '../../search/client.js'
 import { syncArticleToSearch } from '../../search/sync.js'
-import { requireJson } from '../../auth.js'
+import { requireJson } from '../../auth/index.js'
 import { fetchArticleContent, enrichArticle, clipContext } from '../../fetcher.js'
 import { parseOrBadRequest } from '../../lib/validation.js'
 

@@ -2323,10 +2323,10 @@ describe('FlareSolverr — discoverRssUrl', () => {
 })
 
 describe('FlareSolverr — fetchAndParseRss', () => {
-  let fetchAndParseRss: typeof import('./fetcher/rss.js').fetchAndParseRss
+  let fetchAndParseRss: typeof import('./fetcher/rss/fetch.js').fetchAndParseRss
 
   beforeEach(async () => {
-    const mod = await import('./fetcher/rss.js')
+    const mod = await import('./fetcher/rss/fetch.js')
     fetchAndParseRss = mod.fetchAndParseRss
   })
 

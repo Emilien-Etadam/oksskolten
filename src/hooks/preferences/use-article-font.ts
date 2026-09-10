@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { findArticleFont } from '../data/articleFonts'
+import { findArticleFont } from '../../data/articleFonts'
 
 const LS_KEY = 'article-font'
 const LINK_ID = 'article-font-link'

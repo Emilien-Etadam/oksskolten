@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { setupTestDb } from './__tests__/helpers/testDb.js'
-import { buildApp } from './__tests__/helpers/buildApp.js'
-import { createApiKey } from './db/apiKeys.js'
+import { setupTestDb } from '../__tests__/helpers/testDb.js'
+import { buildApp } from '../__tests__/helpers/buildApp.js'
+import { createApiKey } from './api-keys-db.js'
 import type { FastifyInstance } from 'fastify'
 
 let app: FastifyInstance

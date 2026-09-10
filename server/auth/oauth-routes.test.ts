@@ -3,11 +3,11 @@ import Fastify from 'fastify'
 import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
 import type { FastifyInstance } from 'fastify'
-import { setupTestDb } from './__tests__/helpers/testDb.js'
-import { getDb, upsertSetting } from './db.js'
+import { setupTestDb } from '../__tests__/helpers/testDb.js'
+import { getDb, upsertSetting } from '../db.js'
 import { hashSync } from 'bcryptjs'
-import { oauthRoutes, isGitHubOAuthEnabled } from './oauthRoutes.js'
-import { authRoutes } from './authRoutes.js'
+import { oauthRoutes, isGitHubOAuthEnabled } from './oauth-routes.js'
+import { authRoutes } from './routes.js'
 
 let app: FastifyInstance
 let savedAuthDisabled: string | undefined

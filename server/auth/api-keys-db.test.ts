@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setupTestDb } from '../__tests__/helpers/testDb.js'
-import { createApiKey, listApiKeys, deleteApiKey, validateApiKey } from './apiKeys.js'
+import { createApiKey, listApiKeys, deleteApiKey, validateApiKey } from './api-keys-db.js'
 
 beforeEach(() => {
   setupTestDb()

@@ -17,9 +17,7 @@ const log = logger
 import { getDb } from './db/connection.js'
 import { registerApi } from './api.js'
 import { registerChatApi } from './ai/index.js'
-import { authRoutes } from './authRoutes.js'
-import { passkeyRoutes } from './passkeyRoutes.js'
-import { oauthRoutes } from './oauthRoutes.js'
+import { registerAuthRoutes } from './auth/index.js'
 import { fetchAllFeeds } from './fetcher.js'
 import { ensureSearchIndex, rebuildSearchIndex, isSearchReady, syncAllScoredArticlesToSearch } from './search/sync.js'
 
@@ -146,9 +144,7 @@ app.get('/api/health', async (_req, reply) => {
 })
 
 // Public auth routes (outside requireAuth)
-app.register(authRoutes)
-app.register(passkeyRoutes)
-app.register(oauthRoutes)
+registerAuthRoutes(app)
 
 // Protected API routes
 registerApi(app)
