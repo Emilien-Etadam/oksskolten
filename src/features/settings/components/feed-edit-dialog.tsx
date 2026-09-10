@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { useI18n } from '@/i18n'
 import { apiPatch } from '@/lib/fetcher'
+import { useFetchProgressContext } from '@/contexts/fetch-progress-context'
 import {
   Dialog,
   DialogContent,
@@ -34,9 +35,14 @@ function isHttpUrl(value: string): boolean {
  * its RSS document had to be deleted and added again, losing its articles.
  *
  * An empty feed URL is allowed: feeds served through RSS Bridge have none.
+ *
+ * A saved URL change is fetched right away — the point of fixing an address is
+ * to see whether it works — unless the feed is disabled, which the fetch
+ * endpoint refuses.
  */
 export function FeedEditDialog({ feed, onOpenChange, onSaved }: FeedEditDialogProps) {
   const { t } = useI18n()
+  const { startFeedFetch } = useFetchProgressContext()
   const [name, setName] = useState(feed.name)
   const [url, setUrl] = useState(feed.url)
   const [rssUrl, setRssUrl] = useState(feed.rss_url ?? '')
@@ -45,10 +51,16 @@ export function FeedEditDialog({ feed, onOpenChange, onSaved }: FeedEditDialogPr
   const trimmedRss = rssUrl.trim()
   const urlValid = isHttpUrl(url.trim())
   const rssValid = trimmedRss === '' || isHttpUrl(trimmedRss)
-  const changed = name.trim() !== feed.name
-    || url.trim() !== feed.url
-    || (trimmedRss || null) !== (feed.rss_url ?? null)
+  const urlChanged = url.trim() !== feed.url || (trimmedRss || null) !== (feed.rss_url ?? null)
+  const changed = name.trim() !== feed.name || urlChanged
   const canSave = name.trim().length > 0 && urlValid && rssValid && changed
+
+  async function fetchAfterSave(feedName: string) {
+    const result = await startFeedFetch(feed.id)
+    if (result.error) toast.error(t('toast.fetchError', { name: feedName }))
+    else if (result.totalNew > 0) toast.success(t('toast.fetchedArticles', { count: String(result.totalNew), name: feedName }))
+    else toast(t('toast.noNewArticles', { name: feedName }))
+  }
 
   async function handleSave() {
     if (!canSave || saving) return
@@ -62,6 +74,9 @@ export function FeedEditDialog({ feed, onOpenChange, onSaved }: FeedEditDialogPr
       toast.success(t('settings.feedsEditSaved'))
       onSaved()
       onOpenChange(false)
+      // The dialog is gone by now; the fetch runs in the provider and
+      // announces itself with a toast.
+      if (urlChanged && !feed.disabled) void fetchAfterSave(name.trim())
     } catch {
       toast.error(t('settings.feedsEditFailed'))
     } finally {

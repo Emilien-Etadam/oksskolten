@@ -174,6 +174,42 @@ describe('FeedManagementSection', () => {
       url: 'https://beta-news.example.com',
       rss_url: 'https://beta.example.com/atom.xml',
     })
+    // A fixed address is worth trying at once
+    expect(mockStartFeedFetch).toHaveBeenCalledWith(2)
+  })
+
+  it('does not fetch when only the name changed', async () => {
+    mockApiPatch.mockResolvedValue({})
+    renderSection()
+
+    await user.click(screen.getByRole('button', { name: /Edit feed — Beta News/ }))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('Name'), ' Daily')
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+
+    expect(mockApiPatch).toHaveBeenCalledWith('/api/feeds/2', {
+      name: 'Beta News Daily',
+      url: 'https://beta-news.example.com',
+      rss_url: null,
+    })
+    expect(mockStartFeedFetch).not.toHaveBeenCalled()
+  })
+
+  it('does not fetch a disabled feed after an URL change', async () => {
+    mockApiPatch.mockResolvedValue({})
+    renderSection()
+
+    await user.click(screen.getByRole('button', { name: /Edit feed — Gamma Dead/ }))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('Feed URL (RSS/Atom)'), 'https://gamma.example.com/rss')
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }))
+
+    expect(mockApiPatch).toHaveBeenCalledWith('/api/feeds/3', {
+      name: 'Gamma Dead',
+      url: 'https://gamma-dead.example.com',
+      rss_url: 'https://gamma.example.com/rss',
+    })
+    expect(mockStartFeedFetch).not.toHaveBeenCalled()
   })
 
   it('does not save a feed URL that is not http(s)', async () => {
