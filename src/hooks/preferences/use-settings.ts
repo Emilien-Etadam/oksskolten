@@ -21,9 +21,9 @@ import { useLayout } from './use-layout'
 import { useMascot, type MascotChoice } from './use-mascot'
 import { useKeyboardNavSetting } from './use-keyboard-nav-setting'
 import { useKeybindingsSetting } from './use-keybindings-setting'
-import type { LayoutName } from '../data/layouts'
-import type { Theme } from '../data/themes'
-import { fetcher, apiPatch, authHeaders } from '../lib/fetcher'
+import type { LayoutName } from '../../data/layouts'
+import type { Theme } from '../../data/themes'
+import { fetcher, apiPatch, authHeaders } from '../../lib/fetcher'
 
 /** Debounce delay (ms) before syncing settings to backend */
 const SETTINGS_SYNC_DEBOUNCE_MS = 500
@@ -383,7 +383,7 @@ export function useSettings() {
       syncedSetArticleFont: make<string>('appearance.font_family', setArticleFont),
       syncedSetMascot: make<MascotChoice>('appearance.mascot', setMascot),
       syncedSetKeyboardNavigation: make<'on' | 'off'>('reading.keyboard_navigation', setKeyboardNavigation),
-      syncedSetKeybindings: (value: import('./use-keyboard-navigation').KeyBindings) => {
+      syncedSetKeybindings: (value: import('../use-keyboard-navigation').KeyBindings) => {
         dirtyKeysRef.current.add('reading.keybindings')
         setKeybindings(value)
         pendingRef.current['reading.keybindings'] = JSON.stringify(value)

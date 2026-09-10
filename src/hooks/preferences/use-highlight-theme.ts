@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { resolveHighlightCss } from '../data/highlightThemes'
+import { resolveHighlightCss } from '../../data/highlightThemes'
 
 const LS_KEY = 'highlight-theme-override'
 const LINK_ID = 'hljs-theme-link'

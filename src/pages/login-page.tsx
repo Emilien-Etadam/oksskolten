@@ -3,8 +3,7 @@ import { browserSupportsWebAuthn, startAuthentication } from '@simplewebauthn/br
 import { Input } from '../components/ui/input'
 import { FormField } from '../components/ui/form-field'
 import { useI18n } from '@/i18n'
-import { useDarkMode } from '../hooks/use-dark-mode'
-import { useTheme } from '../hooks/use-theme'
+import { useDarkMode, useTheme } from '@/hooks/preferences'
 import { Fingerprint, Github } from 'lucide-react'
 import { SetupPage } from './setup-page'
 

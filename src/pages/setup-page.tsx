@@ -4,8 +4,7 @@ import { Input } from '../components/ui/input'
 import { FormField } from '../components/ui/form-field'
 import { PasswordStrength } from '../components/ui/password-strength'
 import { useI18n } from '@/i18n'
-import { useDarkMode } from '../hooks/use-dark-mode'
-import { useTheme } from '../hooks/use-theme'
+import { useDarkMode, useTheme } from '@/hooks/preferences'
 
 export function SetupPage({ onLogin }: { onLogin: (token: string) => void }) {
   const { t } = useI18n()

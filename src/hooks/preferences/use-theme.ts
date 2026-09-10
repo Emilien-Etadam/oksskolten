@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { themes as builtinThemes, type Theme } from '../data/themes'
+import { themes as builtinThemes, type Theme } from '../../data/themes'
 
 function getInitialTheme(): string {
   return localStorage.getItem('color-theme') || 'default'

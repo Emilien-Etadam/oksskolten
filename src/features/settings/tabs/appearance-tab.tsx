@@ -7,7 +7,7 @@ import { PreviewCard } from '../components/preview-card'
 import { useAppLayout } from '@/app'
 import { Separator } from '@/components/ui/separator'
 import { PixelDreamPuff, PixelSleepyGiant } from '@/components/ui/mascot'
-import type { MascotChoice } from '@/hooks/use-mascot'
+import type { MascotChoice } from '@/hooks/preferences'
 import { ThemeSection } from './theme-section'
 
 /** Derive preview colors from a theme's color definitions */

@@ -5,7 +5,7 @@ import { PROVIDER_LABELS, LLM_API_PROVIDERS, TRANSLATE_SERVICE_PROVIDERS } from 
 import { Input } from '@/components/ui/input'
 import { FormField } from '@/components/ui/form-field'
 import { ExternalLink, CircleDot, CircleCheck, CircleSlash } from 'lucide-react'
-import type { Settings } from '../../../hooks/use-settings'
+import type { Settings } from '@/hooks/preferences'
 
 type TFunc = (key: any, params?: Record<string, string>) => string
 
