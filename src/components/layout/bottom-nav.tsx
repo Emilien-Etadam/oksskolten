@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Inbox, Search, Bookmark, MessagesSquare, Menu } from 'lucide-react'
 import { useAppLayout } from '../../app'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import { SearchDialog } from '../ui/search-dialog'
 
 /**

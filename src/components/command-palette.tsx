@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/command'
 import useSWR from 'swr'
 import { fetcher, fetchOpmlBlob } from '@/lib/fetcher'
-import { useI18n } from '@/lib/i18n'
+import { useI18n } from '@/i18n'
 import { useAppLayout } from '../app'
 import { themes as builtinThemes } from '@/data/themes'
 import { layouts } from '@/data/layouts'

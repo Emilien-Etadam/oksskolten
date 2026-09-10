@@ -6,14 +6,14 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Dialog, DialogPortal, DialogOverlay, DialogTitle } from './dialog'
 import { fetcher } from '../../lib/fetcher'
 import { searchArticles } from '../../lib/search'
-import { SmartFolderDialog } from '../smart/smart-folder-dialog'
+import { SmartFolderDialog } from '@/features/feeds'
 import { apiPost } from '../../lib/fetcher'
 
 /** Maximum number of search results returned per page */
 const SEARCH_RESULTS_LIMIT = 20
 import { articleUrlToPath } from '../../lib/url'
 import { formatRelativeDate } from '../../lib/dateFormat'
-import { useI18n } from '../../lib/i18n'
+import { useI18n } from '@/i18n'
 import {
   Command,
   CommandInput,

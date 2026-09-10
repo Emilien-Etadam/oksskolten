@@ -9,9 +9,9 @@ const JAPANESE_RE =
 
 const ALLOWLIST: RegExp[] = [
   // i18n translation files
-  /^src\/lib\/i18n\.ts$/,
+  /^src\/i18n\/messages\//,
   /^src\/lib\/demo\/i18n\.ts$/,
-  /^src\/lib\/i18n\.test\.ts$/,
+  /^src\/i18n\/index\.test\.ts$/,
 
   // Test files — assertions often contain Japanese text
   /\.test\.tsx?$/,
@@ -30,7 +30,7 @@ const ALLOWLIST: RegExp[] = [
   /^server\/lib\/cleaner\/boilerplate-text\.ts$/,
 
   // Translation provider implementation (Japanese in markdown protection logic)
-  /^server\/providers\/translate\//,
+  /^server\/ai\/providers\/translate\//,
 
   // Binary / non-text assets
   /\.(png|jpg|jpeg|gif|ico|svg|woff2?|ttf|eot|webp|avif)$/,

@@ -4,23 +4,21 @@ import { AnimatePresence, motion } from 'framer-motion'
 import useSWR, { SWRConfig } from 'swr'
 import { useSettings, type Settings } from './hooks/use-settings'
 import { fetcher } from './lib/fetcher'
-import { LocaleContext, APP_NAME, type Locale, useI18n } from './lib/i18n'
+import { LocaleContext, APP_NAME, type Locale, useI18n } from '@/i18n'
 import { MD_BREAKPOINT } from './lib/breakpoints'
 import { useIsTouchDevice } from './hooks/use-is-touch-device'
 import { saveScrollPosition, restoreScrollPosition } from './hooks/use-scroll-restoration'
 import { useSwipeDrawer } from './hooks/use-swipe-drawer'
 import { Header } from './components/layout/header'
-import { ArticleList, type ArticleListHandle } from './components/article/article-list'
-import { ArticleDetail } from './components/article/article-detail'
-import { ArticleRawPage } from './components/article/article-raw-page'
+import { ArticleList, type ArticleListHandle, ArticleDetail, ArticleRawPage } from '@/features/reading'
 import { PageLayout } from './components/layout/page-layout'
 import { KeyboardNavigationProvider, useKeyboardNavigationContext } from './contexts/keyboard-navigation-context'
-import { CategoryTabs } from './components/feed/category-tabs'
+import { CategoryTabs } from '@/features/feeds'
 import { isSidebarCollapsed, persistSidebarCollapsed } from './lib/sidebar-collapsed'
-const SettingsPage = lazy(() => import('./pages/settings-page').then(m => ({ default: m.SettingsPage })))
-const ChatPage = lazy(() => import('./pages/chat-page').then(m => ({ default: m.ChatPage })))
-const FrontPage = lazy(() => import('./pages/front-page').then(m => ({ default: m.FrontPage })))
-const StoriesPage = lazy(() => import('./pages/stories-page').then(m => ({ default: m.StoriesPage })))
+const SettingsPage = lazy(() => import('@/features/settings/settings-page').then(m => ({ default: m.SettingsPage })))
+const ChatPage = lazy(() => import('@/features/chat/chat-page').then(m => ({ default: m.ChatPage })))
+const FrontPage = lazy(() => import('@/features/reading/pages/front-page').then(m => ({ default: m.FrontPage })))
+const StoriesPage = lazy(() => import('@/features/reading/pages/stories-page').then(m => ({ default: m.StoriesPage })))
 import { AuthShell } from './lib/auth-shell'
 import { ErrorBoundary } from './components/auth/error-boundary'
 import { HintBanner } from './components/ui/hint-banner'

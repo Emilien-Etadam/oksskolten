@@ -1,10 +1,9 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { useAppLayout } from '../../app'
 import { MD_BREAKPOINT } from '../../lib/breakpoints'
-import { FeedList } from '../feed/feed-list'
+import { FeedList, RefreshButton } from '@/features/feeds'
 import { Header } from './header'
 import { BottomNav } from './bottom-nav'
-import { RefreshButton } from '../feed/refresh-button'
 
 interface PageLayoutProps {
   /** Header mode */

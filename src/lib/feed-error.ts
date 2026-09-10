@@ -1,5 +1,5 @@
 import { authHeaders } from './fetcher'
-import type { TranslateFn } from './i18n'
+import type { TranslateFn } from '@/i18n'
 
 type MessageKey = Parameters<TranslateFn>[0]
 

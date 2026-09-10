@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import App from './app'
 import './index.css'
 import { flushOfflineQueue } from './lib/offlineQueue'
-import { translate } from './lib/i18n'
+import { translate } from '@/i18n'
 
 const updateSW = registerSW({
   immediate: true,
