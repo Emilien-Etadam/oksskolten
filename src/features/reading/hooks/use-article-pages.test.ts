@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import type { ArticleListItem } from '../../../../shared/types'
 import { useArticlePages, type ArticlePagesParams } from './use-article-pages'
+import { refreshArticleLists } from '@/lib/article-list-refresh'
 
 interface ArticlesResponse {
   articles: ArticleListItem[]
@@ -179,5 +180,18 @@ describe('useArticlePages', () => {
   it('returns null once the previous page has no more items', () => {
     renderHook(() => useArticlePages(defaultParams))
     expect(capturedGetKey!(1, { articles: [], total: 0, has_more: false })).toBeNull()
+  })
+
+  // A global mutate on the page keys leaves the cached pages untouched, so a
+  // fetch that found new articles only reached the list after a page reload.
+  it('reloads its pages through the bound mutate when the refresh bus fires', () => {
+    const { unmount } = renderHook(() => useArticlePages(defaultParams))
+
+    refreshArticleLists()
+    expect(swrInfiniteReturn.mutate).toHaveBeenCalledTimes(1)
+
+    unmount()
+    refreshArticleLists()
+    expect(swrInfiniteReturn.mutate).toHaveBeenCalledTimes(1)
   })
 })

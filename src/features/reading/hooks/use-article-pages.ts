@@ -1,6 +1,7 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import useSWRInfinite from 'swr/infinite'
 import { fetcher } from '@/lib/fetcher'
+import { subscribeArticleListRefresh } from '@/lib/article-list-refresh'
 import type { ArticleListItem } from '../../../../shared/types'
 
 interface ArticlesResponse {
@@ -66,6 +67,11 @@ export function useArticlePages({
       revalidateFirstPage: isCollectionView,
     },
   )
+
+  // A global `mutate` on the page keys leaves the cached pages in place; only
+  // this bound mutate makes the infinite fetcher refetch all of them. Anything
+  // that pulls in new articles emits on the bus.
+  useEffect(() => subscribeArticleListRefresh(() => { void mutate() }), [mutate])
 
   const allArticles = useMemo(() => data ? data.flatMap(page => page.articles) : [], [data])
 

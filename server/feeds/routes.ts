@@ -112,6 +112,8 @@ const AI_FILTER_MAX_CHARS = 1000
 
 const UpdateFeedBody = z.object({
   name: z.string().optional(),
+  url: httpOrHttpsUrl.optional(),
+  rss_url: httpOrHttpsUrl.nullable().optional(),
   rss_bridge_url: z.string().nullable().optional(),
   disabled: z.number().optional(),
   category_id: z.number().nullable().optional(),

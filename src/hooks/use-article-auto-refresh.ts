@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { fetcher } from '../lib/fetcher'
 import { isArticleListKey } from './use-fetch-progress'
+import { refreshArticleLists } from '../lib/article-list-refresh'
 import type { FeedWithCounts } from '../../shared/types'
 
 export const AUTO_REFRESH_INTERVAL_MS = 60_000
@@ -32,6 +33,7 @@ export function useArticleAutoRefresh(intervalMs = AUTO_REFRESH_INTERVAL_MS): vo
     const signature = data.feeds.map(f => `${f.id}:${f.article_count}`).join(',')
     if (lastSignature.current !== null && signature !== lastSignature.current) {
       void mutate(isArticleListKey)
+      refreshArticleLists()
     }
     lastSignature.current = signature
   }, [data, mutate])
