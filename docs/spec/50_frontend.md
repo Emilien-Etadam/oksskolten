@@ -92,7 +92,17 @@ Pull-to-refresh calls `startFeedFetch(feedId)` on individual feed pages to fetch
 | Delete feed (`DELETE /api/feeds/:id`) | `/api/feeds`, `/api/articles` |
 | Update feed (`PATCH /api/feeds/:id`) | `/api/feeds` |
 | Seen/read update (`PATCH .../seen`, `POST .../read`) | `/api/feeds` (to update unread_count) |
-| Manual fetch (refresh icon, context menu, `Fetch all feeds`) | `/api/feeds`, `/api/articles`, `/api/frontpage` |
+| Manual fetch (refresh icon, context menu, pull-to-refresh) | `/api/feeds`, `/api/articles`, `/api/frontpage` |
+
+The article list needs more than a `mutate()` on its keys. It is a `useSWRInfinite`
+hook, and that fetcher only refetches a page when the page is missing from the cache,
+when `revalidateAll` is on, or when the hook's own `mutate` set the force flag — and
+`revalidateFirstPage` is off outside collection views. A global mutate therefore woke
+the hook and handed back the same cached pages: the toast announced new articles while
+the list stayed as it was until the page was reloaded. `src/lib/article-list-refresh.ts`
+is a small bus for that: `useArticlePages` subscribes its bound `mutate`, and anything
+that brings in articles (the fetch-progress revalidation, the feed actions, the
+auto-refresh poll) emits on it.
 
 Revalidation is disabled app-wide (`revalidateIfStale`, `revalidateOnFocus` and
 `revalidateOnReconnect` are all `false`), so a cached response survives until a full
@@ -104,11 +114,19 @@ the session while the list, keyed separately, already shows the recovered text.
 
 The other exception is the server's scheduled fetch, which the client never hears
 about. `useArticleAutoRefresh` (mounted once in `AppLayout`) polls `/api/feeds` every
-60 seconds while the tab is visible — SWR pauses the interval in a background tab —
-and revalidates the article lists and the front page when a feed's `article_count`
-moves. Unread counts are deliberately left out of that comparison: they change as the
-reader marks articles, and refetching an unread-only list on that would pull articles
-out from under them.
+60 seconds while the tab is visible, and revalidates the article lists and the front
+page when a feed's `article_count` moves. Unread counts are deliberately left out of
+that comparison: they change as the reader marks articles, and refetching an
+unread-only list on that would pull articles out from under them.
+
+The polling is the hook's own `setInterval`, not SWR's `refreshInterval`. SWR skips
+the revalidation on every tick whose key holds an error (`!getCache().error` in its
+interval loop) and, with focus and reconnect revalidation off, nothing brought it
+back: one failed request — a server restart, a sleeping laptop, a dropped connection —
+froze a tab's lists until it was reloaded, which is what a window left open for days
+runs into. An explicit `mutate('/api/feeds')` revalidates whatever the last result was.
+Hidden tabs skip their tick and catch up on `visibilitychange`, however long they have
+been away.
 
 
 ### Feed Metrics
@@ -192,12 +210,22 @@ advertises, plus pull-to-refresh on touch devices.
 | Control | Where | Scope |
 |---|---|---|
 | Refresh icon | List header (`Header`'s `rightSlot`, filled by `RefreshButton`) | Follows the route: the feed on `/feeds/:id`, a category's enabled feeds on `/categories/:id`, every enabled feed anywhere else |
-| `Fetch all feeds` | Settings → Feeds, next to `Add Feed` | Every enabled feed |
+| Pull-to-refresh | Article list, touch devices | The feed on `/feeds/:id`; elsewhere a plain list revalidation |
+| Context menu → Fetch | Sidebar, per feed or category | The feed, or a category's enabled feeds |
 
-Both report the number of new articles, or that there were none, as a toast.
 The "every feed" path calls `POST /api/admin/fetch-all` — one request, server-side
 concurrency — instead of firing one per feed; `fetchAllFeeds()` in
 `src/lib/feed-refresh.ts` reads its SSE stream and sums the per-feed counts.
+
+Settings has no fetch control: the articles a run brings in are not on screen there,
+and the list it would refresh is unmounted, so the run looked like it had done nothing.
+
+The refresh icon reports the larger of two numbers: what the run pulled from the
+sources, and how many articles the feeds in scope gained between the counts the tab
+held and the ones read back afterwards. They differ whenever the server's scheduled
+fetch got there first — those articles are new to the reader even though the run
+itself found nothing, and reporting only the run's count read as "no new articles"
+next to a list that had just grown.
 
 ### Day Separators
 
@@ -298,6 +326,7 @@ Lists the feeds with `disabled = 1` or a non-null `last_error`, disabled first, 
 | Sorting | Any column header. Count and date columns sort descending on first click, text columns ascending |
 | Filtering | Free-text search over name and URL, plus category and status dropdowns |
 | Adding | An `Add Feed` button in the section header opens the shared `FeedModal` with `initialStep="feed"`, skipping the add-something chooser. On success the table refreshes from the same SWR cache and the new feed's fetch is subscribed to |
+| Editing | A pencil per row opens `FeedEditDialog`: name, feed URL (RSS/Atom) and site URL, saved with `PATCH /api/feeds/:id`. A feed whose address moved used to have to be deleted and added again, losing its articles. Saving a URL change fetches the feed at once and reports what it found; a rename alone does not, and a disabled feed is left alone since `POST /api/feeds/:id/fetch` answers 404 for one |
 | Selection | Per-row checkbox toggles; Shift + Click selects a range; the header checkbox toggles every row matching the current filters |
 | Scope | Bulk actions apply only to selected feeds that the current filters keep visible — a selection hidden by a filter is never acted on |
 
@@ -307,6 +336,5 @@ Bulk actions reuse `useFeedBulkActions` (shared with the sidebar multi-select):
 |---|---|
 | Move to Category | `POST /api/feeds/bulk-move` |
 | Mark All Read | `POST /api/feeds/:id/mark-all-seen` per feed |
-| Fetch | Fetches each selected enabled feed sequentially, one toast per feed |
 | Re-enable | `PATCH /api/feeds/:id` with `disabled: 0` for each selected disabled feed. Shown only when the selection contains a disabled feed |
 | Delete | Requires confirmation dialog. `DELETE /api/feeds/:id` per feed |

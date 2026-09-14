@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import useSWR from 'swr'
+import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
@@ -9,6 +9,14 @@ import { useI18n } from '@/i18n'
 import { useFetchProgressContext } from '@/contexts/fetch-progress-context'
 import { IconButton } from '@/components/ui/icon-button'
 import type { FeedWithCounts } from '../../../../shared/types'
+
+type FeedsData = { feeds: FeedWithCounts[] }
+
+/** Articles held by the feeds a refresh covers, as of the given payload. */
+function countArticles(feeds: FeedWithCounts[] | undefined, inScope: (feed: FeedWithCounts) => boolean): number | null {
+  if (!feeds) return null
+  return feeds.filter(inScope).reduce((sum, feed) => sum + feed.article_count, 0)
+}
 
 /**
  * Fetch the feeds behind the list currently on screen. Until now the only way
@@ -23,7 +31,8 @@ export function RefreshButton() {
   const { t } = useI18n()
   const location = useLocation()
   const { startFeedFetch, revalidate } = useFetchProgressContext()
-  const { data: feedsData } = useSWR<{ feeds: FeedWithCounts[] }>('/api/feeds', fetcher)
+  const { mutate: globalMutate } = useSWRConfig()
+  const { data: feedsData } = useSWR<FeedsData>('/api/feeds', fetcher)
   const [running, setRunning] = useState(false)
 
   const refresh = useCallback(async () => {
@@ -32,6 +41,12 @@ export function RefreshButton() {
     try {
       const feedMatch = /^\/feeds\/(\d+)/.exec(location.pathname)
       const categoryMatch = /^\/categories\/(\d+)/.exec(location.pathname)
+      const inScope = feedMatch
+        ? (feed: FeedWithCounts) => feed.id === Number(feedMatch[1])
+        : categoryMatch
+          ? (feed: FeedWithCounts) => feed.category_id === Number(categoryMatch[1]) && feed.type !== 'clip'
+          : (feed: FeedWithCounts) => feed.type !== 'clip'
+      const before = countArticles(feedsData?.feeds, inScope)
       let totalNew = 0
 
       if (feedMatch) {
@@ -49,7 +64,16 @@ export function RefreshButton() {
         totalNew = (await fetchAllFeeds()).totalNew
       }
 
-      if (totalNew > 0) toast.success(t('refresh.done', { count: String(totalNew) }))
+      // What the run pulled from the sources is not what reaches the list: the
+      // scheduled fetch may have brought articles in since this tab last looked,
+      // and those are new to the reader even though this run found nothing. Read
+      // the counts back and report whichever number is larger.
+      const fresh = await globalMutate<FeedsData>('/api/feeds')
+      const after = countArticles(fresh?.feeds, inScope)
+      const appeared = before != null && after != null ? Math.max(0, after - before) : 0
+      const count = Math.max(totalNew, appeared)
+
+      if (count > 0) toast.success(t('refresh.done', { count: String(count) }))
       else toast(t('refresh.upToDate'))
     } catch {
       toast.error(t('refresh.failed'))
@@ -60,7 +84,7 @@ export function RefreshButton() {
       // toast announced new articles.
       revalidate()
     }
-  }, [running, location.pathname, startFeedFetch, feedsData, revalidate, t])
+  }, [running, location.pathname, startFeedFetch, feedsData, globalMutate, revalidate, t])
 
   return (
     <IconButton

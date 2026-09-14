@@ -724,13 +724,17 @@ The frontend then presents the user with a choice: "Subscribe to the whole site"
 // Request (all optional, only specified fields are updated)
 {
   "name": "New Name",
+  "url": "https://example.com",
+  "rss_url": "https://example.com/feed.xml",
   "rss_bridge_url": "http://rss-bridge/?...",
   "disabled": 0,
   "category_id": 2
 }
 ```
 
-Updatable fields: `name`, `rss_bridge_url`, `disabled` (`0` or `1`), `category_id`. `url` and `rss_url` cannot be changed (ignored even if included in the request). Setting `disabled: 0` also resets `error_count` to `0` and `last_error` to `NULL`.
+Updatable fields: `name`, `url`, `rss_url`, `rss_bridge_url`, `disabled` (`0` or `1`), `category_id`. `url` and `rss_url` must be `http://` or `https://` URLs; `rss_url` may be `null` for a feed served through RSS Bridge. Setting `disabled: 0` also resets `error_count` to `0` and `last_error` to `NULL`.
+
+Changing `url` or `rss_url` clears what the old address left behind — `etag`, `last_modified`, `last_content_hash`, `last_error` and `error_count` — so the next fetch is a plain request instead of a conditional one carrying the previous document's validators, and clears `next_check_at` so the feed is due on the next scheduled pass.
 
 ```json
 // Response: 200 (returns all feed fields)
