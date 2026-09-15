@@ -4,6 +4,7 @@ import { Separator } from '@/components/ui/separator'
 import { ProviderConfigSection } from '../sections/provider-config-section'
 import { TaskModelSection } from '../sections/task-model-section'
 import { GithubSection } from '../sections/github-section'
+import { DiscordSection } from '../sections/discord-section'
 
 export function IntegrationTab() {
   const { settings } = useAppLayout()
@@ -16,6 +17,8 @@ export function IntegrationTab() {
       <TaskModelSection settings={settings} t={t} />
       <Separator />
       <GithubSection t={t} settings={settings} />
+      <Separator />
+      <DiscordSection t={t} />
     </>
   )
 }

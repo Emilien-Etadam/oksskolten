@@ -16,6 +16,7 @@ import {
 import { isBlueskyApiUrl, isBlueskyFeedUrl, fetchBlueskySearch, fetchBlueskyFeed } from '../../feeds/sources/social-search.js'
 import { isGithubStarsUrl, fetchGithubStarredReleases } from '../../feeds/sources/github-releases.js'
 import { isGithubTrendingUrl, fetchGithubTrending } from '../../feeds/sources/github-trending.js'
+import { isDiscordChannelUrl, fetchDiscordChannel } from '../../feeds/sources/discord-channel.js'
 import { type FetchRssResult, type RssItem, RateLimitError } from './types.js'
 import { cleanItems, parseRssXml } from './parse.js'
 
@@ -95,16 +96,18 @@ export async function fetchAndParseRss(feed: Feed, opts?: { skipCache?: boolean 
   const rssUrl = feed.rss_url || feed.rss_bridge_url
   if (!rssUrl) throw new Error('No RSS URL')
 
-  // Bluesky searches and custom feeds, GitHub stars and GitHub trending have
-  // no RSS endpoint — query the API, or scrape the page
-  if (isBlueskyApiUrl(rssUrl) || isGithubStarsUrl(rssUrl) || isGithubTrendingUrl(rssUrl)) {
+  // Bluesky searches and custom feeds, GitHub stars and trending, and Discord
+  // channels have no RSS endpoint — query the API, or scrape the page
+  if (isBlueskyApiUrl(rssUrl) || isGithubStarsUrl(rssUrl) || isGithubTrendingUrl(rssUrl) || isDiscordChannelUrl(rssUrl)) {
     const items = isGithubStarsUrl(rssUrl)
       ? await fetchGithubStarredReleases(rssUrl)
       : isGithubTrendingUrl(rssUrl)
         ? await fetchGithubTrending(rssUrl)
-        : isBlueskyFeedUrl(rssUrl)
-          ? await fetchBlueskyFeed(rssUrl)
-          : await fetchBlueskySearch(rssUrl)
+        : isDiscordChannelUrl(rssUrl)
+          ? await fetchDiscordChannel(rssUrl)
+          : isBlueskyFeedUrl(rssUrl)
+            ? await fetchBlueskyFeed(rssUrl)
+            : await fetchBlueskySearch(rssUrl)
     return {
       items: cleanItems(items),
       notModified: false,

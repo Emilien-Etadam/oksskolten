@@ -25,7 +25,7 @@ import { requireJson } from '../auth/index.js'
 import { fetchSingleFeed } from '../fetcher.js'
 import { discoverRssUrl } from './discovery.js'
 import { sweepAutoArchiveFeeds, SWEEP_LIMIT_BACKLOG } from '../fetcher/article-images.js'
-import { resolveFeedSource, type ResolveEvent } from './resolve.js'
+import { resolveFeedSource, type ResolveEvent, type ResolveStage } from './resolve.js'
 import { parseOpml, generateOpml } from './opml.js'
 import { categoryRoutes } from './categories-routes.js'
 import { NumericIdParams, parseOrBadRequest } from '../lib/validation.js'
@@ -57,12 +57,19 @@ const CreateFeedBody = z
 
 type SseSend = ReturnType<typeof startSSE>['send']
 
+/**
+ * Stages that answer from a known source instead of discovering one. They have
+ * no progress worth showing: either they match, and the feed is resolved, or
+ * the chain moves on.
+ */
+const DIRECT_SOURCE_STAGES = new Set<ResolveStage>(['github-stars', 'github-trending', 'discord', 'social'])
+
 function translateCreateResolveEvent(
   send: SseSend,
   event: ResolveEvent,
   state: { directSource: boolean },
 ): void {
-  if (event.stage === 'github-stars' || event.stage === 'github-trending' || event.stage === 'social') {
+  if (DIRECT_SOURCE_STAGES.has(event.stage)) {
     if (event.status === 'done' && event.found) {
       state.directSource = true
       send({ type: 'step', step: 'rss-discovery', status: 'done', found: true })
@@ -87,7 +94,7 @@ function translateRedetectResolveEvent(
   send: SseSend,
   event: ResolveEvent,
 ): void {
-  if (event.stage === 'github-stars' || event.stage === 'github-trending' || event.stage === 'social') {
+  if (DIRECT_SOURCE_STAGES.has(event.stage)) {
     if (event.status === 'done' && event.found) {
       send({ type: 'stage', stage: 'discovery' })
       send({ type: 'stage-done', stage: 'discovery', found: true })
