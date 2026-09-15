@@ -62,7 +62,7 @@ function translateCreateResolveEvent(
   event: ResolveEvent,
   state: { directSource: boolean },
 ): void {
-  if (event.stage === 'github-stars' || event.stage === 'social') {
+  if (event.stage === 'github-stars' || event.stage === 'github-trending' || event.stage === 'social') {
     if (event.status === 'done' && event.found) {
       state.directSource = true
       send({ type: 'step', step: 'rss-discovery', status: 'done', found: true })
@@ -87,7 +87,7 @@ function translateRedetectResolveEvent(
   send: SseSend,
   event: ResolveEvent,
 ): void {
-  if (event.stage === 'github-stars' || event.stage === 'social') {
+  if (event.stage === 'github-stars' || event.stage === 'github-trending' || event.stage === 'social') {
     if (event.status === 'done' && event.found) {
       send({ type: 'stage', stage: 'discovery' })
       send({ type: 'stage-done', stage: 'discovery', found: true })

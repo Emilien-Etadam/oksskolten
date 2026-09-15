@@ -2,12 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const {
   mockResolveGithubStarsFeed,
+  mockResolveGithubTrendingFeed,
   mockResolveSocialSearchFeed,
   mockDiscoverRssUrl,
   mockQueryRssBridge,
   mockInferCssSelectorBridge,
 } = vi.hoisted(() => ({
   mockResolveGithubStarsFeed: vi.fn(),
+  mockResolveGithubTrendingFeed: vi.fn(),
   mockResolveSocialSearchFeed: vi.fn(),
   mockDiscoverRssUrl: vi.fn(),
   mockQueryRssBridge: vi.fn(),
@@ -16,6 +18,10 @@ const {
 
 vi.mock('./sources/github-releases.js', () => ({
   resolveGithubStarsFeed: (url: string) => mockResolveGithubStarsFeed(url),
+}))
+
+vi.mock('./sources/github-trending.js', () => ({
+  resolveGithubTrendingFeed: (url: string) => mockResolveGithubTrendingFeed(url),
 }))
 
 vi.mock('./sources/social-search.js', () => ({
@@ -62,6 +68,7 @@ async function resolve(
 
 beforeEach(() => {
   mockResolveGithubStarsFeed.mockReset().mockReturnValue(null)
+  mockResolveGithubTrendingFeed.mockReset().mockReturnValue(null)
   mockResolveSocialSearchFeed.mockReset().mockResolvedValue(null)
   mockDiscoverRssUrl.mockReset().mockResolvedValue({ rssUrl: null, title: null, usedFlareSolverr: false })
   mockQueryRssBridge.mockReset().mockResolvedValue(null)
@@ -84,6 +91,35 @@ describe('resolveFeedSource', () => {
     expect(events).toEqual<ResolveEvent[]>([
       { stage: 'github-stars', status: 'start' },
       { stage: 'github-stars', status: 'done', found: true },
+      { stage: 'github-trending', status: 'skipped' },
+      { stage: 'social', status: 'skipped' },
+      { stage: 'rss-discovery', status: 'skipped' },
+      { stage: 'rss-bridge', status: 'skipped' },
+      { stage: 'css-selector', status: 'skipped' },
+    ])
+    expect(mockResolveSocialSearchFeed).not.toHaveBeenCalled()
+    expect(mockDiscoverRssUrl).not.toHaveBeenCalled()
+    expect(mockQueryRssBridge).not.toHaveBeenCalled()
+    expect(mockInferCssSelectorBridge).not.toHaveBeenCalled()
+  })
+
+  it('returns a GitHub-trending feed and skips the rest of the chain', async () => {
+    mockResolveGithubTrendingFeed.mockReturnValue({
+      feedUrl: 'https://github.com/trending?since=weekly',
+      title: 'GitHub Trending (this week)',
+    })
+
+    const { result, events } = await resolve('https://github.com/trending?since=weekly')
+
+    expect(result).toEqual(source({
+      rssUrl: 'https://github.com/trending?since=weekly',
+      title: 'GitHub Trending (this week)',
+    }))
+    expect(events).toEqual<ResolveEvent[]>([
+      { stage: 'github-stars', status: 'start' },
+      { stage: 'github-stars', status: 'done', found: false },
+      { stage: 'github-trending', status: 'start' },
+      { stage: 'github-trending', status: 'done', found: true },
       { stage: 'social', status: 'skipped' },
       { stage: 'rss-discovery', status: 'skipped' },
       { stage: 'rss-bridge', status: 'skipped' },
@@ -104,6 +140,8 @@ describe('resolveFeedSource', () => {
     expect(events).toEqual<ResolveEvent[]>([
       { stage: 'github-stars', status: 'start' },
       { stage: 'github-stars', status: 'done', found: false },
+      { stage: 'github-trending', status: 'start' },
+      { stage: 'github-trending', status: 'done', found: false },
       { stage: 'social', status: 'start' },
       { stage: 'social', status: 'done', found: true },
       { stage: 'rss-discovery', status: 'skipped' },
@@ -132,6 +170,8 @@ describe('resolveFeedSource', () => {
     expect(events).toEqual<ResolveEvent[]>([
       { stage: 'github-stars', status: 'start' },
       { stage: 'github-stars', status: 'done', found: false },
+      { stage: 'github-trending', status: 'start' },
+      { stage: 'github-trending', status: 'done', found: false },
       { stage: 'social', status: 'start' },
       { stage: 'social', status: 'done', found: false },
       { stage: 'rss-discovery', status: 'start' },
@@ -150,6 +190,8 @@ describe('resolveFeedSource', () => {
     expect(events).toEqual<ResolveEvent[]>([
       { stage: 'github-stars', status: 'start' },
       { stage: 'github-stars', status: 'done', found: false },
+      { stage: 'github-trending', status: 'start' },
+      { stage: 'github-trending', status: 'done', found: false },
       { stage: 'social', status: 'start' },
       { stage: 'social', status: 'done', found: false },
       { stage: 'rss-discovery', status: 'start' },
@@ -170,6 +212,8 @@ describe('resolveFeedSource', () => {
     expect(events).toEqual<ResolveEvent[]>([
       { stage: 'github-stars', status: 'start' },
       { stage: 'github-stars', status: 'done', found: false },
+      { stage: 'github-trending', status: 'start' },
+      { stage: 'github-trending', status: 'done', found: false },
       { stage: 'social', status: 'start' },
       { stage: 'social', status: 'done', found: false },
       { stage: 'rss-discovery', status: 'start' },
@@ -188,6 +232,8 @@ describe('resolveFeedSource', () => {
     expect(events).toEqual<ResolveEvent[]>([
       { stage: 'github-stars', status: 'start' },
       { stage: 'github-stars', status: 'done', found: false },
+      { stage: 'github-trending', status: 'start' },
+      { stage: 'github-trending', status: 'done', found: false },
       { stage: 'social', status: 'start' },
       { stage: 'social', status: 'done', found: false },
       { stage: 'rss-discovery', status: 'start' },
@@ -211,6 +257,7 @@ describe('resolveFeedSource', () => {
     expect(result).toEqual(source({ rssUrl: 'https://example.com/feed.xml', title: 'Blog' }))
     expect(events).toEqual<ResolveEvent[]>([
       { stage: 'github-stars', status: 'skipped' },
+      { stage: 'github-trending', status: 'skipped' },
       { stage: 'social', status: 'skipped' },
       { stage: 'rss-discovery', status: 'start' },
       { stage: 'rss-discovery', status: 'done', found: true },
@@ -228,6 +275,7 @@ describe('resolveFeedSource', () => {
     expect(result).toEqual(source({ rssBridgeUrl: 'https://bridge.example.com/css' }))
     expect(events).toEqual<ResolveEvent[]>([
       { stage: 'github-stars', status: 'skipped' },
+      { stage: 'github-trending', status: 'skipped' },
       { stage: 'social', status: 'skipped' },
       { stage: 'rss-discovery', status: 'skipped' },
       { stage: 'rss-bridge', status: 'skipped' },

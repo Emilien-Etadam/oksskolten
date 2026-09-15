@@ -12,6 +12,12 @@ vi.mock('../ssrf.js', () => ({
   safeFetch: (...args: unknown[]) => mockSafeFetch(...args),
 }))
 
+const mockFetchGithubTrending = vi.fn()
+vi.mock('../../feeds/sources/github-trending.js', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../feeds/sources/github-trending.js')>()
+  return { ...real, fetchGithubTrending: (url: string) => mockFetchGithubTrending(url) }
+})
+
 // Controllable feedsmith mock — set feedsmithShouldFail = true to force fast-xml-parser fallback
 let feedsmithShouldFail = false
 vi.mock('feedsmith', async (importOriginal) => {
@@ -126,7 +132,26 @@ function mockResponse(body: string, ok = true, status = 200, contentType = 'appl
 describe('fetchAndParseRss', () => {
   beforeEach(() => {
     mockSafeFetch.mockReset()
+    mockFetchGithubTrending.mockReset()
     feedsmithShouldFail = false
+  })
+
+  it('reads a GitHub trending feed from the page instead of an RSS endpoint', async () => {
+    mockFetchGithubTrending.mockResolvedValue([
+      { title: 'acme/widget', url: 'https://github.com/acme/widget', published_at: '2026-09-15T10:00:00.000Z' },
+    ])
+
+    const { items, notModified } = await fetchAndParseRss({
+      id: 1, name: 'trending', url: 'https://github.com/trending',
+      rss_url: 'https://github.com/trending?since=weekly',
+    } as any)
+
+    expect(mockFetchGithubTrending).toHaveBeenCalledWith('https://github.com/trending?since=weekly')
+    expect(mockSafeFetch).not.toHaveBeenCalled()
+    expect(notModified).toBe(false)
+    expect(items).toEqual([
+      { title: 'acme/widget', url: 'https://github.com/acme/widget', published_at: '2026-09-15T10:00:00.000Z' },
+    ])
   })
 
   it('throws when no RSS URL is configured', async () => {

@@ -15,6 +15,7 @@ import {
 // feeds/index.js would cycle: rss.ts → feeds/index → feeds/routes → fetcher.js → ingest → rss.ts.
 import { isBlueskyApiUrl, isBlueskyFeedUrl, fetchBlueskySearch, fetchBlueskyFeed } from '../../feeds/sources/social-search.js'
 import { isGithubStarsUrl, fetchGithubStarredReleases } from '../../feeds/sources/github-releases.js'
+import { isGithubTrendingUrl, fetchGithubTrending } from '../../feeds/sources/github-trending.js'
 import { type FetchRssResult, type RssItem, RateLimitError } from './types.js'
 import { cleanItems, parseRssXml } from './parse.js'
 
@@ -94,14 +95,16 @@ export async function fetchAndParseRss(feed: Feed, opts?: { skipCache?: boolean 
   const rssUrl = feed.rss_url || feed.rss_bridge_url
   if (!rssUrl) throw new Error('No RSS URL')
 
-  // Bluesky searches and custom feeds, and GitHub stars, have no RSS endpoint
-  // — query the API
-  if (isBlueskyApiUrl(rssUrl) || isGithubStarsUrl(rssUrl)) {
+  // Bluesky searches and custom feeds, GitHub stars and GitHub trending have
+  // no RSS endpoint — query the API, or scrape the page
+  if (isBlueskyApiUrl(rssUrl) || isGithubStarsUrl(rssUrl) || isGithubTrendingUrl(rssUrl)) {
     const items = isGithubStarsUrl(rssUrl)
       ? await fetchGithubStarredReleases(rssUrl)
-      : isBlueskyFeedUrl(rssUrl)
-        ? await fetchBlueskyFeed(rssUrl)
-        : await fetchBlueskySearch(rssUrl)
+      : isGithubTrendingUrl(rssUrl)
+        ? await fetchGithubTrending(rssUrl)
+        : isBlueskyFeedUrl(rssUrl)
+          ? await fetchBlueskyFeed(rssUrl)
+          : await fetchBlueskySearch(rssUrl)
     return {
       items: cleanItems(items),
       notModified: false,

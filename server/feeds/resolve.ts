@@ -2,8 +2,9 @@ import { discoverRssUrl } from './discovery.js'
 import { queryRssBridge, inferCssSelectorBridge } from './rss-bridge.js'
 import { resolveSocialSearchFeed } from './sources/social-search.js'
 import { resolveGithubStarsFeed } from './sources/github-releases.js'
+import { resolveGithubTrendingFeed } from './sources/github-trending.js'
 
-export type ResolveStage = 'github-stars' | 'social' | 'rss-discovery' | 'rss-bridge' | 'css-selector'
+export type ResolveStage = 'github-stars' | 'github-trending' | 'social' | 'rss-discovery' | 'rss-bridge' | 'css-selector'
 
 export interface ResolveEvent {
   stage: ResolveStage
@@ -23,7 +24,7 @@ export interface ResolvedSource {
 export async function resolveFeedSource(
   url: string,
   opts: {
-    /** Skip the GitHub-stars and social resolvers (create-feed with a discovered URL or forced selector) */
+    /** Skip the GitHub and social resolvers (create-feed with a discovered URL or forced selector) */
     skipResolvers?: boolean
     /**
      * Create-only: user chose "this page only". Skip discovery and RSS-Bridge
@@ -45,18 +46,27 @@ export async function resolveFeedSource(
 
   const empty: ResolvedSource = { rssUrl: null, rssBridgeUrl: null, title: null, usedFlareSolverr: false }
 
-  // GitHub stars pages, Bluesky searches and Mastodon hashtag timelines
-  // resolve to a feed without the discovery/bridge pipeline.
+  // GitHub stars and trending pages, Bluesky searches and Mastodon hashtag
+  // timelines resolve to a feed without the discovery/bridge pipeline.
   if (opts.skipResolvers || opts.forcePageSelector) {
-    skip('github-stars', 'social')
+    skip('github-stars', 'github-trending', 'social')
   } else {
     emit({ stage: 'github-stars', status: 'start' })
     const githubStarsFeed = resolveGithubStarsFeed(url)
     emit({ stage: 'github-stars', status: 'done', found: !!githubStarsFeed })
     if (githubStarsFeed) {
       // Stars page: the feed is the account's star list, read via GraphQL
-      skip('social', 'rss-discovery', 'rss-bridge', 'css-selector')
+      skip('github-trending', 'social', 'rss-discovery', 'rss-bridge', 'css-selector')
       return { ...empty, rssUrl: githubStarsFeed.feedUrl, title: githubStarsFeed.title }
+    }
+
+    emit({ stage: 'github-trending', status: 'start' })
+    const githubTrendingFeed = resolveGithubTrendingFeed(url)
+    emit({ stage: 'github-trending', status: 'done', found: !!githubTrendingFeed })
+    if (githubTrendingFeed) {
+      // Trending board: GitHub serves no feed for it, the page is scraped
+      skip('social', 'rss-discovery', 'rss-bridge', 'css-selector')
+      return { ...empty, rssUrl: githubTrendingFeed.feedUrl, title: githubTrendingFeed.title }
     }
 
     emit({ stage: 'social', status: 'start' })
