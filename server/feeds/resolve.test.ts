@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const {
   mockResolveGithubStarsFeed,
   mockResolveGithubTrendingFeed,
+  mockResolveDiscordChannelFeed,
   mockResolveSocialSearchFeed,
   mockDiscoverRssUrl,
   mockQueryRssBridge,
@@ -10,6 +11,7 @@ const {
 } = vi.hoisted(() => ({
   mockResolveGithubStarsFeed: vi.fn(),
   mockResolveGithubTrendingFeed: vi.fn(),
+  mockResolveDiscordChannelFeed: vi.fn(),
   mockResolveSocialSearchFeed: vi.fn(),
   mockDiscoverRssUrl: vi.fn(),
   mockQueryRssBridge: vi.fn(),
@@ -22,6 +24,10 @@ vi.mock('./sources/github-releases.js', () => ({
 
 vi.mock('./sources/github-trending.js', () => ({
   resolveGithubTrendingFeed: (url: string) => mockResolveGithubTrendingFeed(url),
+}))
+
+vi.mock('./sources/discord-channel.js', () => ({
+  resolveDiscordChannelFeed: (url: string) => mockResolveDiscordChannelFeed(url),
 }))
 
 vi.mock('./sources/social-search.js', () => ({
@@ -69,6 +75,7 @@ async function resolve(
 beforeEach(() => {
   mockResolveGithubStarsFeed.mockReset().mockReturnValue(null)
   mockResolveGithubTrendingFeed.mockReset().mockReturnValue(null)
+  mockResolveDiscordChannelFeed.mockReset().mockResolvedValue(null)
   mockResolveSocialSearchFeed.mockReset().mockResolvedValue(null)
   mockDiscoverRssUrl.mockReset().mockResolvedValue({ rssUrl: null, title: null, usedFlareSolverr: false })
   mockQueryRssBridge.mockReset().mockResolvedValue(null)
@@ -92,6 +99,7 @@ describe('resolveFeedSource', () => {
       { stage: 'github-stars', status: 'start' },
       { stage: 'github-stars', status: 'done', found: true },
       { stage: 'github-trending', status: 'skipped' },
+      { stage: 'discord', status: 'skipped' },
       { stage: 'social', status: 'skipped' },
       { stage: 'rss-discovery', status: 'skipped' },
       { stage: 'rss-bridge', status: 'skipped' },
@@ -120,6 +128,37 @@ describe('resolveFeedSource', () => {
       { stage: 'github-stars', status: 'done', found: false },
       { stage: 'github-trending', status: 'start' },
       { stage: 'github-trending', status: 'done', found: true },
+      { stage: 'discord', status: 'skipped' },
+      { stage: 'social', status: 'skipped' },
+      { stage: 'rss-discovery', status: 'skipped' },
+      { stage: 'rss-bridge', status: 'skipped' },
+      { stage: 'css-selector', status: 'skipped' },
+    ])
+    expect(mockResolveSocialSearchFeed).not.toHaveBeenCalled()
+    expect(mockDiscoverRssUrl).not.toHaveBeenCalled()
+    expect(mockQueryRssBridge).not.toHaveBeenCalled()
+    expect(mockInferCssSelectorBridge).not.toHaveBeenCalled()
+  })
+
+  it('returns a Discord channel feed and skips the rest of the chain', async () => {
+    mockResolveDiscordChannelFeed.mockResolvedValue({
+      feedUrl: 'https://discord.com/channels/123456789012345678/234567890123456789',
+      title: 'Discord #announcements',
+    })
+
+    const { result, events } = await resolve('https://discord.com/channels/123456789012345678/234567890123456789')
+
+    expect(result).toEqual(source({
+      rssUrl: 'https://discord.com/channels/123456789012345678/234567890123456789',
+      title: 'Discord #announcements',
+    }))
+    expect(events).toEqual<ResolveEvent[]>([
+      { stage: 'github-stars', status: 'start' },
+      { stage: 'github-stars', status: 'done', found: false },
+      { stage: 'github-trending', status: 'start' },
+      { stage: 'github-trending', status: 'done', found: false },
+      { stage: 'discord', status: 'start' },
+      { stage: 'discord', status: 'done', found: true },
       { stage: 'social', status: 'skipped' },
       { stage: 'rss-discovery', status: 'skipped' },
       { stage: 'rss-bridge', status: 'skipped' },
@@ -142,6 +181,8 @@ describe('resolveFeedSource', () => {
       { stage: 'github-stars', status: 'done', found: false },
       { stage: 'github-trending', status: 'start' },
       { stage: 'github-trending', status: 'done', found: false },
+      { stage: 'discord', status: 'start' },
+      { stage: 'discord', status: 'done', found: false },
       { stage: 'social', status: 'start' },
       { stage: 'social', status: 'done', found: true },
       { stage: 'rss-discovery', status: 'skipped' },
@@ -172,6 +213,8 @@ describe('resolveFeedSource', () => {
       { stage: 'github-stars', status: 'done', found: false },
       { stage: 'github-trending', status: 'start' },
       { stage: 'github-trending', status: 'done', found: false },
+      { stage: 'discord', status: 'start' },
+      { stage: 'discord', status: 'done', found: false },
       { stage: 'social', status: 'start' },
       { stage: 'social', status: 'done', found: false },
       { stage: 'rss-discovery', status: 'start' },
@@ -192,6 +235,8 @@ describe('resolveFeedSource', () => {
       { stage: 'github-stars', status: 'done', found: false },
       { stage: 'github-trending', status: 'start' },
       { stage: 'github-trending', status: 'done', found: false },
+      { stage: 'discord', status: 'start' },
+      { stage: 'discord', status: 'done', found: false },
       { stage: 'social', status: 'start' },
       { stage: 'social', status: 'done', found: false },
       { stage: 'rss-discovery', status: 'start' },
@@ -214,6 +259,8 @@ describe('resolveFeedSource', () => {
       { stage: 'github-stars', status: 'done', found: false },
       { stage: 'github-trending', status: 'start' },
       { stage: 'github-trending', status: 'done', found: false },
+      { stage: 'discord', status: 'start' },
+      { stage: 'discord', status: 'done', found: false },
       { stage: 'social', status: 'start' },
       { stage: 'social', status: 'done', found: false },
       { stage: 'rss-discovery', status: 'start' },
@@ -234,6 +281,8 @@ describe('resolveFeedSource', () => {
       { stage: 'github-stars', status: 'done', found: false },
       { stage: 'github-trending', status: 'start' },
       { stage: 'github-trending', status: 'done', found: false },
+      { stage: 'discord', status: 'start' },
+      { stage: 'discord', status: 'done', found: false },
       { stage: 'social', status: 'start' },
       { stage: 'social', status: 'done', found: false },
       { stage: 'rss-discovery', status: 'start' },
@@ -258,6 +307,7 @@ describe('resolveFeedSource', () => {
     expect(events).toEqual<ResolveEvent[]>([
       { stage: 'github-stars', status: 'skipped' },
       { stage: 'github-trending', status: 'skipped' },
+      { stage: 'discord', status: 'skipped' },
       { stage: 'social', status: 'skipped' },
       { stage: 'rss-discovery', status: 'start' },
       { stage: 'rss-discovery', status: 'done', found: true },
@@ -276,6 +326,7 @@ describe('resolveFeedSource', () => {
     expect(events).toEqual<ResolveEvent[]>([
       { stage: 'github-stars', status: 'skipped' },
       { stage: 'github-trending', status: 'skipped' },
+      { stage: 'discord', status: 'skipped' },
       { stage: 'social', status: 'skipped' },
       { stage: 'rss-discovery', status: 'skipped' },
       { stage: 'rss-bridge', status: 'skipped' },

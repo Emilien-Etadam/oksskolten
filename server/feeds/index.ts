@@ -12,6 +12,11 @@ export {
   fetchGithubTrending,
 } from './sources/github-trending.js'
 export {
+  resolveDiscordChannelFeed,
+  isDiscordChannelUrl,
+  fetchDiscordChannel,
+} from './sources/discord-channel.js'
+export {
   resolveSocialSearchFeed,
   isBlueskyApiUrl,
   isBlueskyFeedUrl,

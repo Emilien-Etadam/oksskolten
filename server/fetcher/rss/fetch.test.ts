@@ -18,6 +18,12 @@ vi.mock('../../feeds/sources/github-trending.js', async (importOriginal) => {
   return { ...real, fetchGithubTrending: (url: string) => mockFetchGithubTrending(url) }
 })
 
+const mockFetchDiscordChannel = vi.fn()
+vi.mock('../../feeds/sources/discord-channel.js', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../feeds/sources/discord-channel.js')>()
+  return { ...real, fetchDiscordChannel: (url: string) => mockFetchDiscordChannel(url) }
+})
+
 // Controllable feedsmith mock — set feedsmithShouldFail = true to force fast-xml-parser fallback
 let feedsmithShouldFail = false
 vi.mock('feedsmith', async (importOriginal) => {
@@ -133,6 +139,7 @@ describe('fetchAndParseRss', () => {
   beforeEach(() => {
     mockSafeFetch.mockReset()
     mockFetchGithubTrending.mockReset()
+    mockFetchDiscordChannel.mockReset()
     feedsmithShouldFail = false
   })
 
@@ -152,6 +159,22 @@ describe('fetchAndParseRss', () => {
     expect(items).toEqual([
       { title: 'acme/widget', url: 'https://github.com/acme/widget', published_at: '2026-09-15T10:00:00.000Z' },
     ])
+  })
+
+  it('reads a Discord channel feed from the API instead of an RSS endpoint', async () => {
+    const channelUrl = 'https://discord.com/channels/123456789012345678/234567890123456789'
+    mockFetchDiscordChannel.mockResolvedValue([
+      { title: 'Release 1.4 is out.', url: `${channelUrl}/345678901234567890`, published_at: '2026-09-15T10:00:00.000Z' },
+    ])
+
+    const { items } = await fetchAndParseRss({
+      id: 1, name: 'discord', url: channelUrl, rss_url: channelUrl,
+    } as any)
+
+    expect(mockFetchDiscordChannel).toHaveBeenCalledWith(channelUrl)
+    expect(mockSafeFetch).not.toHaveBeenCalled()
+    expect(items).toHaveLength(1)
+    expect(items[0].title).toBe('Release 1.4 is out.')
   })
 
   it('throws when no RSS URL is configured', async () => {

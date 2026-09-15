@@ -20,6 +20,7 @@ Typical RSS readers only display the title and summary provided by the feed, req
 > - [86_feature_github_releases.md](./86_feature_github_releases.md) — GitHub Starred Releases
 > - [87_feature_intelligence.md](./87_feature_intelligence.md) — Reading Intelligence (smart folders, rules, top stories, trust, interests)
 > - [88_feature_github_trending.md](./88_feature_github_trending.md) — GitHub Trending
+> - [89_feature_discord_channel.md](./89_feature_discord_channel.md) — Discord Channels
 > - [90_perf_retry_backoff.md](./90_perf_retry_backoff.md) — Exponential Backoff for Article Retry
 > - [91_perf_score_recalculation.md](./91_perf_score_recalculation.md) — Score Recalculation Optimization
 
