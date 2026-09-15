@@ -7,6 +7,11 @@ export {
   fetchGithubStarredReleases,
 } from './sources/github-releases.js'
 export {
+  resolveGithubTrendingFeed,
+  isGithubTrendingUrl,
+  fetchGithubTrending,
+} from './sources/github-trending.js'
+export {
   resolveSocialSearchFeed,
   isBlueskyApiUrl,
   isBlueskyFeedUrl,
