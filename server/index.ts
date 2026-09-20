@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import Fastify from 'fastify'
 import fastifyStatic from '@fastify/static'
 import jwt from '@fastify/jwt'
+import cookie from '@fastify/cookie'
 import rateLimit from '@fastify/rate-limit'
 import multipart from '@fastify/multipart'
 import cron, { type ScheduledTask } from 'node-cron'
@@ -80,6 +81,10 @@ await app.register(jwt, {
   secret: jwtSecret,
   sign: { expiresIn: JWT_EXPIRY },
 })
+// Read-only for the API: the only cookie is the one archived media is served
+// with (server/auth/media-cookie.ts), because <img> and <video> cannot send
+// an Authorization header.
+await app.register(cookie)
 await app.register(rateLimit, {
   max: RATE_LIMIT_MAX,
   timeWindow: RATE_LIMIT_WINDOW,

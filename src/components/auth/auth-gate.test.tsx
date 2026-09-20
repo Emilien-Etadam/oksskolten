@@ -15,6 +15,7 @@ vi.mock('swr', () => ({
 vi.mock('../../lib/auth', () => ({
   getAuthToken: vi.fn(() => 'test-token'),
   setAuthToken: vi.fn(),
+  syncMediaCookie: vi.fn(() => Promise.resolve()),
   AUTH_LOGOUT_EVENT: 'reader:auth-logout',
 }))
 
@@ -27,7 +28,7 @@ vi.mock('../../pages/login-page', () => ({
 }))
 
 import { AuthGate } from './auth-gate'
-import { setAuthToken, AUTH_LOGOUT_EVENT } from '../../lib/auth'
+import { setAuthToken, syncMediaCookie, AUTH_LOGOUT_EVENT } from '../../lib/auth'
 
 describe('AuthGate', () => {
   beforeEach(() => {
@@ -52,6 +53,22 @@ describe('AuthGate', () => {
 
     expect(screen.getByText('App Content')).toBeTruthy()
     expect(screen.queryByTestId('login-page')).toBeNull()
+  })
+
+  // Archived images and videos are served against this cookie; a returning
+  // session has nothing else that would refresh it.
+  it('refreshes the media cookie once the session is confirmed', () => {
+    swrReturn = { data: { email: 'user@example.com' }, error: undefined, isLoading: false }
+    render(<AuthGate><div>App Content</div></AuthGate>)
+
+    expect(syncMediaCookie).toHaveBeenCalledWith('test-token')
+  })
+
+  it('does not ask for a media cookie while unauthenticated', () => {
+    swrReturn = { data: undefined, error: new Error('Unauthorized'), isLoading: false }
+    render(<AuthGate><div>App Content</div></AuthGate>)
+
+    expect(syncMediaCookie).not.toHaveBeenCalled()
   })
 
   it('shows LoginPage when auth error', () => {

@@ -5,6 +5,7 @@ import { oauthRoutes } from './oauth-routes.js'
 
 export {
   requireAuth,
+  requireMediaAuth,
   getAuthUser,
   requireWriteScope,
   getOrigin,
@@ -20,6 +21,7 @@ export {
 } from './api-keys-db.js'
 export type { ApiKey, ApiKeyCreated } from './api-keys-db.js'
 export { apiKeyRoutes } from './api-key-routes.js'
+export { mediaCookieRoutes, clearMediaCookie, MEDIA_COOKIE } from './media-cookie.js'
 export { authRoutes, passkeyRoutes, oauthRoutes }
 
 export function registerAuthRoutes(app: FastifyInstance): void {

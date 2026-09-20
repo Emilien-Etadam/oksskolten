@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import { requireMediaAuth } from '../../auth/guards.js'
 import { getArticleById } from '../../db.js'
 import { archiveArticleImages, isImageArchivingEnabled } from '../../fetcher/article-images.js'
 import { archiveArticleVideos, isVideoArchivingEnabled, findArchivableVideos } from '../../fetcher/article-videos.js'
@@ -89,6 +90,16 @@ export async function articleMediaRoutes(api: FastifyInstance): Promise<void> {
       })
     },
   )
+}
+
+/**
+ * Archived media, served to the browser rather than to a script: an <img> or
+ * <video> load carries no `Authorization` header, so these two GETs sit
+ * outside the header-only API scope and authenticate with the media cookie
+ * (see server/auth/media-cookie.ts). Everything else stays header-only.
+ */
+export async function archivedMediaRoutes(api: FastifyInstance): Promise<void> {
+  api.addHook('preHandler', requireMediaAuth)
 
   // --- Serve archived images ---
 
@@ -180,7 +191,6 @@ export async function articleMediaRoutes(api: FastifyInstance): Promise<void> {
       reply.send(fs.createReadStream(filepath, { start, end }))
     },
   )
-
 }
 
 /**

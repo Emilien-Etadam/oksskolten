@@ -1,5 +1,6 @@
 import Fastify from 'fastify'
 import jwt from '@fastify/jwt'
+import cookie from '@fastify/cookie'
 import rateLimit from '@fastify/rate-limit'
 import multipart from '@fastify/multipart'
 import { registerApi } from '../../api.js'
@@ -9,6 +10,7 @@ import { authRoutes, passkeyRoutes } from '../../auth/index.js'
 export async function buildApp() {
   const app = Fastify()
   await app.register(jwt, { secret: 'test-secret', sign: { expiresIn: '30d' } })
+  await app.register(cookie)
   await app.register(rateLimit, { max: 100, timeWindow: '1 minute' })
   await app.register(multipart, { limits: { fileSize: 5 * 1024 * 1024 } })
   await app.register(authRoutes)

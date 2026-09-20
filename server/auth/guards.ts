@@ -1,6 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify'
 import { getDb } from '../db.js'
 import { validateApiKey } from './api-keys-db.js'
+import { MEDIA_COOKIE } from './media-cookie.js'
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -30,17 +31,56 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
 
   try {
     await request.jwtVerify()
-    const { email, token_version } = request.user as { email: string; token_version: number }
-
-    const db = getDb()
-    const user = db.prepare('SELECT token_version FROM users WHERE email = ?').get(email) as
-      | { token_version: number }
-      | undefined
-
-    if (!user || user.token_version !== token_version) {
+    const email = acceptSession(request.user as SessionPayload)
+    if (!email) {
       return reply.status(401).send({ error: 'Unauthorized' })
     }
+    request.authUser = email
+  } catch {
+    reply.status(401).send({ error: 'Unauthorized' })
+  }
+}
 
+interface SessionPayload {
+  email: string
+  token_version: number
+}
+
+/**
+ * The account behind a verified JWT, or null when the token is stale: our own
+ * signature is not enough, since a password change or a sign-out-everywhere
+ * bumps `token_version` precisely to retire the tokens issued before it.
+ */
+function acceptSession({ email, token_version }: SessionPayload): string | null {
+  const user = getDb()
+    .prepare('SELECT token_version FROM users WHERE email = ?')
+    .get(email) as { token_version: number } | undefined
+
+  if (!user || user.token_version !== token_version) return null
+  return email
+}
+
+/**
+ * Auth for archived images and videos. A browser loads those through <img>
+ * and <video>, which send no `Authorization` header, so the session is read
+ * from the media cookie instead (see media-cookie.ts). Callers that can set
+ * the header — scripts, API keys — still authenticate the ordinary way.
+ */
+export async function requireMediaAuth(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  if (request.headers.authorization || process.env.AUTH_DISABLED === '1') {
+    return requireAuth(request, reply)
+  }
+
+  const token = request.cookies?.[MEDIA_COOKIE]
+  if (!token) {
+    return reply.status(401).send({ error: 'Unauthorized' })
+  }
+
+  try {
+    const email = acceptSession(request.server.jwt.verify(token) as SessionPayload)
+    if (!email) {
+      return reply.status(401).send({ error: 'Unauthorized' })
+    }
     request.authUser = email
   } catch {
     reply.status(401).send({ error: 'Unauthorized' })

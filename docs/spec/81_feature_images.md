@@ -68,6 +68,7 @@ Images archived in local mode are served via `GET /api/articles/images/:filename
 - Path traversal protection: `path.basename(filename) !== filename || filename.includes('..')` → 400
 - MIME type: based on file extension (`.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.svg`, `.avif`)
 - Cache: `Cache-Control: public, max-age=31536000, immutable`
+- Authentication: `requireMediaAuth`, not the `requireAuth` the rest of the API uses. The reader reaches this URL through an `<img>` tag the browser loads by itself, with no chance to attach the `Authorization` header the session runs on; every archived image would answer 401 and render broken. The request therefore also authenticates with the `media_token` cookie — the same JWT, `HttpOnly`, scoped to `/api/articles` (`docs/spec/40_auth.md`). This is why the route is registered outside the authenticated scope in `server/routes/index.ts`.
 
 ### Image Deletion
 

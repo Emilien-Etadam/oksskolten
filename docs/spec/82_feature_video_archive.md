@@ -79,6 +79,11 @@ watch from the start. `parseByteRange()` handles `bytes=a-b`, `bytes=a-`, and
 `bytes=-n`, clamps an end past the last byte, and returns null for anything
 unsatisfiable or multipart — answered with `416` and `Content-Range: bytes */size`.
 
+It also mirrors the image route's authentication: `<video>` loads the file
+itself and cannot send the `Authorization` header, so the route runs
+`requireMediaAuth` and accepts the `media_token` cookie
+(`docs/spec/40_auth.md`).
+
 ### No CSP change
 
 An archived video is served from this origin, and `default-src 'self'` covers
