@@ -3,6 +3,12 @@ export interface RssItem {
   url: string
   published_at: string | null
   excerpt?: string
+  /**
+   * The feed's own identifier for the entry (RSS `<guid>`, Atom `<id>`).
+   * Feeds that point several entries at the same link tell them apart with
+   * it, so it is the article identity whenever the feed provides one.
+   */
+  guid?: string
 }
 
 export interface FetchRssResult {

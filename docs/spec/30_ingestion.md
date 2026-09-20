@@ -130,6 +130,33 @@ flowchart TD
 
 **Note**: Summarization (Haiku) and translation (Sonnet) are not executed during Cron. They are invoked on-demand when the user opens an article (`POST /api/articles/:id/summarize`, `POST /api/articles/:id/translate`).
 
+### Article Identity
+
+Alongside the URL, every parser path reads the feed's own identifier for an
+entry — RSS `<guid>`, Atom `<id>`, RSS 1.0 `rdf:about` — into `RssItem.guid`,
+stored as `articles.guid`. It is the identity whenever the feed provides one,
+because URL alone is not one: SOLIDWORKS Tech Alerts, for instance, points
+every release note at the same `downloads.html` and tells them apart by
+`<guid>`, so URL-only dedup collapsed the whole feed into its first article.
+
+`selectNewItems()` (`server/ingest/dedup.ts`) decides what is new. An incoming
+item is a duplicate when:
+
+| Condition | Why |
+| --- | --- |
+| its guid is already stored **under this feed** | same entry, wherever the link now points |
+| the same URL **and** title is already stored under this feed | the entry re-emitted — by a feed that regenerates guids on every build, or from a row saved before guids were tracked. The stored row then adopts the item's guid (`setArticleGuid`), so the next pass matches on guid |
+| the item has **no guid** and the URL is stored anywhere | historical behaviour, kept for feeds that publish no identifier |
+| the item has a guid and the URL is stored under **another** feed | guids are feed-specific, so cross-feed dedup stays on URL |
+
+The same URL under *this* feed with an unknown guid is the reused-link case
+and yields a new article. Feeds that publish genuinely distinct entries under
+one URL *and* one title are the accepted blind spot: they are kept once.
+
+`articles.url` therefore carries no UNIQUE constraint — `UNIQUE (feed_id,
+guid)` replaces it (see [schema](./10_schema.md)). Dedup lives in the ingest
+layer, not in the constraint.
+
 ### Shared Article Fetch Function (`fetchArticleContent`)
 
 The fetch + fallback + language detection logic is encapsulated in a single exported function `fetchArticleContent()` in `server/fetcher.ts`. Both the Cron pipeline (`processArticle`) and the clip save endpoint (`POST /api/articles/from-url`) call this function, ensuring identical behavior for full-text retrieval, FlareSolverr fallback, bot-block detection, and language detection. See [Clip spec](./80_feature_clip.md#shared-fetch-pipeline-with-rss-feeds) for the option differences between RSS and clip invocations.

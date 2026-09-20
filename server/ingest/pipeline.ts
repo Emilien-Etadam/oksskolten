@@ -115,6 +115,7 @@ export async function processArticle(task: ArticleTask): Promise<boolean> {
         feed_id: task.feed_id,
         title: task.title,
         url: task.url,
+        guid: task.guid ?? null,
         published_at: task.published_at,
         lang: effectiveLang,
         full_text: content.fullText,

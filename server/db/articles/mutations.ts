@@ -112,6 +112,7 @@ export function insertArticle(data: {
   feed_id: number
   title: string
   url: string
+  guid?: string | null
   published_at: string | null
   lang?: string | null
   full_text?: string | null
@@ -123,12 +124,13 @@ export function insertArticle(data: {
   last_error?: string | null
 }): number {
   const info = runNamed(`
-    INSERT INTO articles (feed_id, category_id, title, url, published_at, lang, full_text, full_text_translated, translated_lang, summary, excerpt, og_image, last_error)
-    VALUES (@feed_id, (SELECT category_id FROM feeds WHERE id = @feed_id), @title, @url, @published_at, @lang, @full_text, @full_text_translated, @translated_lang, @summary, @excerpt, @og_image, @last_error)
+    INSERT INTO articles (feed_id, category_id, title, url, guid, published_at, lang, full_text, full_text_translated, translated_lang, summary, excerpt, og_image, last_error)
+    VALUES (@feed_id, (SELECT category_id FROM feeds WHERE id = @feed_id), @title, @url, @guid, @published_at, @lang, @full_text, @full_text_translated, @translated_lang, @summary, @excerpt, @og_image, @last_error)
   `, {
     feed_id: data.feed_id,
     title: data.title,
     url: data.url,
+    guid: data.guid ?? null,
     published_at: data.published_at,
     lang: data.lang ?? null,
     full_text: data.full_text ?? null,
@@ -153,6 +155,18 @@ export function insertArticle(data: {
  */
 export function markArticleRefreshAttempted(articleId: number, when: string): void {
   runNamed('UPDATE articles SET last_refresh_attempt_at = @when WHERE id = @id', { id: articleId, when })
+}
+
+/**
+ * Record the feed's identifier on an article stored without one — either
+ * because it predates guid tracking or because the feed only started
+ * emitting guids later. Without the backfill the article would stay
+ * matchable by URL and title alone, and a later title edit upstream would
+ * bring it back as a second copy. No Meilisearch resync: guid is not part
+ * of the indexed document.
+ */
+export function setArticleGuid(articleId: number, guid: string): void {
+  runNamed('UPDATE articles SET guid = @guid WHERE id = @id AND guid IS NULL', { id: articleId, guid })
 }
 
 /** Add a rule-driven score boost (may be negative) and refresh the score. */

@@ -42,12 +42,13 @@ beforeEach(() => {
   vi.stubGlobal('fetch', mockFetch)
 })
 
-function rss20Xml(title: string, items: { title: string; link: string; pubDate?: string; description?: string }[]): string {
+function rss20Xml(title: string, items: { title: string; link: string; pubDate?: string; description?: string; guid?: string }[]): string {
   const itemsXml = items
     .map(
       i => `<item>
       <title>${i.title}</title>
       <link>${i.link}</link>
+      ${i.guid ? `<guid isPermaLink="false">${i.guid}</guid>` : ''}
       ${i.pubDate ? `<pubDate>${i.pubDate}</pubDate>` : ''}
       ${i.description ? `<description><![CDATA[${i.description}]]></description>` : ''}
     </item>`,
@@ -256,5 +257,127 @@ describe('collectFeedTasks', () => {
     expect(row.summary).toBeNull()
     expect(row.full_text_translated).toBeNull()
     expect(row.translated_lang).toBeNull()
+  })
+
+  // --- guid identity (feeds that reuse one link for several entries) ---
+
+  const DOWNLOADS = 'https://www.solidworks.com/sw/support/subscription/downloads.html'
+
+  it('keeps entries that share a link but carry different guids', async () => {
+    const feed = seedFeed()
+    insertArticle({
+      feed_id: feed.id,
+      title: 'SOLIDWORKS 2026 SP1.1 is available for download',
+      url: DOWNLOADS,
+      published_at: '2026-02-09T00:00:00Z',
+    })
+    serveRss(
+      feed,
+      rss20Xml('SOLIDWORKS Tech Alerts', [
+        { title: 'SOLIDWORKS 2026 SP4.1 is available for download', link: DOWNLOADS, guid: 'EF50AC02', pubDate: 'Mon, 14 Sep 2026 13:30:28 GMT' },
+        { title: 'SOLIDWORKS 2027 PR1 is available for download', link: DOWNLOADS, guid: '574784BC', pubDate: 'Mon, 10 Aug 2026 11:55:53 GMT' },
+      ]),
+    )
+
+    const result = await collectFeedTasks(feed)
+
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') return
+    expect(result.tasks.map(t => t.title)).toEqual([
+      'SOLIDWORKS 2026 SP4.1 is available for download',
+      'SOLIDWORKS 2027 PR1 is available for download',
+    ])
+    expect(result.tasks.map(t => t.guid)).toEqual(['EF50AC02', '574784BC'])
+  })
+
+  it('skips an item whose guid is already stored, wherever it now points', async () => {
+    const feed = seedFeed()
+    insertArticle({
+      feed_id: feed.id,
+      title: 'Release notes',
+      url: DOWNLOADS,
+      guid: 'EF50AC02',
+      published_at: '2026-09-14T00:00:00Z',
+    })
+    serveRss(
+      feed,
+      rss20Xml('SOLIDWORKS Tech Alerts', [
+        { title: 'Release notes (moved)', link: 'https://www.solidworks.com/sw/support/moved.html', guid: 'EF50AC02' },
+      ]),
+    )
+
+    const result = await collectFeedTasks(feed)
+
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') return
+    expect(result.tasks).toHaveLength(0)
+  })
+
+  it('adopts the guid of an article stored before guids were tracked', async () => {
+    const feed = seedFeed()
+    insertArticle({
+      feed_id: feed.id,
+      title: 'SOLIDWORKS 2026 SP4.1 is available for download',
+      url: DOWNLOADS,
+      published_at: '2026-09-14T00:00:00Z',
+    })
+    serveRss(
+      feed,
+      rss20Xml('SOLIDWORKS Tech Alerts', [
+        { title: 'SOLIDWORKS 2026 SP4.1 is available for download', link: DOWNLOADS, guid: 'EF50AC02' },
+      ]),
+    )
+
+    const result = await collectFeedTasks(feed)
+
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') return
+    // Same URL and title: the article we already have, not a new one.
+    expect(result.tasks).toHaveLength(0)
+
+    const { getDb } = await import('../db.js')
+    const row = getDb().prepare('SELECT guid FROM articles WHERE url = ?').get(DOWNLOADS) as { guid: string | null }
+    expect(row.guid).toBe('EF50AC02')
+  })
+
+  it('still skips an article already stored under another feed', async () => {
+    const other = seedFeed({ name: 'Other Feed', url: 'https://other.example.com', rss_url: 'https://other.example.com/feed.xml' })
+    insertArticle({
+      feed_id: other.id,
+      title: 'Shared story',
+      url: 'https://example.com/shared',
+      guid: 'other-feed-guid',
+      published_at: '2026-09-01T00:00:00Z',
+    })
+
+    const feed = seedFeed()
+    serveRss(
+      feed,
+      rss20Xml('Test', [{ title: 'Shared story, our headline', link: 'https://example.com/shared', guid: 'our-guid' }]),
+    )
+
+    const result = await collectFeedTasks(feed)
+
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') return
+    expect(result.tasks).toHaveLength(0)
+  })
+
+  it('stores one article when a single fetch lists the same guid twice', async () => {
+    const feed = seedFeed()
+    serveRss(
+      feed,
+      rss20Xml('Test', [
+        { title: 'Duplicated entry', link: 'https://example.com/dup', guid: 'same-guid' },
+        { title: 'Duplicated entry (again)', link: 'https://example.com/dup-2', guid: 'same-guid' },
+      ]),
+    )
+
+    const result = await collectFeedTasks(feed)
+
+    expect(result.status).toBe('ok')
+    if (result.status !== 'ok') return
+    expect(result.tasks).toHaveLength(1)
+    expect(result.tasks[0].title).toBe('Duplicated entry')
   })
 })
