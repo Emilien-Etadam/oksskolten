@@ -11,6 +11,7 @@ export {
   recordArticleRead,
   insertArticle,
   markArticleRefreshAttempted,
+  setArticleGuid,
   addRuleBoost,
   setArticleQuality,
   setArticleInterestScore,
@@ -20,10 +21,12 @@ export {
   getArticlesNeedingRefresh,
   countStaleArticlesByFeed,
   getExistingArticleUrls,
+  getFeedArticleIdentities,
+  urlProtocolVariants,
   getRetryArticles,
   getRetryStats,
 } from './articles/retry.js'
-export type { RetryStats } from './articles/retry.js'
+export type { RetryStats, FeedArticleIdentity } from './articles/retry.js'
 export {
   getUnarchivedArticlesByFeed,
   markImagesArchived,

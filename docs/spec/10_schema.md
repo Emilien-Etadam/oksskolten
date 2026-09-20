@@ -33,7 +33,8 @@ erDiagram
     articles {
         INTEGER id PK
         INTEGER feed_id FK
-        TEXT url UK
+        TEXT url
+        TEXT guid "nullable; UK with feed_id"
         TEXT lang
         TEXT full_text
         TEXT summary
@@ -125,7 +126,8 @@ CREATE TABLE articles (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   feed_id         INTEGER NOT NULL REFERENCES feeds(id) ON DELETE CASCADE,
   title           TEXT NOT NULL,
-  url             TEXT NOT NULL UNIQUE,
+  url             TEXT NOT NULL,                      -- Not unique: some feeds point several entries at one link
+  guid            TEXT,                               -- Feed's own identifier (RSS <guid> / Atom <id>); NULL when the feed has none
   published_at    TEXT,                               -- Normalized to ISO 8601
   lang            TEXT,                               -- "en" / "ja" etc.
   full_text       TEXT,                               -- Original Markdown from Readability
@@ -160,6 +162,10 @@ CREATE INDEX idx_articles_category_published ON articles(category_id, published_
 CREATE INDEX idx_articles_feed_score ON articles(feed_id, score DESC);
 CREATE INDEX idx_articles_category_score ON articles(category_id, score DESC);
 CREATE INDEX idx_articles_interest ON articles(interest_score);
+CREATE INDEX idx_articles_url ON articles(url);
+-- Article identity: a feed cannot carry the same guid twice. Rows without a
+-- guid stay out of the index. See 30_ingestion.md "Article Identity".
+CREATE UNIQUE INDEX idx_articles_feed_guid ON articles(feed_id, guid) WHERE guid IS NOT NULL;
 
 -- Fork additions (87_feature_intelligence.md); articles also carry
 -- rule_boost REAL DEFAULT 0, quality_score REAL, interest_score REAL DEFAULT 0

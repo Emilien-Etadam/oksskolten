@@ -549,4 +549,35 @@ describe('markdownToExcerpt', () => {
     const md = 'Line one.\n\nLine two.  Spaces.'
     expect(markdownToExcerpt(md)).toBe('Line one. Line two. Spaces.')
   })
+
+  it('drops heading markers', () => {
+    const md = '## SOLIDWORKS Downloads\n\nAccess the latest release.\n\n### FAQ\n\nAnswers to common questions.'
+    expect(markdownToExcerpt(md)).toBe('SOLIDWORKS Downloads Access the latest release. FAQ Answers to common questions.')
+  })
+
+  it('unwraps emphasis, code and strikethrough', () => {
+    const md = 'A **bold** claim, an *italic* one, __also bold__, ~~dropped~~ and `code()`.'
+    expect(markdownToExcerpt(md)).toBe('A bold claim, an italic one, also bold, dropped and code().')
+  })
+
+  it('drops list markers, quotes and thematic breaks', () => {
+    const md = '> Quoted line\n\n- First item\n- Second item\n\n1. Numbered\n\n---\n\nEnd.'
+    expect(markdownToExcerpt(md)).toBe('Quoted line First item Second item Numbered End.')
+  })
+
+  it('restores characters Turndown escaped', () => {
+    // Turndown writes \* for a literal asterisk in the source HTML.
+    const md = '\\*Model courtesy of Develop LLC. 50\\% off \\[sic\\].'
+    expect(markdownToExcerpt(md)).toBe('*Model courtesy of Develop LLC. 50\\% off [sic].')
+  })
+
+  it('leaves a lone asterisk alone instead of eating the text after it', () => {
+    const md = 'Rates from 3* to 5* hotels.'
+    expect(markdownToExcerpt(md)).toBe('Rates from 3* to 5* hotels.')
+  })
+
+  it('truncates after markdown is stripped, not before', () => {
+    const md = `### Heading\n\n${'A'.repeat(300)}`
+    expect(markdownToExcerpt(md, 20)).toBe('Heading ' + 'A'.repeat(12))
+  })
 })

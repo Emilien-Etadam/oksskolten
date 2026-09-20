@@ -4,6 +4,26 @@ import type { RssItem } from './types.js'
 
 const RSS_BRIDGE_ERROR_RE = /^Bridge returned error/i
 
+/**
+ * Read the feed's own identifier for an entry (RSS `<guid>`, Atom `<id>`).
+ * Parsers hand it over as a bare string, or as an object when the element
+ * carries attributes — `{ value, isPermaLink }` for feedsmith,
+ * `{ '#text': ... }` for fast-xml-parser.
+ */
+function readGuid(raw: unknown): string | undefined {
+  let text: string
+  if (typeof raw === 'string') text = raw
+  else if (typeof raw === 'number') text = String(raw)
+  else if (raw && typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>
+    const inner = obj.value ?? obj['#text']
+    if (inner === undefined || inner === null) return undefined
+    text = String(inner)
+  } else return undefined
+  const trimmed = text.trim()
+  return trimmed || undefined
+}
+
 export function cleanItems(items: RssItem[]): RssItem[] {
   return items
     .filter(item => !RSS_BRIDGE_ERROR_RE.test(item.title))
@@ -40,6 +60,7 @@ export async function parseRssXml(xml: string): Promise<RssItem[]> {
           }
           const rawExcerpt = item.content_encoded || item['content:encoded'] || item.content || item.description || item.summary
           const excerpt = typeof rawExcerpt === 'string' ? rawExcerpt : (rawExcerpt && typeof rawExcerpt === 'object' && 'value' in rawExcerpt ? String((rawExcerpt as Record<string, unknown>).value) : undefined)
+          const guid = readGuid(item.guid ?? item.id ?? (item.rdf as Record<string, unknown>)?.about)
           return {
             title: (item.title as string) || 'Untitled',
             url: (url || item.id) as string,
@@ -47,6 +68,7 @@ export async function parseRssXml(xml: string): Promise<RssItem[]> {
               (item.published || item.updated || item.date || item.pubDate || (item.dc as Record<string, unknown>)?.date) as string | undefined,
             ),
             ...(excerpt ? { excerpt } : {}),
+            ...(guid ? { guid } : {}),
           }
         })
     }
@@ -73,11 +95,13 @@ export async function parseRssXml(xml: string): Promise<RssItem[]> {
     return items
       .map((item: Record<string, unknown>) => {
         const excerpt = textOf(item['content:encoded']) || textOf(item.description)
+        const guid = readGuid(item.guid)
         return {
           title: textOf(item.title) || 'Untitled',
-          url: (item.link || item.guid || '') as string,
+          url: (item.link || textOf(item.guid) || '') as string,
           published_at: normalizeDate(item.pubDate as string | undefined),
           ...(excerpt ? { excerpt } : {}),
+          ...(guid ? { guid } : {}),
         }
       })
       .filter((item: RssItem) => item.url)
@@ -96,6 +120,7 @@ export async function parseRssXml(xml: string): Promise<RssItem[]> {
         const id = entry.id as string | undefined
         const effectiveUrl = link || (id && /^https?:\/\//i.test(id) ? id : '') || ''
         const excerpt = textOf(entry.content) || textOf(entry.summary)
+        const guid = readGuid(entry.id)
         return {
           title: textOf(entry.title) || 'Untitled',
           url: effectiveUrl,
@@ -103,6 +128,7 @@ export async function parseRssXml(xml: string): Promise<RssItem[]> {
             (entry.published || entry.updated) as string | undefined,
           ),
           ...(excerpt ? { excerpt } : {}),
+          ...(guid ? { guid } : {}),
         }
       })
       .filter((item: RssItem) => item.url)
@@ -114,11 +140,15 @@ export async function parseRssXml(xml: string): Promise<RssItem[]> {
   if (rdfItem) {
     const items = Array.isArray(rdfItem) ? rdfItem : [rdfItem]
     return items
-      .map((item: Record<string, unknown>) => ({
-        title: textOf(item.title) || 'Untitled',
-        url: (item.link || item['@_rdf:about'] || '') as string,
-        published_at: normalizeDate((item['dc:date'] ?? item.pubDate) as string | undefined),
-      }))
+      .map((item: Record<string, unknown>) => {
+        const guid = readGuid(item['@_rdf:about'])
+        return {
+          title: textOf(item.title) || 'Untitled',
+          url: (item.link || item['@_rdf:about'] || '') as string,
+          published_at: normalizeDate((item['dc:date'] ?? item.pubDate) as string | undefined),
+          ...(guid ? { guid } : {}),
+        }
+      })
       .filter((item: RssItem) => item.url)
   }
 

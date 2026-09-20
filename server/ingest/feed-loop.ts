@@ -2,8 +2,10 @@ import {
   countStaleArticlesByFeed,
   getArticlesNeedingRefresh,
   getExistingArticleUrls,
+  getFeedArticleIdentities,
   markArticleRefreshAttempted,
   normalizeUrl,
+  setArticleGuid,
   updateArticleContent,
   updateFeedError,
   updateFeedRateLimit,
@@ -20,6 +22,7 @@ import { isGoogleNewsUrl } from '../fetcher/google-news.js'
 import { computeInterval, computeEmpiricalInterval, sqliteFuture, DEFAULT_INTERVAL } from '../fetcher/schedule.js'
 import { isRemovedRedditPost } from '../fetcher/reddit.js'
 import { logger } from '../logger.js'
+import { selectNewItems } from './dedup.js'
 import type { NewArticle } from './tasks.js'
 
 const log = logger.child('fetcher')
@@ -50,6 +53,10 @@ function refreshStaleArticles(feedId: number, rssItems: RssItem[]): void {
   // is percent-encoded (or vice versa) and the article would incorrectly
   // be treated as rolled off the feed.
   const itemsByUrl = new Map(rssItems.map(i => [normalizeUrl(i.url), i]))
+  // Feeds that point several entries at one link need the guid to tell which
+  // item belongs to which stored article; URL alone would hand them all the
+  // same excerpt.
+  const itemsByGuid = new Map(rssItems.filter(i => i.guid).map(i => [i.guid!, i]))
   const now = new Date().toISOString()
   for (const candidate of refreshCandidates) {
     const currentLen = (candidate.full_text ?? '').replace(/\s+/g, ' ').trim().length
@@ -77,7 +84,8 @@ function refreshStaleArticles(feedId: number, rssItems: RssItem[]): void {
       continue
     }
 
-    const rssItem = itemsByUrl.get(normalizeUrl(candidate.url))
+    const rssItem = (candidate.guid ? itemsByGuid.get(candidate.guid) : undefined)
+      ?? itemsByUrl.get(normalizeUrl(candidate.url))
     const md = rssItem?.excerpt ? convertHtmlToMarkdown(rssItem.excerpt) : ''
     const mdLen = md.replace(/\s+/g, ' ').trim().length
 
@@ -152,8 +160,6 @@ export async function collectFeedTasks(
     updateFeedSchedule(feed.id, sqliteFuture(interval), interval)
   }
 
-  const urls = rssResult.items.map(i => i.url)
-  const existing = getExistingArticleUrls(urls)
   refreshStaleArticles(feed.id, rssResult.items)
 
   const removedRedditPosts = rssResult.items.filter(item => isRemovedRedditPost(item.url, item.title))
@@ -161,19 +167,31 @@ export async function collectFeedTasks(
     log.info(`Feed ${feed.name}: skipping ${removedRedditPosts.length} removed Reddit post(s)`)
   }
 
-  const tasks: NewArticle[] = rssResult.items
-    // Reddit keeps removed posts in the feed with a placeholder title and a
-    // removal notice for a body — nothing worth storing or reading.
-    .filter(item => !existing.has(item.url) && !isRemovedRedditPost(item.url, item.title))
-    .map(item => ({
-      kind: 'new' as const,
-      feed_id: feed.id,
-      title: item.title,
-      url: item.url,
-      published_at: item.published_at,
-      requires_js_challenge: !!feed.requires_js_challenge,
-      excerpt: item.excerpt,
-    }))
+  // Reddit keeps removed posts in the feed with a placeholder title and a
+  // removal notice for a body — nothing worth storing or reading.
+  const candidates = rssResult.items.filter(item => !isRemovedRedditPost(item.url, item.title))
+  const urls = candidates.map(i => i.url)
+  const guids = candidates.flatMap(i => i.guid ? [i.guid] : [])
+  const { newItems, guidBackfills } = selectNewItems(
+    candidates,
+    getFeedArticleIdentities(feed.id, urls, guids),
+    getExistingArticleUrls(urls),
+  )
+
+  // Stamp the feed's identifier on articles stored before it was tracked, so
+  // the next pass matches them on guid instead of URL + title.
+  for (const { id, guid } of guidBackfills) setArticleGuid(id, guid)
+
+  const tasks: NewArticle[] = newItems.map(item => ({
+    kind: 'new' as const,
+    feed_id: feed.id,
+    title: item.title,
+    url: item.url,
+    guid: item.guid,
+    published_at: item.published_at,
+    requires_js_challenge: !!feed.requires_js_challenge,
+    excerpt: item.excerpt,
+  }))
 
   return { status: 'ok', tasks, itemCount: rssResult.items.length }
 }

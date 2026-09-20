@@ -5,6 +5,8 @@ export interface NewArticle {
   feed_id: number
   title: string
   url: string
+  /** Feed-provided identifier (RSS <guid> / Atom <id>), when the feed has one. */
+  guid?: string
   published_at: string | null
   requires_js_challenge?: boolean
   /** Excerpt from listing page (CSS Bridge content_selector), used as fullText fallback */

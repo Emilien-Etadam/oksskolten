@@ -28,7 +28,9 @@ function resolveRelativeDate(value: string | null): string | null {
  * Insert seed data from demo JSON files directly into the database.
  * Runs only when NODE_ENV=development, NO_SEED is not set,
  * and the database has no RSS feeds (fresh DB).
- * Idempotent: skips if RSS feeds already exist, uses INSERT OR IGNORE on url.
+ * Idempotent through the feed count check above — `articles.url` carries no
+ * unique constraint (see migrations/0018), so INSERT OR IGNORE no longer
+ * collapses repeated URLs on its own.
  *
  * Note: IDs are NOT specified — DB auto-assigns them to avoid collision
  * with the Clips feed (id=1) created by ensureClipFeed().

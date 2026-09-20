@@ -26,15 +26,15 @@ const REFRESH_ATTEMPT_BACKOFF = "datetime('now', '-1 day')"
 export function getArticlesNeedingRefresh(
   feedId: number,
   minLength: number,
-): { id: number; url: string; full_text: string | null }[] {
+): { id: number; url: string; guid: string | null; full_text: string | null }[] {
   return getDb().prepare(`
-    SELECT id, url, full_text
+    SELECT id, url, guid, full_text
     FROM articles
     WHERE feed_id = ?
       AND purged_at IS NULL
       AND length(coalesce(trim(full_text), '')) < ?
       AND (last_refresh_attempt_at IS NULL OR datetime(last_refresh_attempt_at) < ${REFRESH_ATTEMPT_BACKOFF})
-  `).all(feedId, minLength) as { id: number; url: string; full_text: string | null }[]
+  `).all(feedId, minLength) as { id: number; url: string; guid: string | null; full_text: string | null }[]
 }
 
 /**
@@ -57,25 +57,29 @@ export function countStaleArticlesByFeed(feedId: number, minLength: number): num
   return row.n
 }
 
+/**
+ * Both protocol variants of a normalized URL. Callers query for both so a
+ * feed item that arrives as https:// is treated as duplicate when we
+ * already stored it as http://, and vice versa. This is an intentional
+ * design trade-off: sites that serve genuinely different content at
+ * http:// vs https:// (extremely rare for RSS feeds) would lose the http
+ * version. The alternative — strict per-protocol dedup — causes duplicate
+ * articles when the same blog is referenced under both protocols in
+ * different feeds.
+ */
+export function urlProtocolVariants(url: string): string[] {
+  if (url.startsWith('https://')) return [url, 'http://' + url.slice(8)]
+  if (url.startsWith('http://')) return [url, 'https://' + url.slice(7)]
+  return [url]
+}
+
 export function getExistingArticleUrls(urls: string[]): Set<string> {
   if (urls.length === 0) return new Set()
   const normalized = urls.map(normalizeUrl)
 
-  // Query both protocol variants so a feed item that arrives as https://
-  // is treated as duplicate when we already stored it as http://, and
-  // vice versa. This is an intentional design trade-off: sites that serve
-  // genuinely different content at http:// vs https:// (extremely rare for
-  // RSS feeds) would lose the http version. The alternative — strict
-  // per-protocol dedup — causes duplicate articles when the same blog is
-  // referenced under both protocols in different feeds.
   const expanded = new Set<string>()
   for (const u of normalized) {
-    expanded.add(u)
-    if (u.startsWith('https://')) {
-      expanded.add('http://' + u.slice(8))
-    } else if (u.startsWith('http://')) {
-      expanded.add('https://' + u.slice(7))
-    }
+    for (const variant of urlProtocolVariants(u)) expanded.add(variant)
   }
   const expandedList = [...expanded]
   const placeholders = expandedList.map(() => '?').join(',')
@@ -91,6 +95,50 @@ export function getExistingArticleUrls(urls: string[]): Set<string> {
     else if (u.startsWith('http://') && dbUrls.has('https://' + u.slice(7))) existing.add(u)
   }
   return existing
+}
+
+/** Identity of a stored article, as needed to match it against a feed item. */
+export interface FeedArticleIdentity {
+  id: number
+  url: string
+  title: string
+  guid: string | null
+}
+
+/**
+ * Stored articles of one feed that could be the same entry as one of the
+ * incoming items — matched on the feed's guid, or on the URL (either
+ * protocol variant) for items and rows that carry none.
+ *
+ * Purged articles are included: they were seen once already and must not
+ * come back as new.
+ */
+export function getFeedArticleIdentities(
+  feedId: number,
+  urls: string[],
+  guids: string[],
+): FeedArticleIdentity[] {
+  const expanded = new Set<string>()
+  for (const u of urls) {
+    for (const variant of urlProtocolVariants(normalizeUrl(u))) expanded.add(variant)
+  }
+  const uniqueGuids = [...new Set(guids)]
+  if (expanded.size === 0 && uniqueGuids.length === 0) return []
+
+  const conditions: string[] = []
+  const params: unknown[] = [feedId]
+  if (expanded.size > 0) {
+    conditions.push(`url IN (${[...expanded].map(() => '?').join(',')})`)
+    params.push(...expanded)
+  }
+  if (uniqueGuids.length > 0) {
+    conditions.push(`guid IN (${uniqueGuids.map(() => '?').join(',')})`)
+    params.push(...uniqueGuids)
+  }
+
+  return getDb().prepare(
+    `SELECT id, url, title, guid FROM articles WHERE feed_id = ? AND (${conditions.join(' OR ')})`,
+  ).all(...params) as FeedArticleIdentity[]
 }
 
 // Backoff deadline: datetime when the article becomes eligible for retry again.

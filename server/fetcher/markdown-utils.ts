@@ -91,13 +91,29 @@ export function ensureLeadImage(fullText: string, ogImage: string | null, articl
 }
 
 /**
- * Generate a plain-text excerpt from Markdown by stripping images and links.
+ * Generate a plain-text excerpt from Markdown.
  * Used by both contentWorker (page extraction) and fetcher (RSS fallback).
+ *
+ * Every construct is unwrapped down to its text, not just images and links:
+ * an excerpt is rendered as plain text, so a leftover `## Heading` or the
+ * `\*` Turndown writes when escaping a literal asterisk shows up verbatim in
+ * the article list. Line-anchored patterns run before whitespace is
+ * collapsed, while the markers are still at the start of their line.
  */
 export function markdownToExcerpt(md: string, maxLen = 200): string | null {
   return md
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')        // strip ![alt](url)
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')     // [text](url) → text
+    .replace(/^ {0,3}```.*$/gm, '')                    // code fences
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '')              // strip ![alt](url)
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')           // [text](url) → text
+    .replace(/^ {0,3}([*\-_])(?: *\1){2,} *$/gm, '')   // thematic breaks
+    .replace(/^ {0,3}#{1,6} +/gm, '')                  // # headings
+    .replace(/^ {0,3}>[ \t]?/gm, '')                   // > quotes
+    .replace(/^ {0,3}(?:[-*+]|\d+[.)]) +/gm, '')       // list markers
+    .replace(/(?<![\\*_])(\*\*|__)(?=\S)([\s\S]*?\S)(?<!\\)\1/g, '$2')  // **bold**
+    .replace(/(?<![\\*_])([*_])(?=\S)([\s\S]*?\S)(?<!\\)\1/g, '$2')     // *italic*
+    .replace(/~~(?=\S)([\s\S]*?\S)~~/g, '$1')          // ~~strike~~
+    .replace(/`+([^`]*)`+/g, '$1')                     // `code`
+    .replace(/\\([\\`*_{}[\]()#+\-.!>~|])/g, '$1')      // \* → * (Turndown escapes)
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, maxLen)
