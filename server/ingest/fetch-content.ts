@@ -2,6 +2,7 @@ import { errorMessage } from '../fetcher/util.js'
 import { fetchFullText, isBotBlockPage, convertHtmlToMarkdown, markdownToExcerpt, ensureLeadImage, MIN_EXTRACTED_LENGTH } from '../fetcher/content.js'
 import { isGoogleNewsUrl } from '../fetcher/google-news.js'
 import { isDiscordMessageUrl } from '../feeds/sources/discord-channel.js'
+import { isGithubReleaseUrl } from '../feeds/sources/github-releases.js'
 import { detectLanguage } from '../ai/index.js'
 import { logger } from '../logger.js'
 
@@ -45,10 +46,15 @@ export async function fetchArticleContent(
   const isAnchorLink = url.includes('#')
   const existingBodyLen = existing?.full_text?.replace(/\s+/g, ' ').trim().length ?? 0
 
-  // A Discord permalink is a login wall: fetching it returns the web app's
-  // shell, never the message. The feed already carries the whole message, so
-  // that is the body — and the fetch is skipped rather than spent.
-  const isSelfContained = isAnchorLink || isDiscordMessageUrl(url)
+  // Some links cannot yield a better body than the one the feed already
+  // handed us, so the fetch is skipped rather than spent:
+  //
+  // - a Discord permalink is a login wall — fetching it returns the web app's
+  //   shell, never the message, while the feed carries the whole message;
+  // - a GitHub release page buries its changelog next to the asset table, and
+  //   extraction takes the table: a wall of filenames and checksums that is
+  //   long enough to pass for a body and shut the fallback below out.
+  const isSelfContained = isAnchorLink || isDiscordMessageUrl(url) || isGithubReleaseUrl(url)
 
   if (existing && existingBodyLen >= MIN_EXTRACTED_LENGTH) {
     fullText = existing.full_text

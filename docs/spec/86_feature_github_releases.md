@@ -64,7 +64,15 @@ The GraphQL query omits the `refs` block entirely unless tags are wanted, since 
 
 ### Item Shape
 
-Each entry becomes an `RssItem`: the title is `<owner>/<repo> <release name>`, the URL is the release page (or `/releases/tag/<name>` for a tag), and the release body becomes the excerpt, truncated to 2000 characters. Items are sorted newest first so that the per-feed article cap keeps the most recent releases. From there the normal ingestion pipeline applies — the release page is fetched and extracted like any other article, with the excerpt as fallback content.
+Each entry becomes an `RssItem`: the title is `<owner>/<repo> <release name>`, the URL is the release page (or `/releases/tag/<name>` for a tag), and the release body becomes the excerpt, truncated to 20 000 characters. Items are sorted newest first so that the per-feed article cap keeps the most recent releases.
+
+### The Release Page Is Not Fetched
+
+The body carried by the feed *is* the article, so `fetchArticleContent()` treats a release URL as self-contained — the same treatment a Discord permalink gets — and skips the page fetch entirely. `isGithubReleaseUrl()` recognises those URLs.
+
+Fetching the page produced the wrong article. A release page renders the changelog next to the table of downloadable assets, and extraction takes the table: a wall of filenames, checksums and sizes. That wall is long enough to clear `MIN_EXTRACTED_LENGTH`, so the fallback to the feed's own copy never fired and the changelog was lost. This is also why the excerpt cap is generous — it bounds the article, not a teaser.
+
+A tag entry has no body at all, so it is not affected: its URL is `/releases/tag/<name>` too, but with no excerpt to stand in, the pipeline fetches the page as usual.
 
 ### Key Files
 
@@ -72,6 +80,7 @@ Each entry becomes an `RssItem`: the title is `<owner>/<repo> <release name>`, t
 |---|---|
 | `server/fetcher/github-releases.ts` | URL parsing, token resolution, GraphQL query, release/tag filtering |
 | `server/fetcher/rss.ts` | Routes stars URLs to the GraphQL fetcher |
+| `server/ingest/fetch-content.ts` | Treats release URLs as self-contained, skipping the page fetch |
 | `server/routes/feeds.ts` | Resolves a pasted stars URL before RSS discovery |
 | `server/routes/settings.ts` | `github.release_types` preference key, `github` entry in `PROVIDER_KEY_MAP` |
 | `src/hooks/use-github-release-types.ts` | Client-side release-types setting state |

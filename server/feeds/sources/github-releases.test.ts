@@ -9,6 +9,7 @@ vi.mock('../../db.js', () => ({
 import {
   parseGithubStarsUrl,
   isGithubStarsUrl,
+  isGithubReleaseUrl,
   resolveGithubStarsFeed,
   getReleaseTypes,
   getGithubToken,
@@ -326,5 +327,23 @@ describe('fetchGithubStarredReleases', () => {
   it('rejects a URL that is not a stars page', async () => {
     await expect(fetchGithubStarredReleases('https://github.com/acme/widget'))
       .rejects.toThrow(/Not a GitHub stars URL/)
+  })
+})
+
+describe('isGithubReleaseUrl', () => {
+  it('recognises a release page', () => {
+    expect(isGithubReleaseUrl('https://github.com/acme/widget/releases/tag/v1.2.0')).toBe(true)
+    expect(isGithubReleaseUrl('https://www.github.com/acme/widget/releases/tag/v1.2.0')).toBe(true)
+  })
+
+  it('accepts a tag name holding a slash', () => {
+    expect(isGithubReleaseUrl('https://github.com/acme/widget/releases/tag/rel/2026-01')).toBe(true)
+  })
+
+  it('rejects the release index, the repository, and other hosts', () => {
+    expect(isGithubReleaseUrl('https://github.com/acme/widget/releases')).toBe(false)
+    expect(isGithubReleaseUrl('https://github.com/acme/widget')).toBe(false)
+    expect(isGithubReleaseUrl('https://gitlab.com/acme/widget/releases/tag/v1.2.0')).toBe(false)
+    expect(isGithubReleaseUrl('not a url')).toBe(false)
   })
 })

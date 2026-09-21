@@ -31,8 +31,12 @@ const MAX_PAGES = 5
 /** Recent entries kept per repository. Older ones have already been ingested. */
 const ENTRIES_PER_REPO = 3
 
-/** Release bodies are long; the excerpt only has to seed the article. */
-const EXCERPT_MAX_CHARS = 2000
+/**
+ * Cap on a release body. It is the article itself, not a teaser — the release
+ * page is never scraped (see `isGithubReleaseUrl`) — so the cut has to fall
+ * well past the end of an ordinary changelog.
+ */
+const EXCERPT_MAX_CHARS = 20_000
 
 /**
  * What counts as a release, from the `github.release_types` setting.
@@ -98,6 +102,32 @@ export function parseGithubStarsUrl(url: string): string | null {
 
 export function isGithubStarsUrl(url: string): boolean {
   return parseGithubStarsUrl(url) !== null
+}
+
+/**
+ * Is this a release page on github.com — the URL every release item points at?
+ *
+ * The page renders the release body, but extraction reliably picks the asset
+ * table over it: a list of filenames, checksums and sizes outscores the
+ * changelog beside it, and comfortably clears the length bar that would
+ * otherwise hand the article back to the feed's own copy. Since the feed
+ * already carries that body, the ingestion pipeline treats these URLs as
+ * self-contained and skips the fetch.
+ */
+export function isGithubReleaseUrl(url: string): boolean {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return false
+  }
+  if (parsed.hostname.replace(/^www\./, '') !== 'github.com') return false
+
+  const segments = parsed.pathname.replace(/^\/+|\/+$/g, '').split('/')
+  return segments.length >= 5
+    && segments[2] === 'releases'
+    && segments[3] === 'tag'
+    && segments[4] !== ''
 }
 
 /**
