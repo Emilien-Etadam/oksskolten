@@ -648,6 +648,18 @@ Response headers:
 - `Content-Type`: MIME type based on extension (`.jpg`, `.png`, `.gif`, `.webp`, `.svg`, `.avif`)
 - `Cache-Control: public, max-age=31536000, immutable`
 
+Authentication differs from every other route: this endpoint and the video one above are loaded by `<img>` and `<video>`, which send no `Authorization` header, so they accept the `media_token` cookie as well (`requireMediaAuth`). See `docs/spec/40_auth.md`.
+
+
+**POST /api/auth/media-cookie** — Issue the archived-media cookie
+
+Sets `media_token` (the caller's own JWT; `HttpOnly`, `SameSite=Lax`, `Path=/api/articles`, expiring with the token) and answers `204`. Authenticated by the `Authorization` header. An API key gets `204` and no cookie.
+
+
+**DELETE /api/auth/media-cookie** — Expire the archived-media cookie
+
+Answers `204` and clears the cookie. Unauthenticated: dropping your own cookie proves nothing.
+
 
 **POST /api/feeds** — Add feed
 

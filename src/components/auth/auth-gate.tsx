@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
-import { AUTH_LOGOUT_EVENT, getAuthToken, setAuthToken } from '../../lib/auth'
+import { AUTH_LOGOUT_EVENT, getAuthToken, setAuthToken, syncMediaCookie } from '../../lib/auth'
 import { LoginPage } from '../../pages/login-page'
 
 // AuthGate uses its own fetcher that does NOT redirect on 401.
@@ -29,6 +29,16 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     setAuthToken(token)
     void mutate()
   }, [mutate])
+
+  // A session that predates the media cookie — or whose cookie has expired —
+  // only learns about it here: nothing else in a returning visit touches the
+  // token, and archived images answer 401 until the cookie is back.
+  const mediaCookieSynced = useRef(false)
+  useEffect(() => {
+    if (!data || mediaCookieSynced.current) return
+    mediaCookieSynced.current = true
+    void syncMediaCookie(getAuthToken())
+  }, [data])
 
   useEffect(() => {
     const handleLogout = () => {

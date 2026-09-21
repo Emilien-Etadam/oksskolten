@@ -5,6 +5,8 @@ describe('auth', () => {
   beforeEach(async () => {
     localStorage.clear()
     vi.resetModules()
+    // setAuthToken mirrors the session into the media cookie over the network.
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(null, { status: 204 }))))
   })
 
   async function loadAuth() {
@@ -52,6 +54,34 @@ describe('auth', () => {
       const { setAuthToken, getAuthToken } = await loadAuth()
       setAuthToken('new_token')
       expect(getAuthToken()).toBe('new_token')
+    })
+  })
+
+  // Archived images and videos are <img>/<video> loads: they cannot send the
+  // Authorization header, so the session is mirrored into a cookie for them.
+  describe('syncMediaCookie', () => {
+    it('asks the server for a cookie when a session starts', async () => {
+      const { setAuthToken } = await loadAuth()
+      setAuthToken('tok_abc')
+
+      expect(fetch).toHaveBeenCalledWith('/api/auth/media-cookie', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer tok_abc' },
+      })
+    })
+
+    it('drops the cookie when the session ends', async () => {
+      const { setAuthToken } = await loadAuth()
+      setAuthToken(null)
+
+      expect(fetch).toHaveBeenCalledWith('/api/auth/media-cookie', { method: 'DELETE' })
+    })
+
+    it('stays quiet when the request fails', async () => {
+      vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('offline'))))
+      const { syncMediaCookie } = await loadAuth()
+
+      await expect(syncMediaCookie('tok_abc')).resolves.toBeUndefined()
     })
   })
 

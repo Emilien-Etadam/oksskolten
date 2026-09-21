@@ -127,9 +127,20 @@ Security considerations:
 - Payload: `{ email, token_version }`
 - Transport: `Authorization: Bearer <token>` header
 - Frontend storage: `localStorage` (`auth_token` key)
+- Exception — archived media: `<img>` and `<video>` load `/api/articles/images/:filename` and `/api/articles/videos/:filename` on their own and cannot send the header, so those two GETs also accept the same JWT from the `media_token` cookie (see "Media cookie" below)
 - Signing secret: persisted in DB (`settings` table). Can be overridden with the `JWT_SECRET` environment variable
 - On 401 response: frontend automatically discards the token and redirects to the login screen
 - Invalidation via `token_version`: incrementing `token_version` on password change invalidates all existing sessions
+
+### Media Cookie
+
+Archived images and videos are the only responses the browser fetches without JavaScript in the loop, so they are the only ones a Bearer header cannot reach. `media_token` closes that gap:
+
+- Value: the caller's own JWT — no new credential, and it dies with the session
+- Attributes: `HttpOnly`, `SameSite=Lax`, `Secure` over HTTPS, `Path=/api/articles`, `Max-Age` taken from the token's `exp`
+- Issued by `POST /api/auth/media-cookie` (authenticated by the header) and expired by `DELETE /api/auth/media-cookie`. The client calls the first on login and on every boot — which is how sessions predating the cookie get one — and the second on logout
+- Read only by `requireMediaAuth` (`server/auth/guards.ts`), and only after the request proves to have no `Authorization` header. `requireAuth`, which guards every other route including all mutations, ignores cookies entirely
+- API keys get no cookie: a script sets its own header
 
 ### WebAuthn Configuration
 
@@ -220,7 +231,7 @@ Skip authentication checks with `AUTH_DISABLED=1`. Only effective when `NODE_ENV
 
 ### Security
 
-- No CSRF risk since cookies are not used (tokens are explicitly sent as Authorization headers)
+- No CSRF risk: mutating APIs accept the token only as an `Authorization` header. The single cookie (`media_token`) is `SameSite=Lax`, scoped to `/api/articles`, and honored by two read-only media GETs alone
 - Write APIs (POST / PATCH / DELETE) require `Content-Type: application/json`; otherwise return `415 Unsupported Media Type`
 - XSS protection: React's automatic escaping + Markdown sanitization with DOMPurify
 - WebAuthn challenges are consumed after a single use (replay attack prevention)
