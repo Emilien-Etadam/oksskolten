@@ -304,6 +304,11 @@ export interface RedditPostContent {
   title: string | null
   ogImage: string | null
   excerpt: string | null
+  /**
+   * Destination of a link post — the site that actually holds the article.
+   * The body returned alongside is only a stub; callers extract there first.
+   */
+  linkUrl: string | null
 }
 
 export { redditImageLinksToMarkdown }
@@ -312,6 +317,9 @@ interface RedditPostData {
   title?: unknown
   selftext?: unknown
   subreddit_name_prefixed?: unknown
+  author?: unknown
+  url?: unknown
+  url_overridden_by_dest?: unknown
   crosspost_parent_list?: unknown
   preview?: { images?: Array<{ source?: { url?: unknown } }> }
 }
@@ -320,12 +328,66 @@ function postSelftext(post: RedditPostData): string {
   return typeof post.selftext === 'string' ? post.selftext.trim() : ''
 }
 
+/** Reddit's own hosts: what they serve is the post itself, not an article elsewhere. */
+const REDDIT_HOST_RE = /(^|\.)(reddit\.com|redd\.it|redditmedia\.com|redditstatic\.com)$/
+/** A file the extraction pipeline would find no text in. */
+const DIRECT_MEDIA_RE = /\.(jpe?g|png|gifv?|webp|bmp|svg|mp4|webm|mov|mp3|m4a)$/i
+
+/**
+ * The article a link post points to, or null when the post links nowhere
+ * outside Reddit (self posts, image and video posts, galleries) or points
+ * straight at a media file, which holds no text to extract.
+ */
+function postLinkUrl(post: RedditPostData): string | null {
+  const raw = typeof post.url_overridden_by_dest === 'string'
+    ? post.url_overridden_by_dest
+    : typeof post.url === 'string' ? post.url : null
+  if (!raw) return null
+  let parsed: URL
+  try {
+    parsed = new URL(raw)
+  } catch {
+    return null
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null
+  if (REDDIT_HOST_RE.test(parsed.hostname)) return null
+  if (DIRECT_MEDIA_RE.test(parsed.pathname)) return null
+  return parsed.toString()
+}
+
+/**
+ * Body for a post that carries no text of its own: the picture it was posted
+ * for, and where it points. Thin on purpose — for a link post it is the
+ * fallback shown only when the destination cannot be extracted, and it still
+ * beats what HTML extraction returns for a Reddit post page, which is the
+ * cookie banner.
+ */
+function textlessPostBody(post: RedditPostData, linkUrl: string | null, image: string | null): string {
+  const parts: string[] = []
+  if (image) parts.push(`![](${image})`)
+  if (linkUrl) {
+    let label = linkUrl
+    try {
+      label = new URL(linkUrl).hostname.replace(/^www\./, '')
+    } catch { /* unparseable: link the raw URL */ }
+    parts.push(`[${label}](${linkUrl})`)
+  }
+  if (parts.length === 0) return ''
+  const sub = typeof post.subreddit_name_prefixed === 'string' ? post.subreddit_name_prefixed : null
+  const author = typeof post.author === 'string' ? post.author : null
+  const origin = [sub && `Posted in ${sub}`, author && `by u/${author}`].filter(Boolean).join(' ')
+  if (origin) parts.push(`_${origin}_`)
+  return parts.join('\n\n')
+}
+
 /**
  * Build article content for a Reddit post from its public JSON: the selftext
  * is already Markdown, and crossposts carry their embedded parent's selftext
- * (which HTML extraction cannot see reliably). Returns null for non-reddit
- * URLs, link posts without text, or when Reddit is unreachable — callers
- * fall back to the regular HTML extraction pipeline.
+ * (which HTML extraction cannot see reliably). A post with no text at all
+ * returns its destination in `linkUrl` — the article lives there — with a stub
+ * body as the fallback. Returns null for non-reddit URLs, for posts holding
+ * neither text, image nor link, and when Reddit is unreachable; callers fall
+ * back to the regular HTML extraction pipeline.
  */
 export async function fetchRedditPostContent(articleUrl: string): Promise<RedditPostContent | null> {
   const jsonUrl = redditJsonUrl(articleUrl)
@@ -335,32 +397,45 @@ export async function fetchRedditPostContent(articleUrl: string): Promise<Reddit
   const post = (payload?.[0]?.data?.children?.[0] as { data?: RedditPostData } | undefined)?.data
   if (!post) return null
 
+  const parent = Array.isArray(post.crosspost_parent_list)
+    ? post.crosspost_parent_list[0] as RedditPostData | undefined
+    : undefined
+
   let markdown = postSelftext(post)
 
   // Crosspost: the outer post has no text of its own — use the embedded parent
-  if (!markdown && Array.isArray(post.crosspost_parent_list)) {
-    const parent = post.crosspost_parent_list[0] as RedditPostData | undefined
-    if (parent) {
-      const parentText = postSelftext(parent)
-      if (parentText) {
-        const from = typeof parent.subreddit_name_prefixed === 'string' ? parent.subreddit_name_prefixed : 'reddit'
-        markdown = `> Crossposted from ${from}\n\n${parentText}`
-      }
+  if (!markdown && parent) {
+    const parentText = postSelftext(parent)
+    if (parentText) {
+      const from = typeof parent.subreddit_name_prefixed === 'string' ? parent.subreddit_name_prefixed : 'reddit'
+      markdown = `> Crossposted from ${from}\n\n${parentText}`
     }
   }
 
-  if (!markdown) return null
+  const title = typeof post.title === 'string' ? post.title : null
+  const rawPreview = post.preview?.images?.[0]?.source?.url ?? parent?.preview?.images?.[0]?.source?.url
+  const preview = typeof rawPreview === 'string' ? decodeHtmlEntities(rawPreview) : null
+
+  // Link post: the words are on the site the post points to (a crossposted
+  // link post carries its destination on the parent). Hand that URL to the
+  // caller to extract from, with the stub as the fallback body.
+  if (!markdown) {
+    const linkUrl = postLinkUrl(post) ?? (parent ? postLinkUrl(parent) : null)
+    const body = textlessPostBody(post, linkUrl, preview)
+    if (!body) return null
+    return { fullText: body, title, ogImage: preview, excerpt: markdownToExcerpt(body), linkUrl }
+  }
 
   markdown = redditImageLinksToMarkdown(markdown)
 
-  const previewUrl = post.preview?.images?.[0]?.source?.url
   // Text posts with inline images carry no `preview` — fall back to the first
   // image in the markdown so the article still gets a thumbnail
   const firstBodyImage = markdown.match(/!\[[^\]]*\]\(\s*([^)\s]+)/)?.[1] ?? null
   return {
     fullText: markdown,
-    title: typeof post.title === 'string' ? post.title : null,
-    ogImage: typeof previewUrl === 'string' ? decodeHtmlEntities(previewUrl) : firstBodyImage,
+    title,
+    ogImage: preview ?? firstBodyImage,
     excerpt: markdownToExcerpt(markdown),
+    linkUrl: null,
   }
 }

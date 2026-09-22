@@ -2492,6 +2492,75 @@ describe('fetchFullText — pages whose text lives elsewhere', () => {
   })
 })
 
+describe('fetchFullText — reddit link posts', () => {
+  let fetchFullText: typeof import('./fetcher/content.js').fetchFullText
+
+  const postUrl = 'https://www.reddit.com/r/RuntimeWire/comments/abc/formas/'
+
+  const linkPostJson = JSON.stringify([
+    {
+      data: {
+        children: [{
+          kind: 't3',
+          data: {
+            title: 'Formas will open Cartesian preview for editable AI-generated CAD models',
+            selftext: '',
+            author: 'ryanmerket',
+            subreddit_name_prefixed: 'r/RuntimeWire',
+            url_overridden_by_dest: 'https://runtimewire.com/formas-cartesian',
+            preview: { images: [{ source: { url: 'https://preview.redd.it/card.jpg' } }] },
+          },
+        }],
+      },
+    },
+    { data: { children: [] } },
+  ])
+
+  beforeEach(async () => {
+    const mod = await import('./fetcher/content.js')
+    fetchFullText = mod.fetchFullText
+    const reddit = await import('./fetcher/reddit.js')
+    reddit._resetRedditOauthForTests()
+    vi.stubEnv('REDDIT_CLIENT_ID', '')
+    vi.stubEnv('REDDIT_CLIENT_SECRET', '')
+    mockFlareSolverr.mockResolvedValue(null)
+  })
+
+  /** Serve the post's JSON; every other URL comes from `pages`, or 404s. */
+  function serveReddit(pages: Record<string, string>) {
+    mockFetch.mockImplementation((input: string | URL) => {
+      const url = String(input)
+      if (url.startsWith('https://www.reddit.com/r/') && url.includes('.json')) {
+        return Promise.resolve(mockResponse(linkPostJson, { headers: { 'content-type': 'application/json' } }))
+      }
+      const body = pages[url]
+      if (body === undefined) return Promise.resolve(mockResponse('Not found', { status: 404 }))
+      return Promise.resolve(mockResponse(body))
+    })
+  }
+
+  it('extracts the linked article instead of the reddit page cookie banner', async () => {
+    serveReddit({ 'https://runtimewire.com/formas-cartesian': articleHtml({ title: 'Formas opens Cartesian' }) })
+
+    const result = await fetchFullText(postUrl)
+
+    expect(result.fullText).toContain('paragraph of article content')
+    expect(result.fullText).not.toContain('cookie')
+    // The reader keeps the title the post carried in their feed
+    expect(result.title).toBe('Formas will open Cartesian preview for editable AI-generated CAD models')
+  })
+
+  it('keeps the post stub when the linked article cannot be extracted', async () => {
+    serveReddit({})
+
+    const result = await fetchFullText(postUrl)
+
+    expect(result.fullText).toContain('[runtimewire.com](https://runtimewire.com/formas-cartesian)')
+    expect(result.fullText).toContain('![](https://preview.redd.it/card.jpg)')
+    expect(result.ogImage).toBe('https://preview.redd.it/card.jpg')
+  })
+})
+
 describe('FlareSolverr — fetchFullText', () => {
   let fetchFullText: typeof import('./fetcher/content.js').fetchFullText
 

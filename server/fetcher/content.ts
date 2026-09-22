@@ -205,6 +205,21 @@ export async function fetchFullText(url: string, options?: FetchFullTextOptions)
   // extraction. Falls through to the regular pipeline on failure.
   const redditPost = await fetchRedditPostContent(articleUrl)
   if (redditPost) {
+    // A link post holds no text of its own: the article is on the site it
+    // points to, and extracting the Reddit page returns its cookie banner
+    // instead. Extract at the destination, keeping the post's own title — the
+    // one the reader saw in the feed — and keep the stub body when that fails.
+    if (redditPost.linkUrl) {
+      const followed = await fetchFullText(redditPost.linkUrl, options).catch(() => null)
+      const followedLen = followed ? textLength(followed.fullText) : 0
+      if (followed && followedLen >= MIN_EXTRACTED_LENGTH && !isGarbageExtraction(followed.fullText)) {
+        return {
+          ...followed,
+          title: redditPost.title || followed.title,
+          ogImage: followed.ogImage || redditPost.ogImage,
+        }
+      }
+    }
     return {
       fullText: redditPost.fullText,
       ogImage: redditPost.ogImage,

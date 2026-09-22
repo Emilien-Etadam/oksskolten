@@ -82,6 +82,7 @@ describe('fetchRedditPostContent', () => {
       title: 'My post',
       ogImage: 'https://preview.redd.it/x.jpg?width=640&s=abc',
       excerpt: expect.any(String),
+      linkUrl: null,
     })
   })
 
@@ -120,13 +121,71 @@ describe('fetchRedditPostContent', () => {
     expect(content?.excerpt).toBe('Before After')
   })
 
-  it('returns null for link posts without text', async () => {
+  it('hands back the destination and a stub body for a link post', async () => {
     mockFetch.mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(postPayload({ title: 'Link post', selftext: '' })),
+      json: () => Promise.resolve(postPayload({
+        title: 'Link post',
+        selftext: '',
+        author: 'ryanmerket',
+        subreddit_name_prefixed: 'r/RuntimeWire',
+        url_overridden_by_dest: 'https://runtimewire.com/formas-cartesian',
+        preview: { images: [{ source: { url: 'https://preview.redd.it/card.jpg?s=abc' } }] },
+      })),
     })
 
-    expect(await fetchRedditPostContent('https://www.reddit.com/r/ollama/comments/abc/link/')).toBeNull()
+    const content = await fetchRedditPostContent('https://www.reddit.com/r/RuntimeWire/comments/abc/link/')
+    expect(content?.linkUrl).toBe('https://runtimewire.com/formas-cartesian')
+    expect(content?.ogImage).toBe('https://preview.redd.it/card.jpg?s=abc')
+    expect(content?.fullText).toBe(
+      '![](https://preview.redd.it/card.jpg?s=abc)\n\n'
+      + '[runtimewire.com](https://runtimewire.com/formas-cartesian)\n\n'
+      + '_Posted in r/RuntimeWire by u/ryanmerket_',
+    )
+  })
+
+  it('takes the destination from the parent of a crossposted link post', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(postPayload({
+        title: 'Crossposted link',
+        selftext: '',
+        url_overridden_by_dest: 'https://www.reddit.com/r/other/comments/xyz/original/',
+        crosspost_parent_list: [{ selftext: '', url_overridden_by_dest: 'https://example.com/article' }],
+      })),
+    })
+
+    const content = await fetchRedditPostContent('https://www.reddit.com/r/ollama/comments/abc/xlink/')
+    expect(content?.linkUrl).toBe('https://example.com/article')
+  })
+
+  it('has no destination to follow for a reddit-hosted image post', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(postPayload({
+        title: 'Image post',
+        selftext: '',
+        url_overridden_by_dest: 'https://i.redd.it/pic.jpg',
+        preview: { images: [{ source: { url: 'https://preview.redd.it/pic.jpg?s=abc' } }] },
+      })),
+    })
+
+    const content = await fetchRedditPostContent('https://www.reddit.com/r/ollama/comments/abc/pic/')
+    expect(content?.linkUrl).toBeNull()
+    expect(content?.fullText).toBe('![](https://preview.redd.it/pic.jpg?s=abc)')
+  })
+
+  it('returns null for a post with no text, image or outbound link', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(postPayload({
+        title: 'Empty post',
+        selftext: '',
+        url: 'https://www.reddit.com/r/ollama/comments/abc/empty/',
+      })),
+    })
+
+    expect(await fetchRedditPostContent('https://www.reddit.com/r/ollama/comments/abc/empty/')).toBeNull()
   })
 
   it('returns null without fetching for non-reddit URLs', async () => {
