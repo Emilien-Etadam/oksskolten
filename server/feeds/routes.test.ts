@@ -171,6 +171,43 @@ describe('POST /api/feeds — RSS discovery pipeline', () => {
     expect(mockQueryRssBridge).not.toHaveBeenCalled()
   })
 
+  // Two subscriptions to one RSS URL store every article twice.
+  it('refuses a feed whose RSS URL another feed already polls', async () => {
+    seedFeed({ name: 'Korben', url: 'https://korben.info', rss_url: 'https://korben.info/feed' })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/feeds',
+      headers: json,
+      payload: {
+        url: 'https://korben.info/news',
+        discovered_rss_url: 'https://korben.info/feed/',
+        discovered_rss_title: 'Les news de Korben',
+      },
+    })
+
+    const events = parseSSE(res.body)
+    const error = events.find(e => e.type === 'error') as any
+    expect(error?.error).toContain('Korben')
+    expect(events.find(e => e.type === 'done')).toBeUndefined()
+  })
+
+  it('refuses before offering a choice when the discovered RSS URL is already followed', async () => {
+    seedFeed({ name: 'Blog', url: 'https://example.com/blog', rss_url: 'https://example.com/feed.xml' })
+    mockDiscoverRssUrl.mockResolvedValue({ rssUrl: 'https://example.com/feed.xml', title: 'Blog' })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/feeds',
+      headers: json,
+      payload: { url: 'https://example.com' },
+    })
+
+    const events = parseSSE(res.body)
+    expect(events.find(e => e.type === 'error')).toBeDefined()
+    expect(events.find(e => e.type === 'choice_needed')).toBeUndefined()
+  })
+
   it('falls back to RSS bridge when discovery fails', async () => {
     mockDiscoverRssUrl.mockResolvedValue({ rssUrl: null, title: null })
     mockQueryRssBridge.mockResolvedValue('https://bridge.example.com/rss')
@@ -649,6 +686,24 @@ describe('POST /api/opml with selectedUrls', () => {
     expect(names).toContain('Lobsters')
     expect(names).toContain('xkcd')
     expect(names).not.toContain('Hacker News')
+  })
+
+  it('skips an entry whose RSS URL another feed already polls', async () => {
+    seedFeed({ name: 'HN', url: 'https://hn.example', rss_url: 'https://news.ycombinator.com/rss' })
+    const { body, contentType } = buildMultipart({
+      file: { filename: 'feeds.opml', content: sampleOpml },
+    })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/opml',
+      headers: { 'content-type': contentType },
+      payload: body,
+    })
+
+    expect(res.json().imported).toBe(2)
+    const { getFeeds } = await import('../db.js')
+    expect(getFeeds().map((f: { name: string }) => f.name)).not.toContain('Hacker News')
   })
 
   it('imports all feeds when selectedUrls is omitted (backward compat)', async () => {

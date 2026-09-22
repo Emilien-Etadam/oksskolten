@@ -9,6 +9,7 @@ import {
   getFeeds,
   getFeedById,
   getFeedByUrl,
+  getFeedByRssUrl,
   createFeed,
   updateFeed,
   deleteFeed,
@@ -165,6 +166,17 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
       const sse = startSSE(reply)
       const send = sse.send
 
+      // Two subscriptions polling one RSS URL (say, the site and its /feed
+      // page added separately) store every article twice: both see the URL as
+      // new in the same fetch cycle, before either has inserted it.
+      const rejectDuplicateRssUrl = (rssUrl: string | null): boolean => {
+        const existing = rssUrl ? getFeedByRssUrl(rssUrl) : undefined
+        if (!existing) return false
+        send({ type: 'error', error: `Already subscribed to this feed as "${existing.name}"` })
+        sse.end()
+        return true
+      }
+
       try {
         let rssUrl: string | null = null
         let rssBridgeUrl: string | null = null
@@ -175,6 +187,7 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
           // Phase 2: user chose "whole site" — use the provided RSS URL directly
           rssUrl = body.discovered_rss_url
           discoveredTitle = body.discovered_rss_title ?? null
+          if (rejectDuplicateRssUrl(rssUrl)) return
           send({ type: 'step', step: 'rss-discovery', status: 'done', found: true })
           send({ type: 'step', step: 'rss-bridge', status: 'skipped' })
           send({ type: 'step', step: 'css-selector', status: 'skipped' })
@@ -194,6 +207,8 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
           rssBridgeUrl = resolved.rssBridgeUrl
           discoveredTitle = resolved.title
           if (resolved.usedFlareSolverr) requiresJsChallenge = true
+
+          if (rejectDuplicateRssUrl(rssUrl)) return
 
           // Discovery hit (not a GitHub/social shortcut): offer a choice instead of creating
           if (rssUrl && !resolveState.directSource && !body.force_page_selector) {
@@ -434,7 +449,7 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
     }
 
     const feeds = parsed.map((entry) => {
-      const existing = getFeedByUrl(entry.url)
+      const existing = getFeedByUrl(entry.url) ?? (entry.rssUrl ? getFeedByRssUrl(entry.rssUrl) : undefined)
       return {
         name: entry.name,
         url: entry.url,
@@ -495,7 +510,7 @@ export async function feedRoutes(api: FastifyInstance): Promise<void> {
     for (const entry of entries) {
       try {
         // Check for duplicate by url or rss_url
-        if (getFeedByUrl(entry.url)) {
+        if (getFeedByUrl(entry.url) || (entry.rssUrl && getFeedByRssUrl(entry.rssUrl))) {
           skipped++
           continue
         }
