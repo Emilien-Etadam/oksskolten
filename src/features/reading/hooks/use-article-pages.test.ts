@@ -194,4 +194,31 @@ describe('useArticlePages', () => {
     refreshArticleLists()
     expect(swrInfiniteReturn.mutate).toHaveBeenCalledTimes(1)
   })
+
+  // SWR serves a list's cached pages without refetching them when the list is
+  // selected again, so articles fetched in the background meanwhile were missing.
+  it('reloads cached pages when switching to a list', () => {
+    swrInfiniteReturn = {
+      ...swrInfiniteReturn,
+      data: [{ articles: [makeArticle()], total: 1, has_more: false }],
+      isLoading: false,
+    }
+
+    const { rerender } = renderHook(
+      (params: ArticlePagesParams) => useArticlePages(params),
+      { initialProps: { ...defaultParams, feedId: 1 } },
+    )
+    expect(swrInfiniteReturn.mutate).toHaveBeenCalledTimes(1)
+
+    rerender({ ...defaultParams, feedId: 1 })
+    expect(swrInfiniteReturn.mutate).toHaveBeenCalledTimes(1)
+
+    rerender({ ...defaultParams, feedId: 2 })
+    expect(swrInfiniteReturn.mutate).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not refetch a list that has nothing cached yet', () => {
+    renderHook(() => useArticlePages({ ...defaultParams, feedId: 1 }))
+    expect(swrInfiniteReturn.mutate).not.toHaveBeenCalled()
+  })
 })
