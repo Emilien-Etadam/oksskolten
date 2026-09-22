@@ -57,3 +57,26 @@ export function findReadSimilarArticle(articleId: number): number | null {
     .get(articleId) as { id: number } | undefined
   return row?.id ?? null
 }
+
+/**
+ * IDs of a feed's articles published within [since, until] (ISO strings), or
+ * undated, excluding `excludeId`. Newest first, capped at `limit`.
+ */
+export function getFeedArticleIdsInWindow(
+  feedId: number,
+  excludeId: number,
+  since: string,
+  until: string,
+  limit: number,
+): number[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT id FROM active_articles
+       WHERE feed_id = ? AND id != ?
+         AND (published_at IS NULL OR (published_at >= ? AND published_at <= ?))
+       ORDER BY id DESC
+       LIMIT ?`,
+    )
+    .all(feedId, excludeId, since, until, limit) as { id: number }[]
+  return rows.map(r => r.id)
+}

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setupTestDb } from '../__tests__/helpers/testDb.js'
-import { insertSimilarity, getSimilarArticles, findReadSimilarArticle } from './similarity-db.js'
+import { insertSimilarity, getSimilarArticles, findReadSimilarArticle, getFeedArticleIdsInWindow } from './similarity-db.js'
 import { getDb } from '../db/connection.js'
 
 function seedFeedAndArticles() {
@@ -83,5 +83,20 @@ describe('findReadSimilarArticle', () => {
 
   it('returns null when no similarities exist', () => {
     expect(findReadSimilarArticle(1)).toBeNull()
+  })
+})
+
+describe('getFeedArticleIdsInWindow', () => {
+  it('returns the feed\'s other articles dated inside the window or undated', () => {
+    const db = getDb()
+    db.prepare('UPDATE articles SET published_at = ? WHERE id = 2').run('2026-01-02T00:00:00.000Z')
+    db.prepare(
+      'INSERT INTO articles (id, feed_id, title, url, category_id, published_at) VALUES (4, 2, \'Old\', \'https://b.com/3\', 1, \'2025-06-01T00:00:00.000Z\')',
+    ).run()
+    // id 3 is undated, id 4 is outside the window, id 1 belongs to another feed
+    expect(getFeedArticleIdsInWindow(2, 99, '2025-12-29T00:00:00.000Z', '2026-01-04T00:00:00.000Z', 10))
+      .toEqual([3, 2])
+    expect(getFeedArticleIdsInWindow(2, 2, '2025-12-29T00:00:00.000Z', '2026-01-04T00:00:00.000Z', 10))
+      .toEqual([3])
   })
 })
