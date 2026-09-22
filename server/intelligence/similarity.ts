@@ -1,7 +1,7 @@
 import { meiliSearch } from '../search/client.js'
 import { isSearchReady } from '../search/sync.js'
 import { getArticlesByIds, markArticleSeen } from '../db.js'
-import { insertSimilarity } from './similarity-db.js'
+import { insertSimilarity, getFeedArticleIdsInWindow } from './similarity-db.js'
 import { logger } from '../logger.js'
 
 const log = logger.child('similarity')
@@ -9,6 +9,8 @@ const log = logger.child('similarity')
 const SIMILARITY_THRESHOLD = 0.4
 const TIME_WINDOW_DAYS = 3
 const MAX_CANDIDATES = 10
+/** Cap on same-feed siblings read from the database (see below). */
+const MAX_FEED_SIBLINGS = 200
 
 /**
  * Compute bigram Dice coefficient between two strings.
@@ -92,14 +94,27 @@ export async function detectAndStoreSimilarArticles(
     })
 
     // Exclude self and same-feed articles
-    const candidateIds = hits
+    const candidateIds = new Set(hits
       .map((h) => h.id)
-      .filter((id) => id !== articleId)
+      .filter((id) => id !== articleId))
 
-    if (candidateIds.length === 0) return
+    // Meilisearch indexes asynchronously, so a crosspost and its original
+    // inserted in the same fetch cycle never find each other there: each one
+    // searches before the other is indexed. The database is already current,
+    // so read the same-feed siblings from it. Only Reddit posts can match
+    // within their own feed (see comparableWithinFeed), so only they pay for it.
+    if (subredditOf(url)) {
+      const since = new Date(refDate.getTime() - TIME_WINDOW_DAYS * 86_400_000).toISOString()
+      const until = new Date(refDate.getTime() + TIME_WINDOW_DAYS * 86_400_000).toISOString()
+      for (const id of getFeedArticleIdsInWindow(feedId, articleId, since, until, MAX_FEED_SIBLINGS)) {
+        candidateIds.add(id)
+      }
+    }
+
+    if (candidateIds.size === 0) return
 
     // Fetch candidate details to check feed_id and compute title similarity
-    const candidates = getArticlesByIds(candidateIds)
+    const candidates = getArticlesByIds([...candidateIds])
 
     let markedSeen = false
 

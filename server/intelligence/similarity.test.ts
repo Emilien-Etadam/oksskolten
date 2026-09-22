@@ -7,12 +7,14 @@ const {
   mockGetArticlesByIds,
   mockMarkArticleSeen,
   mockInsertSimilarity,
+  mockGetFeedArticleIdsInWindow,
 } = vi.hoisted(() => ({
   mockMeiliSearch: vi.fn(),
   mockIsSearchReady: vi.fn(),
   mockGetArticlesByIds: vi.fn(),
   mockMarkArticleSeen: vi.fn(),
   mockInsertSimilarity: vi.fn(),
+  mockGetFeedArticleIdsInWindow: vi.fn(),
 }))
 
 vi.mock('../search/client.js', () => ({
@@ -27,6 +29,7 @@ vi.mock('../db.js', () => ({
 }))
 vi.mock('./similarity-db.js', () => ({
   insertSimilarity: mockInsertSimilarity,
+  getFeedArticleIdsInWindow: mockGetFeedArticleIdsInWindow,
 }))
 
 describe('computeTitleSimilarity', () => {
@@ -97,6 +100,7 @@ describe('detectAndStoreSimilarArticles', () => {
     mockIsSearchReady.mockReturnValue(true)
     mockMeiliSearch.mockResolvedValue({ hits: [], estimatedTotalHits: 0 })
     mockGetArticlesByIds.mockReturnValue([])
+    mockGetFeedArticleIdsInWindow.mockReturnValue([])
   })
 
   it('does nothing when search is not ready', async () => {
@@ -205,5 +209,38 @@ describe('detectAndStoreSimilarArticles', () => {
     mockMeiliSearch.mockResolvedValue({ hits: [{ id: 1 }], estimatedTotalHits: 1 })
     await detectAndStoreSimilarArticles(1, 'Some title', 10, '2026-01-01T00:00:00Z')
     expect(mockGetArticlesByIds).not.toHaveBeenCalled()
+  })
+
+  // A crosspost and its original arrive in the same fetch cycle; Meilisearch
+  // indexes asynchronously, so neither is searchable when the other looks.
+  it('finds a same-feed crosspost the search index does not have yet', async () => {
+    mockGetFeedArticleIdsInWindow.mockReturnValue([2])
+    mockGetArticlesByIds.mockReturnValue([
+      {
+        id: 2,
+        feed_id: 10,
+        title: 'mini-AGI: continual learning transformer grown by evolution',
+        url: 'https://www.reddit.com/r/LocalLLM/comments/bbb222/miniagi/',
+        published_at: '2026-01-01T00:00:00Z',
+        read_at: null,
+      },
+    ])
+    await detectAndStoreSimilarArticles(
+      1,
+      'mini-AGI: continual learning transformer growth by evolution',
+      10,
+      '2026-01-01T00:00:00Z',
+      'https://www.reddit.com/r/LocalLLaMA/comments/aaa111/miniagi/',
+    )
+    expect(mockGetFeedArticleIdsInWindow).toHaveBeenCalledWith(
+      10, 1, '2025-12-29T00:00:00.000Z', '2026-01-04T00:00:00.000Z', expect.any(Number),
+    )
+    expect(mockGetArticlesByIds).toHaveBeenCalledWith([2])
+    expect(mockInsertSimilarity).toHaveBeenCalledWith(1, 2, expect.any(Number))
+  })
+
+  it('does not read same-feed siblings for articles outside Reddit', async () => {
+    await detectAndStoreSimilarArticles(1, 'Some title', 10, '2026-01-01T00:00:00Z', 'https://example.com/post')
+    expect(mockGetFeedArticleIdsInWindow).not.toHaveBeenCalled()
   })
 })
