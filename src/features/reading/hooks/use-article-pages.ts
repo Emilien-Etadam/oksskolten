@@ -73,6 +73,19 @@ export function useArticlePages({
   // that pulls in new articles emits on the bus.
   useEffect(() => subscribeArticleListRefresh(() => { void mutate() }), [mutate])
 
+  // Switching to a list already loaded earlier in the session serves its cached
+  // pages as-is: SWR refetches a cached page only on first mount (and only with
+  // `revalidateOnMount`), and the refresh bus above reaches the mounted list
+  // alone. Articles fetched in the background for another feed stayed missing
+  // from that feed's list — while its unread count showed them — until reload.
+  // So whenever the list identity changes onto cached pages, reload them.
+  const listKey = getKey(0, null)
+  const hasCachedPagesRef = useRef(false)
+  hasCachedPagesRef.current = data !== undefined
+  useEffect(() => {
+    if (hasCachedPagesRef.current) void mutate()
+  }, [listKey, mutate])
+
   const allArticles = useMemo(() => data ? data.flatMap(page => page.articles) : [], [data])
 
   // Group similar articles (e.g. the same story posted on several subreddits):
