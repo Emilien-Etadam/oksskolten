@@ -26,6 +26,7 @@ const KEYS = {
   formatTheta: 'classify.format_theta',
   themeTheta: 'classify.theme_theta',
   themes: 'classify.themes',
+  hideCategories: 'classify.hide_categories',
 } as const
 
 /** Characters of body the model reads after the title */
@@ -73,6 +74,8 @@ export function getClassificationSettings(): ClassificationSettings {
     formatTheta: parseTheta(getSetting(KEYS.formatTheta), DEFAULT_FORMAT_THETA),
     themeTheta: parseTheta(getSetting(KEYS.themeTheta), DEFAULT_THEME_THETA),
     themes: getThemes(),
+    // On unless turned off: themes are meant to replace categories
+    hideCategories: getSetting(KEYS.hideCategories) !== 'off',
   }
 }
 
@@ -86,6 +89,7 @@ export function saveClassificationSettings(patch: Partial<ClassificationSettings
   if (patch.formatTheta !== undefined) upsertSetting(KEYS.formatTheta, String(patch.formatTheta))
   if (patch.themeTheta !== undefined) upsertSetting(KEYS.themeTheta, String(patch.themeTheta))
   if (patch.themes !== undefined) upsertSetting(KEYS.themes, JSON.stringify(patch.themes))
+  if (patch.hideCategories !== undefined) upsertSetting(KEYS.hideCategories, patch.hideCategories ? 'on' : 'off')
 }
 
 function resolveModel(settings: ClassificationSettings): string {

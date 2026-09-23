@@ -27,6 +27,7 @@ import { SearchDialog } from '@/components/ui/search-dialog'
 import { CommandPalette } from '@/components/command-palette'
 import { useGlobalShortcuts } from '@/hooks/use-global-shortcuts'
 import { useAppLayout } from '@/app'
+import type { ClassificationOverview } from '../../../../shared/classification'
 import { extractDomain } from '@/lib/url'
 import type { FeedWithCounts, Category } from '../../../../shared/types'
 
@@ -84,6 +85,9 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
   const { data: categoriesData, mutate: mutateCategories } = useSWR<{ categories: Category[] }>('/api/categories', fetcher)
   const feeds = useMemo(() => feedsData?.feeds ?? [], [feedsData])
   const categories = useMemo(() => categoriesData?.categories ?? [], [categoriesData])
+  // Themes replace categories: feeds are listed flat, without their folders
+  const { data: classification } = useSWR<ClassificationOverview>('/api/classification', fetcher)
+  const hideCategories = !!classification?.hideCategories
 
   const [feedModalOpen, setFeedModalOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -136,8 +140,14 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
     return { categorized: catMap, uncategorized: uncat, clipFeedData: clip }
   }, [feeds])
 
+  const flatFeeds = useMemo(
+    () => feeds.filter(f => f.type !== 'clip').sort((a, b) => a.name.localeCompare(b.name)),
+    [feeds],
+  )
+
   // Flat ordered list of feed IDs matching render order (for shift-click range selection)
   const orderedFeedIds = useMemo(() => {
+    if (hideCategories) return flatFeeds.map(f => f.id)
     const ids: number[] = []
     for (const cat of categories) {
       const catFeeds = categorized.get(cat.id) ?? []
@@ -145,7 +155,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
     }
     for (const f of uncategorized) ids.push(f.id)
     return ids
-  }, [categories, categorized, uncategorized])
+  }, [categories, categorized, uncategorized, hideCategories, flatFeeds])
 
   const {
     selectedFeedIds: multiSelectedIds,
@@ -280,7 +290,8 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
 
     const button = (
       <button
-        draggable={!isRenaming}
+        // No folder to drop into while categories are hidden
+        draggable={!isRenaming && !hideCategories}
         onDragStart={e => handleDragStart(e, feed, multiSelectedIds)}
         onDragEnd={handleDragEnd}
         onClick={e => handleFeedClick(e, feed)}
@@ -526,10 +537,11 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
               ))}
             </div>
           )}
-          {feedsData && categories.map(cat => renderCategoryItem(cat))}
+          {feedsData && hideCategories && flatFeeds.map(feed => renderFeedItem(feed))}
+          {feedsData && !hideCategories && categories.map(cat => renderCategoryItem(cat))}
 
           {/* Uncategorized feeds */}
-          <div
+          {!hideCategories && <div
             onDragOver={e => handleDragOver(e, 'uncategorized')}
             onDragLeave={handleDragLeave}
             onDrop={e => handleDrop(e, null)}
@@ -543,7 +555,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
                 </div>
               )
             }
-          </div>
+          </div>}
         </nav>
 
         <div style={{ paddingBottom: 'var(--safe-area-inset-bottom)' }}>

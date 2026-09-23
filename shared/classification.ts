@@ -57,6 +57,8 @@ export interface ClassificationSettings {
   formatTheta: number
   themeTheta: number
   themes: ClassOption[]
+  /** Replace feed categories with themes in the sidebar and the tab bar */
+  hideCategories: boolean
 }
 
 export interface ClassificationCount {
@@ -67,6 +69,8 @@ export interface ClassificationCount {
 
 export interface ClassificationOverview {
   enabled: boolean
+  /** enabled && hideCategories: the UI shows themes where it showed categories */
+  hideCategories: boolean
   formats: ClassificationCount[]
   themes: ClassificationCount[]
   /** Active articles never classified (neither decided nor undecided) */

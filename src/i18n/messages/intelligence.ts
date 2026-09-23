@@ -64,6 +64,12 @@ export const intelligence = {
   },
   'classification.formats': { ja: '形式', en: 'Formats', zh: '形式'},
   'classification.themes': { ja: 'テーマ', en: 'Themes', zh: '主题'},
+  'classification.hideCategories': { ja: 'カテゴリを非表示', en: 'Hide categories', zh: '隐藏分类'},
+  'classification.hideCategoriesDesc': {
+    ja: 'サイドバーではフィードをフォルダなしで一覧表示し、記事一覧の上のタブにはカテゴリの代わりにテーマを表示します。カテゴリは削除されず、設定 → フィードで管理できます。',
+    en: 'The sidebar lists feeds without their folders, and the tab bar above article lists shows themes instead of categories. Categories are kept and still managed in Settings → Feeds.',
+    zh: '侧边栏不再按文件夹显示订阅源，文章列表上方的标签栏显示主题而非分类。分类会保留，仍可在 设置 → 订阅源 中管理。',
+  },
   'classification.model': { ja: 'モデル', en: 'Model', zh: '模型'},
   'classification.modelDesc': { ja: 'vLLM サーバー上のモデル名。logprobs を返す instruct モデルが必要です。', en: 'Model name on the vLLM server. It must be an instruct model that returns logprobs.', zh: 'vLLM 服务器上的模型名称，需为可返回 logprobs 的 instruct 模型。'},
   'classification.modelPlaceholder': { ja: '要約のモデルを使用', en: 'Same as the summary model', zh: '与摘要模型相同'},

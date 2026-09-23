@@ -59,6 +59,7 @@ describe('classification API', () => {
     expect(res.statusCode).toBe(200)
     const body = res.json()
     expect(body.enabled).toBe(false)
+    expect(body.hideCategories).toBe(false)
     expect(body.formats.map((f: { id: string }) => f.id)).toContain('QUESTION')
     expect(body.themes.map((t: { id: string }) => t.id)).toContain('AI')
     expect(body.formats.every((f: { unread_count: number }) => f.unread_count === 0)).toBe(true)
@@ -72,6 +73,14 @@ describe('classification API', () => {
     expect(saved.enabled).toBe(true)
     expect(saved.formatTheta).toBe(0.4)
     expect(saved.themes.map((t: { id: string }) => t.id)).toEqual(['HOME_AUTOMATION', 'OTHER'])
+  })
+
+  it('hides categories by default once enabled, unless turned off', async () => {
+    await enable()
+    expect((await app.inject({ method: 'GET', url: '/api/classification' })).json().hideCategories).toBe(true)
+    const saved = await enable({ hideCategories: false })
+    expect(saved.hideCategories).toBe(false)
+    expect((await app.inject({ method: 'GET', url: '/api/classification' })).json().hideCategories).toBe(false)
   })
 
   it('refuses duplicate theme ids and out-of-range thresholds', async () => {

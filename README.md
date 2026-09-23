@@ -123,7 +123,7 @@ Five features borrowed from RSSMonster's smart layer, all running on SQLite and 
 
 ### Article classification
 
-Your local vLLM server gives every article a **format** (news, question, discussion, guide, review, release…) and a **theme** from a list you edit, shown as sidebar sections with unread counts and usable in smart folders (`format:question theme:ai`). Each class is a one-token decision read from logprobs ([notjev](https://github.com/9pings/notjev)): when the model hesitates the article stays unclassified instead of getting a guess. Enable it in Settings → Integration. See [`87_feature_classification.md`](docs/spec/87_feature_classification.md)
+Your local vLLM server gives every article a **format** (news, question, discussion, guide, review, release…) and a **theme** from a list you edit, shown as sidebar sections with unread counts and usable in smart folders (`format:question theme:ai`). Each class is a one-token decision read from logprobs ([notjev](https://github.com/9pings/notjev)): when the model hesitates the article stays unclassified instead of getting a guess. Enable it in Settings → Integration; themes then replace feed categories in the sidebar and the tab bar (categories are kept and can be shown again). See [`87_feature_classification.md`](docs/spec/87_feature_classification.md)
 
 ### Feed management and diagnostics
 

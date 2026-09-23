@@ -138,6 +138,20 @@ export function ClassificationSection() {
       {settings.enabled && (
         <>
           <div className="mt-5">
+            <p className="text-sm text-text mb-1">{t('classification.hideCategories')}</p>
+            <p className="text-xs text-muted mb-2">{t('classification.hideCategoriesDesc')}</p>
+            <RadioGroup
+              name="classificationHideCategories"
+              options={[
+                { value: 'on' as const, label: 'ON' },
+                { value: 'off' as const, label: 'OFF' },
+              ]}
+              value={settings.hideCategories ? 'on' : 'off'}
+              onChange={v => { void save({ hideCategories: v === 'on' }) }}
+            />
+          </div>
+
+          <div className="mt-5">
             <p className="text-sm text-text mb-1">{t('classification.model')}</p>
             <p className="text-xs text-muted mb-2">{t('classification.modelDesc')}</p>
             <input

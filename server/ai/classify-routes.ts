@@ -19,6 +19,7 @@ const SettingsBody = z.object({
   model: z.string().max(200).optional(),
   formatTheta: Theta.optional(),
   themeTheta: Theta.optional(),
+  hideCategories: z.boolean().optional(),
   themes: z.array(z.object({
     id: z.string().max(40).optional(),
     label: z.string().max(60),
@@ -59,6 +60,7 @@ export async function classificationRoutes(api: FastifyInstance): Promise<void> 
     `).get() as { unclassified: number }
     const overview: ClassificationOverview = {
       enabled: settings.enabled,
+      hideCategories: settings.enabled && settings.hideCategories,
       formats: withCounts(FORMATS, unreadCounts('format')),
       themes: withCounts(settings.themes, unreadCounts('theme')),
       unclassified,

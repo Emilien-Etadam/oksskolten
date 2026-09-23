@@ -18,7 +18,7 @@ Formats and themes show up in the sidebar with their unread counts (`/formats/:i
 
 - The vLLM provider settings only (base URL and API key): any OpenAI-compatible server that returns logprobs on `/v1/chat/completions` works (vLLM, llama.cpp `llama-server`). The model must be an instruct model, not a thinking one.
 - One format and one theme per article. Multi-label tagging is out of scope.
-- Feed categories are unchanged: feeds keep their folders; classes are an additional way to browse.
+- Feed categories stay in the database, the OPML export and Settings → Feeds. With `classify.hide_categories` on (the default once classification is enabled), the reading UI shows themes where it showed categories; turning it off brings the folders back unchanged.
 
 ## Design
 
@@ -36,6 +36,7 @@ Formats and themes show up in the sidebar with their unread counts (`/formats/:i
 | `classify.model` | empty | vLLM model; empty falls back to `summary.model` |
 | `classify.format_theta` | `0.5` | Minimum margin for a format |
 | `classify.theme_theta` | `0.3` | Minimum margin for a theme (themes like AI / Computing overlap, and the top guess is usually right) |
+| `classify.hide_categories` | `on` | Show themes instead of categories in the sidebar and the tab bar |
 
 Server errors throw, so the queue retries. If neither question saw an option letter (`degraded`: no logprobs, or the model answered outside the menu) the call counts as a failure, not as "undecided".
 
@@ -49,9 +50,9 @@ The `classify` ingest step (new and clipped articles) enqueues task `classify` o
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/classification` | `enabled`, formats and themes with unread counts, `unclassified`, `pending` |
+| GET | `/api/classification` | `enabled`, `hideCategories` (only true while enabled), formats and themes with unread counts, `unclassified`, `pending` |
 | GET | `/api/classification/settings` | Current settings |
-| PATCH | `/api/classification/settings` | Update `enabled`, `model`, `formatTheta`, `themeTheta`, `themes` |
+| PATCH | `/api/classification/settings` | Update `enabled`, `model`, `formatTheta`, `themeTheta`, `themes`, `hideCategories` |
 | POST | `/api/classification/test` | Classify `{ title, body? }` live, nothing stored |
 | POST | `/api/classification/backfill` | Queue unclassified articles (`{ all: true }` to start over) |
 
@@ -60,6 +61,7 @@ The `classify` ingest step (new and clipped articles) enqueues task `classify` o
 ### Frontend
 
 - Sidebar: "Themes" and "Formats" sections under smart folders, collapsible, hidden while classification is off.
+- Hidden categories: the sidebar lists feeds flat, sorted by name, with drag-and-drop to folders disabled (there is no folder to drop into), and the tab bar above article lists (`category-tabs.tsx`) links to `/themes/:id` instead of `/categories/:id`.
 - Settings → Integration → Article classification: switch, model, thresholds, theme editor, live test, backfill and reclassify.
 
 ### Key Files
