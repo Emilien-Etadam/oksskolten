@@ -1,14 +1,15 @@
 #!/usr/bin/env node --import tsx
 /**
- * Evaluate article "format" classification (news, opinion, guide…) with notjev
+ * Evaluate article format (news, question, guide…) and theme classification with notjev
  * against a local OpenAI-compatible inference server, before wiring it into
  * the app.
  *
  * Reads the most recent articles from the SQLite database in read-only mode
- * (safe while the server is running), asks one closed question per article and
- * prints the verdict, its probability and band. `UNDECIDED` means the margin
- * between the two best formats is below theta. Results are also written to a
- * CSV file for review.
+ * (safe while the server is running), asks two closed questions per article
+ * (format and theme) and prints each verdict with its probability. `?LABEL`
+ * means undecided: the margin between the two best options is below theta and
+ * LABEL is only the model's top guess. Results are also written to a CSV file
+ * for review.
  *
  * Usage:
  *   NOTJEV_BASE_URL=http://host:8000 NOTJEV_MODEL=<model> \
@@ -32,7 +33,23 @@ const FORMATS = [
   { id: 'OTHER', description: 'none of the above' },
 ]
 
-const QUESTION = 'What is the format of this article?'
+const THEMES = [
+  { id: '3D', description: '3D modeling, 3D printing, CAD, rendering' },
+  { id: 'COMICS', description: 'comics, bande dessinée, manga, graphic novels' },
+  { id: 'AUTO', description: 'cars, electric vehicles, charging, automotive industry' },
+  { id: 'LUXURY', description: 'jewelry, watches, fashion, beauty and luxury brands' },
+  { id: 'COMPUTING', description: 'computers, software, operating systems, development, networking, security' },
+  { id: 'AI', description: 'artificial intelligence, language models, machine learning, AI hardware' },
+  { id: 'MOBILE', description: 'smartphones, tablets, chips for phones, headphones and consumer gadgets' },
+  { id: 'GAMING', description: 'video games, consoles, game studios' },
+  { id: 'SOCIETY', description: 'society, economy, health, politics, justice' },
+  { id: 'OTHER', description: 'none of the above' },
+]
+
+const QUESTIONS = [
+  { key: 'format', question: 'What is the format of this article?', options: FORMATS },
+  { key: 'theme', question: 'What is the main theme of this article?', options: THEMES },
+] as const
 const BODY_CHARS = 1500
 
 interface Args {
@@ -113,50 +130,55 @@ async function main() {
   }
 
   const jev = notjev.createClient()
-  const header = ['id', 'title', 'feed', 'format', 'top', 'p1', 'p2', 'band', 'undecided', 'degraded', 'ms']
+  const header = ['id', 'title', 'feed']
+  for (const q of QUESTIONS) {
+    header.push(q.key, `${q.key}_top`, `${q.key}_p1`, `${q.key}_band`, `${q.key}_undecided`)
+  }
+  header.push('ms')
   const lines = [header.join(',')]
-  const counts = new Map<string, number>()
-  let undecided = 0
+  const stats = QUESTIONS.map(() => ({ counts: new Map<string, number>(), undecided: 0 }))
   let errors = 0
   let totalMs = 0
 
   console.log(`Classifying ${rows.length} articles (theta ${args.theta})…\n`)
   for (const [i, row] of rows.entries()) {
+    const state = buildState(row)
     try {
-      const r = await jev.decide({
-        state: buildState(row),
-        question: QUESTION,
-        options: FORMATS,
-        theta: args.theta,
+      const results = []
+      for (const q of QUESTIONS) {
+        results.push(await jev.decide({ state, question: q.question, options: [...q.options], theta: args.theta }))
+      }
+      const ms = results.reduce((sum, r) => sum + r.ms, 0)
+      totalMs += ms
+      const cells: unknown[] = [row.id, row.title, row.feed]
+      const shown = results.map((r, k) => {
+        const label = r.choice ?? `?${r.top}`
+        stats[k].counts.set(r.choice ?? 'UNDECIDED', (stats[k].counts.get(r.choice ?? 'UNDECIDED') ?? 0) + 1)
+        if (r.undecided) stats[k].undecided++
+        cells.push(r.choice, r.top, r.p1.toFixed(3), r.band, r.undecided)
+        return `${label.padEnd(14)} ${r.p1.toFixed(2)}`
       })
-      const label = r.choice ?? 'UNDECIDED'
-      counts.set(label, (counts.get(label) ?? 0) + 1)
-      if (r.undecided) undecided++
-      totalMs += r.ms
-      console.log(
-        `${String(i + 1).padStart(3)}. ${label.padEnd(13)} ${r.p1.toFixed(2)} ${r.band.padEnd(7)} `
-        + `${r.undecided ? `(top ${r.top}) ` : ''}${truncate(row.title, 70)}`,
-      )
-      lines.push([
-        row.id, row.title, row.feed, r.choice, r.top, r.p1.toFixed(3), r.p2.toFixed(3),
-        r.band, r.undecided, r.degraded, r.ms,
-      ].map(csvCell).join(','))
+      cells.push(ms)
+      lines.push(cells.map(csvCell).join(','))
+      console.log(`${String(i + 1).padStart(3)}. ${shown.join('  ')}  ${truncate(row.title, 60)}`)
     } catch (err) {
       errors++
       const message = err instanceof Error ? err.message : String(err)
-      console.log(`${String(i + 1).padStart(3)}. ERROR         ${truncate(row.title, 50)} — ${message}`)
-      lines.push([row.id, row.title, row.feed, 'ERROR', '', '', '', '', '', '', ''].map(csvCell).join(','))
+      console.log(`${String(i + 1).padStart(3)}. ERROR  ${truncate(row.title, 50)} — ${message}`)
+      lines.push([row.id, row.title, row.feed, 'ERROR'].map(csvCell).join(','))
     }
   }
 
   fs.writeFileSync(args.out, `${lines.join('\n')}\n`)
 
   const done = rows.length - errors
-  console.log('\nDistribution:')
-  for (const [label, n] of [...counts].sort((a, b) => b[1] - a[1])) {
-    console.log(`  ${label.padEnd(13)} ${String(n).padStart(3)}`)
+  for (const [k, q] of QUESTIONS.entries()) {
+    console.log(`\n${q.key} distribution (undecided ${stats[k].undecided}/${done}):`)
+    for (const [label, n] of [...stats[k].counts].sort((a, b) => b[1] - a[1])) {
+      console.log(`  ${label.padEnd(14)} ${String(n).padStart(3)}`)
+    }
   }
-  console.log(`\nUndecided: ${undecided}/${done}  Errors: ${errors}  Avg latency: ${done ? Math.round(totalMs / done) : 0} ms`)
+  console.log(`\nErrors: ${errors}  Avg latency per article: ${done ? Math.round(totalMs / done) : 0} ms`)
   console.log(`CSV written to ${args.out}`)
 }
 
