@@ -19,11 +19,13 @@ import Database from 'libsql'
 import notjev from 'notjev'
 
 const FORMATS = [
-  { id: 'NEWS', description: 'news or current event: reports what happened' },
-  { id: 'OPINION', description: 'analysis, opinion or editorial: argues a point of view' },
+  { id: 'NEWS', description: 'news or current event: reports what happened, including product launches and company news' },
+  { id: 'QUESTION', description: 'the author asks for help, advice or a recommendation for their own situation' },
+  { id: 'DISCUSSION', description: 'the author opens a debate or asks the community what they think' },
+  { id: 'OPINION', description: 'analysis, opinion or editorial: the author argues a point of view' },
   { id: 'GUIDE', description: 'tutorial, how-to or guide: teaches how to do something' },
   { id: 'REVIEW', description: 'review or hands-on experience of a product, service or work' },
-  { id: 'RELEASE', description: 'announcement or release: new version, launch, changelog' },
+  { id: 'RELEASE', description: 'new version of a software or project: release notes, changelog' },
   { id: 'STORY', description: 'personal story or testimony told by the author' },
   { id: 'RESOURCE', description: 'resource or tool: a list, a link collection, a dataset, a project' },
   { id: 'ENTERTAINMENT', description: 'entertainment, humor or meme' },
