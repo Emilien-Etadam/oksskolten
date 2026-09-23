@@ -465,6 +465,19 @@ describe('isBotBlockPage', () => {
     const html = '<div class="wrapper"><h1>Security Check</h1><p>Please verify you are a human to continue browsing.</p></div>'
     expect(isBotBlockPage(html)).toBe(true)
   })
+
+  // Seen on glitz.paris: the consent modal outweighs the paywalled teaser.
+  it('detects a cookie consent wall extracted as the article', () => {
+    const wall = '##### Paramétrez vos cookies\n\nNous utilisons des cookies pour vous offrir une expérience de navigation personnalisée, sécurisée et mesurer l\'audience.'
+    expect(isBotBlockPage(wall)).toBe(true)
+    expect(isBotBlockPage('We use cookies to improve your experience. Manage your cookie settings.')).toBe(true)
+  })
+
+  it('keeps a long article that ends with a cookie notice', () => {
+    const article = 'A real paragraph of reporting with enough substance to stand on its own. '.repeat(40)
+      + 'We use cookies to measure our audience.'
+    expect(isBotBlockPage(article)).toBe(false)
+  })
 })
 
 describe('convertHtmlToMarkdown', () => {

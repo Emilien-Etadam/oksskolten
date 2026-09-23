@@ -380,6 +380,15 @@ function isGarbageExtraction(text: string): boolean {
   return false
 }
 
+const COOKIE_WALL_MAX_LENGTH = 2000
+const COOKIE_WALL_PATTERNS = [
+  'paramétrez vos cookies',
+  'gérer vos cookies',
+  'nous utilisons des cookies',
+  'we use cookies',
+  'manage your cookie',
+]
+
 /** Detect bot-block / form-submission pages that Readability mistakenly extracts. */
 export function isBotBlockPage(text: string): boolean {
   const lower = text.toLowerCase()
@@ -393,7 +402,10 @@ export function isBotBlockPage(text: string): boolean {
     'attention required',
     'access denied',
   ]
-  return patterns.some(p => lower.includes(p))
+  if (patterns.some(p => lower.includes(p))) return true
+  // A cookie consent wall extracted in place of the article. Real articles can
+  // carry the same wording in a trailing notice, so only a short text counts.
+  return text.length < COOKIE_WALL_MAX_LENGTH && COOKIE_WALL_PATTERNS.some(p => lower.includes(p))
 }
 
 // Re-export markdown utilities so existing import sites don't break.
