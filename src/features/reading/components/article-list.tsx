@@ -35,7 +35,7 @@ export interface ArticleListHandle {
 export const ArticleList = forwardRef<ArticleListHandle, object>(function ArticleList(_props, ref) {
   const location = useLocation()
   const navigate = useNavigate()
-  const { feedId: feedIdParam, categoryId: categoryIdParam, folderId: folderIdParam } = useParams<{ feedId?: string; categoryId?: string; folderId?: string }>()
+  const { feedId: feedIdParam, categoryId: categoryIdParam, folderId: folderIdParam, formatId, themeId } = useParams<{ feedId?: string; categoryId?: string; folderId?: string; formatId?: string; themeId?: string }>()
   const { settings } = useAppLayout()
   const clipFeedId = useClipFeedId()
 
@@ -77,6 +77,8 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     isRecommended,
     feedId,
     categoryId,
+    format: formatId,
+    theme: themeId,
     unreadOnly,
     bookmarkedOnly,
     likedOnly,
@@ -204,7 +206,7 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
     setNoFloor(false)
     setShowReadArticles(false)
     setFocusedItemId(null)
-  }, [feedId, categoryId, smartFolderId, setFocusedItemId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [feedId, categoryId, smartFolderId, formatId, themeId, setFocusedItemId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function renderArticle(article: ArticleListItem, index: number) {
     const isAutoRead = autoReadIds.has(article.id)

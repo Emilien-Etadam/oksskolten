@@ -26,9 +26,14 @@ const coerceOptionalNumber = z.preprocess(
   z.number().optional(),
 )
 
+// Classification ids are stored uppercase; an unknown id simply matches nothing
+const ClassId = z.string().optional().transform(v => (v?.trim() ? v.trim().toUpperCase().slice(0, 40) : undefined))
+
 const ArticlesQuery = z.object({
   feed_id: coerceOptionalNumber,
   category_id: coerceOptionalNumber,
+  format: ClassId,
+  theme: ClassId,
   unread: z.string().optional(),
   bookmarked: z.string().optional(),
   liked: z.string().optional(),
@@ -63,6 +68,8 @@ export async function articleReadRoutes(api: FastifyInstance): Promise<void> {
     const offset = Math.max(query.offset || 0, 0)
     const feedId = query.feed_id ?? undefined
     const categoryId = query.category_id ?? undefined
+    const format = query.format
+    const theme = query.theme
     const unread = query.unread === '1'
     const bookmarked = query.bookmarked === '1'
     const liked = query.liked === '1'
@@ -72,14 +79,14 @@ export async function articleReadRoutes(api: FastifyInstance): Promise<void> {
 
     const isClipFeed = feedId != null && getClipFeed()?.id === feedId
     const smartFloor = !noFloor && !isClipFeed && !unread && !bookmarked && !liked && !read
-    const { articles, total, totalWithoutFloor } = getArticles({ feedId, categoryId, unread, bookmarked, liked, read, sort, limit, offset, smartFloor })
+    const { articles, total, totalWithoutFloor } = getArticles({ feedId, categoryId, format, theme, unread, bookmarked, liked, read, sort, limit, offset, smartFloor })
     const hasMore = offset + articles.length < total
 
     // When unread filter yields 0 results, return total article count (without unread filter)
     // so the UI can distinguish "no articles" from "all read"
     let totalAll: number | undefined
     if (unread && total === 0 && offset === 0) {
-      const allResult = getArticles({ feedId, categoryId, limit: 0, offset: 0 })
+      const allResult = getArticles({ feedId, categoryId, format, theme, limit: 0, offset: 0 })
       totalAll = allResult.total
     }
 

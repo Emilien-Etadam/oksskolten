@@ -198,6 +198,10 @@ export function updateArticleContent(
     summarize_pending_at?: string | null
     filter_pending_at?: string | null
     filtered_at?: string | null
+    format?: string | null
+    theme?: string | null
+    classified_at?: string | null
+    classify_pending_at?: string | null
     summary?: string | null
     excerpt?: string | null
     og_image?: string | null

@@ -11,6 +11,11 @@ describe('parseSmartQuery', () => {
     expect(q).toEqual({ text: 'rust', unread: true, bookmarked: true, feedId: 12, categoryId: 3, sort: 'score' })
   })
 
+  it('parses format: and theme: as uppercase classification ids', () => {
+    expect(parseSmartQuery('format:question theme:Ai')).toEqual({ text: '', format: 'QUESTION', theme: 'AI' })
+    expect(parseSmartQuery('theme:not-an-id').text).toBe('theme:not-an-id')
+  })
+
   it('understands is:… shortcuts', () => {
     expect(parseSmartQuery('is:unread is:liked')).toEqual({ text: '', unread: true, liked: true })
     expect(parseSmartQuery('is:read').unread).toBe(false)

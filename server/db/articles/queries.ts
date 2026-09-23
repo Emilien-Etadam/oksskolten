@@ -7,6 +7,8 @@ import { normalizeUrl, scoreExpr } from './scoring.js'
 export function getArticles(opts: {
   feedId?: number
   categoryId?: number
+  format?: string
+  theme?: string
   unread?: boolean
   bookmarked?: boolean
   liked?: boolean
@@ -27,6 +29,14 @@ export function getArticles(opts: {
   if (opts.categoryId) {
     conditions.push('a.category_id = @categoryId')
     params.categoryId = opts.categoryId
+  }
+  if (opts.format) {
+    conditions.push('a.format = @format')
+    params.format = opts.format
+  }
+  if (opts.theme) {
+    conditions.push('a.theme = @theme')
+    params.theme = opts.theme
   }
   if (opts.unread) {
     conditions.push('a.seen_at IS NULL')
@@ -114,7 +124,7 @@ export function getArticles(opts: {
   const articles = allNamed<ArticleListItem>(`
     SELECT a.id, a.feed_id, f.name AS feed_name,
            a.title, a.title_translated, a.url, a.published_at, a.lang, a.summary, a.excerpt, a.og_image, a.seen_at, a.read_at, a.bookmarked_at, a.liked_at,
-           a.score, a.interest_score, a.quality_score,
+           a.score, a.interest_score, a.quality_score, a.format, a.theme,
            (SELECT COUNT(*) FROM article_similarities WHERE article_id = a.id) AS similar_count,
            (SELECT GROUP_CONCAT(similar_to_id) FROM article_similarities WHERE article_id = a.id) AS similar_ids
     FROM active_articles a
@@ -178,7 +188,7 @@ export function getArticleById(id: number): ArticleDetail | undefined {
     SELECT a.id, a.feed_id, f.name AS feed_name, f.type AS feed_type,
            a.title, a.title_translated, a.url, a.published_at, a.lang, a.summary, a.excerpt, a.og_image,
            a.full_text, a.full_text_translated, a.translated_lang, a.seen_at, a.read_at, a.bookmarked_at, a.liked_at,
-           a.images_archived_at, a.videos_archived_at,
+           a.images_archived_at, a.videos_archived_at, a.filtered_at, a.format, a.theme,
            (SELECT COUNT(*) FROM article_similarities WHERE article_id = a.id) AS similar_count
     FROM active_articles a
     JOIN feeds f ON a.feed_id = f.id

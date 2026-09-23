@@ -10,6 +10,7 @@ const mockSummarizeArticle = vi.fn()
 const mockEvaluateRelevance = vi.fn()
 const mockGetFeedById = vi.fn()
 const mockDbAll = vi.fn()
+const mockClassifyArticle = vi.fn()
 
 vi.mock('../db.js', () => ({
   getSetting: (key: string) => mockGetSetting(key),
@@ -39,8 +40,16 @@ vi.mock('./tasks.js', () => ({
     mockEvaluateRelevance(text, criterion, options),
 }))
 
+vi.mock('./classify.js', () => ({
+  classifyArticle: (input: unknown) => mockClassifyArticle(input),
+  isClassificationEnabled: () => mockGetSetting('classify.enabled') === 'on',
+}))
+
 import {
   enqueueAiFilter,
+  enqueueClassify,
+  enqueueClassifyBackfill,
+  countPendingClassify,
   enqueueAutoTranslate,
   enqueueAutoSummarize,
   isAutoTranslateEnabled,
@@ -363,5 +372,121 @@ describe('ai-queue', () => {
       expect(updatesFor(1).filter_pending_at).toEqual(expect.any(String))
       expect(updatesFor(1).filtered_at).toBeUndefined()
     })
+  })
+})
+
+describe('ai-queue classification', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    _resetAiQueueForTests()
+    settings({ 'classify.enabled': 'on' })
+    mockGetArticleById.mockReturnValue({
+      id: 5,
+      title: 'Which GPU for a local LLM?',
+      feed_name: 'r/LocalLLM',
+      full_text: 'I have a budget of 500 euros',
+      excerpt: null,
+      summary: null,
+      filtered_at: null,
+    })
+    mockClassifyArticle.mockResolvedValue({ format: 'QUESTION', theme: 'AI', formatTop: 'QUESTION', themeTop: 'AI', ms: 10 })
+    mockDbAll.mockReturnValue([])
+  })
+
+  it('does nothing while classification is disabled', async () => {
+    settings({})
+    enqueueClassify(5)
+    await flushQueue()
+    expect(mockClassifyArticle).not.toHaveBeenCalled()
+    expect(mockUpdateArticleContent).not.toHaveBeenCalled()
+  })
+
+  it('stores format and theme and clears the pending marker', async () => {
+    enqueueClassify(5)
+    await flushQueue()
+
+    expect(mockClassifyArticle).toHaveBeenCalledWith({
+      title: 'Which GPU for a local LLM?',
+      feedName: 'r/LocalLLM',
+      body: 'I have a budget of 500 euros',
+    })
+    const merged = updatesFor(5)
+    expect(merged.format).toBe('QUESTION')
+    expect(merged.theme).toBe('AI')
+    expect(merged.classified_at).toBeTruthy()
+    expect(merged.classify_pending_at).toBeNull()
+  })
+
+  it('stores an undecided verdict as null but still marks the article classified', async () => {
+    mockClassifyArticle.mockResolvedValue({ format: null, theme: 'AI', formatTop: 'NEWS', themeTop: 'AI', ms: 10 })
+    enqueueClassify(5)
+    await flushQueue()
+
+    const merged = updatesFor(5)
+    expect(merged.format).toBeNull()
+    expect(merged.classified_at).toBeTruthy()
+  })
+
+  it('skips articles hidden by the AI filter', async () => {
+    mockGetArticleById.mockReturnValue({ id: 5, title: 'x', filtered_at: '2024-01-01T00:00:00Z' })
+    enqueueClassify(5)
+    await flushQueue()
+    expect(mockClassifyArticle).not.toHaveBeenCalled()
+    expect(updatesFor(5).classify_pending_at).toBeNull()
+  })
+
+  it('keeps the pending marker for a retry when the server fails', async () => {
+    mockClassifyArticle.mockRejectedValue(new Error('connect ECONNREFUSED'))
+    enqueueClassify(5)
+    await flushQueue()
+
+    const merged = updatesFor(5)
+    expect(merged.classified_at).toBeUndefined()
+    expect(merged.classify_pending_at).toBeTruthy()
+  })
+
+  it('backfills unclassified articles without writing pending markers', async () => {
+    mockDbAll.mockReturnValue([{ id: 5 }, { id: 6 }])
+    expect(enqueueClassifyBackfill()).toBe(2)
+    expect(countPendingClassify()).toBe(2)
+    // No marker write up front: the only writes are the results
+    expect(mockUpdateArticleContent).not.toHaveBeenCalled()
+    await flushQueue()
+    expect(mockClassifyArticle).toHaveBeenCalledTimes(2)
+    expect(countPendingClassify()).toBe(0)
+  })
+
+  it('runs new-article work before the backfill', async () => {
+    settings({ 'classify.enabled': 'on', 'reading.auto_summarize': 'on' })
+    mockGetArticleById.mockImplementation((id: number) => ({
+      id, title: `t${id}`, feed_name: 'f', full_text: 'body', excerpt: null, summary: null, filtered_at: null,
+    }))
+    mockSummarizeArticle.mockResolvedValue({ summary: 'S' })
+    const order: string[] = []
+    mockClassifyArticle.mockImplementation(async (input: { title: string }) => {
+      order.push(`classify:${input.title}`)
+      return { format: 'NEWS', theme: 'AI', formatTop: 'NEWS', themeTop: 'AI', ms: 1 }
+    })
+    mockSummarizeArticle.mockImplementation(async () => {
+      order.push('summarize')
+      return { summary: 'S' }
+    })
+    mockDbAll.mockReturnValue([{ id: 10 }, { id: 11 }])
+    enqueueClassifyBackfill()
+    enqueueAutoSummarize(12, 'body')
+    await flushQueue()
+    await flushQueue()
+    // The first backfill item may already be running; the new-article task
+    // must come before the rest of the backlog
+    expect(order.indexOf('summarize')).toBeLessThan(order.indexOf('classify:t11'))
+  })
+
+  it('resumes stale classification markers', async () => {
+    mockDbAll.mockReturnValue([
+      { id: 5, translate_pending_at: null, summarize_pending_at: null, filter_pending_at: null, classify_pending_at: '2020-01-01T00:00:00Z' },
+    ])
+    resumePendingAiTasks()
+    await flushQueue()
+    expect(mockClassifyArticle).toHaveBeenCalledTimes(1)
   })
 })

@@ -61,6 +61,7 @@
     "meilisearch": "^0.55.0",
     "minidenticons": "^4.2.1",
     "node-cron": "^3.0.3",
+    "notjev": "^0.2.0",
     "openai": "^6.25.0",
     "piscina": "^5.1.4",
     "react-simple-code-editor": "^0.14.1",

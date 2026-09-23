@@ -5,5 +5,6 @@ import { rules } from './rules.js'
 import { aiQueue } from './ai-queue.js'
 import { aiFilter } from './ai-filter.js'
 import { similarity } from './similarity.js'
+import { classify } from './classify.js'
 
-export const enrichSteps: EnrichStep[] = [quality, interests, rules, aiQueue, aiFilter, similarity]
+export const enrichSteps: EnrichStep[] = [quality, interests, rules, aiQueue, aiFilter, classify, similarity]

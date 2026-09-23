@@ -169,6 +169,9 @@ CREATE UNIQUE INDEX idx_articles_feed_guid ON articles(feed_id, guid) WHERE guid
 
 -- Fork additions (87_feature_intelligence.md); articles also carry
 -- rule_boost REAL DEFAULT 0, quality_score REAL, interest_score REAL DEFAULT 0
+-- Article classification (87_feature_classification.md); articles also carry
+-- format TEXT, theme TEXT, classified_at TEXT, classify_pending_at TEXT,
+-- indexed by idx_articles_format / idx_articles_theme
 CREATE TABLE smart_folders (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   name       TEXT NOT NULL,

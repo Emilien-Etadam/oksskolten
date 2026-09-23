@@ -4,6 +4,7 @@ import { NavLink } from 'react-router-dom'
 import { fetcher } from '@/lib/fetcher'
 import { useI18n } from '@/i18n'
 import type { FeedWithCounts } from '../../../../shared/types'
+import type { ClassificationOverview } from '../../../../shared/classification'
 
 interface CategoriesResponse {
   categories: Array<{ id: number; name: string }>
@@ -31,13 +32,31 @@ function TabCount({ count }: { count: number }) {
  * Newspaper-style horizontal section bar shown above article lists.
  * Lists the inbox plus every category with unread counts; the active
  * section is underlined with the accent color. Hidden when no categories exist.
+ * When article themes replace categories, the bar lists the themes instead.
  */
 export function CategoryTabs() {
   const { t } = useI18n()
   const { data } = useSWR<CategoriesResponse>('/api/categories', fetcher)
   const { data: feedsData } = useSWR<FeedsResponse>('/api/feeds', fetcher)
+  const { data: classification } = useSWR<ClassificationOverview>('/api/classification', fetcher)
 
-  const hasCategories = !!data?.categories.length
+  const tabs: Array<{ key: string; to: string; label: string; count: number }> = []
+  if (classification?.hideCategories) {
+    for (const theme of classification.themes) {
+      tabs.push({ key: `theme-${theme.id}`, to: `/themes/${theme.id}`, label: theme.label, count: theme.unread_count })
+    }
+  } else {
+    const unreadByCategory = new Map<number, number>()
+    for (const feed of feedsData?.feeds ?? []) {
+      if (feed.category_id != null) {
+        unreadByCategory.set(feed.category_id, (unreadByCategory.get(feed.category_id) ?? 0) + feed.unread_count)
+      }
+    }
+    for (const category of data?.categories ?? []) {
+      tabs.push({ key: `category-${category.id}`, to: `/categories/${category.id}`, label: category.name, count: unreadByCategory.get(category.id) ?? 0 })
+    }
+  }
+  const hasCategories = tabs.length > 0
 
   // The bar is sticky under the header; publishing its height lets the day
   // headers stick right below it instead of hiding underneath. Re-runs when the
@@ -60,14 +79,8 @@ export function CategoryTabs() {
 
   if (!hasCategories) return null
 
-  const unreadByCategory = new Map<number, number>()
   let totalUnread = 0
-  for (const feed of feedsData?.feeds ?? []) {
-    totalUnread += feed.unread_count
-    if (feed.category_id != null) {
-      unreadByCategory.set(feed.category_id, (unreadByCategory.get(feed.category_id) ?? 0) + feed.unread_count)
-    }
-  }
+  for (const feed of feedsData?.feeds ?? []) totalUnread += feed.unread_count
 
   return (
     <nav
@@ -80,10 +93,10 @@ export function CategoryTabs() {
           {t('feeds.inbox')}
           <TabCount count={totalUnread} />
         </NavLink>
-        {data.categories.map((category) => (
-          <NavLink key={category.id} to={`/categories/${category.id}`} className={tabClass}>
-            {category.name}
-            <TabCount count={unreadByCategory.get(category.id) ?? 0} />
+        {tabs.map(tab => (
+          <NavLink key={tab.key} to={tab.to} className={tabClass}>
+            {tab.label}
+            <TabCount count={tab.count} />
           </NavLink>
         ))}
       </div>

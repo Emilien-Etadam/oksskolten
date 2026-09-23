@@ -6,11 +6,13 @@ import { CategoryTabs } from './category-tabs'
 
 let swrCategoriesData: { categories: Array<{ id: number; name: string }> } | undefined
 let swrFeedsData: { feeds: Array<{ category_id: number | null; unread_count: number }> } | undefined
+let swrClassificationData: { hideCategories: boolean; themes: Array<{ id: string; label: string; unread_count: number }> } | undefined
 
 vi.mock('swr', () => ({
   default: (key: string) => {
     if (key === '/api/categories') return { data: swrCategoriesData }
     if (key === '/api/feeds') return { data: swrFeedsData }
+    if (key === '/api/classification') return { data: swrClassificationData }
     return { data: undefined }
   },
 }))
@@ -31,6 +33,7 @@ function renderTabs(initialPath = '/inbox') {
 
 describe('CategoryTabs', () => {
   beforeEach(() => {
+    swrClassificationData = undefined
     swrCategoriesData = {
       categories: [
         { id: 1, name: '3D' },
@@ -57,6 +60,24 @@ describe('CategoryTabs', () => {
     swrCategoriesData = { categories: [] }
     const { container } = renderTabs()
     expect(container.querySelector('nav')).toBeNull()
+  })
+
+  it('lists themes instead of categories when themes replace them', () => {
+    swrClassificationData = {
+      hideCategories: true,
+      themes: [{ id: 'AI', label: 'AI', unread_count: 4 }, { id: 'AUTO', label: 'Auto', unread_count: 0 }],
+    }
+    renderTabs()
+    expect(screen.getByRole('link', { name: /AI/ }).getAttribute('href')).toBe('/themes/AI')
+    expect(screen.getByRole('link', { name: /Auto/ }).getAttribute('href')).toBe('/themes/AUTO')
+    expect(screen.queryByRole('link', { name: /3D/ })).toBeNull()
+  })
+
+  it('keeps categories while classification leaves them visible', () => {
+    swrClassificationData = { hideCategories: false, themes: [{ id: 'AI', label: 'AI', unread_count: 4 }] }
+    renderTabs()
+    expect(screen.getByRole('link', { name: /3D/ })).toBeTruthy()
+    expect(screen.queryByRole('link', { name: /^AI/ })).toBeNull()
   })
 
   it('renders an inbox tab and one tab per category', () => {
