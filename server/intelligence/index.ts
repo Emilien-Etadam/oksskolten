@@ -5,6 +5,7 @@ export {
   maybeRebuildInterestProfile,
   invalidateInterestProfile,
   recalculateInterestScores,
+  rescoreArticleInterest,
   _resetInterestsForTests,
 } from './interests.js'
 export { detectAndStoreSimilarArticles, computeTitleSimilarity } from './similarity.js'

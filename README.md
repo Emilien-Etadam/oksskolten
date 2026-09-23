@@ -119,7 +119,7 @@ Five features borrowed from RSSMonster's smart layer, all running on SQLite and 
 - **Automated rules** — regular-expression rules, per feed or global, that mark new articles read, hide them, bookmark or like them, or change their score. Dry-run a pattern over recent articles before saving, replay it over the backlog after
 - **Top stories** — events covered by several of your sources are folded into one story, ranked by how many sources covered it, with the other coverage one click away
 - **Feed trust and article quality** — a per-feed trust score from what you actually read of it, and a per-article quality score (thin body, clickbait or shouting title, promotional markers, link density). Both feed the front page ranking; trust is a sortable column in Settings → Feeds
-- **Interest islands and Recommended** — an interest profile learned from what you like, bookmark and open, grouped into islands of co-occurring terms you can mute; the *Recommended* list ranks unread articles against it
+- **Interest islands and Recommended** — an interest profile learned from what you like, bookmark and open, grouped into islands of co-occurring terms you can mute; the *Recommended* list ranks unread articles against it. With article classification on, it also learns which themes and formats you read more, or less, than average
 
 ### Article classification
 

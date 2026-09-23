@@ -40,6 +40,10 @@ vi.mock('./tasks.js', () => ({
     mockEvaluateRelevance(text, criterion, options),
 }))
 
+vi.mock('../intelligence/interests.js', () => ({
+  rescoreArticleInterest: vi.fn(),
+}))
+
 vi.mock('./classify.js', () => ({
   classifyArticle: (input: unknown) => mockClassifyArticle(input),
   isClassificationEnabled: () => mockGetSetting('classify.enabled') === 'on',

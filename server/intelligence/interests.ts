@@ -9,9 +9,15 @@
  * the same articles — which is what the settings page shows, and what a
  * reader can mute.
  *
+ * The same feedback also measures an affinity for article classes (the
+ * theme and format given by the local model): for each class seen often
+ * enough, its engagement rate against the average one, as -1..1. A theme
+ * the reader keeps opening pulls up; one they scroll past pulls down.
+ *
  * Each unread article then gets an interest score: the sum of the weights
- * of the profile terms it mentions, muted terms counting against it. The
- * Recommended list is that score, descending.
+ * of the profile terms it mentions, muted terms counting against it, plus
+ * the affinities of its theme and format. The Recommended list is that
+ * score, descending.
  */
 import { getDb } from '../db/connection.js'
 import { setArticleInterestScore } from '../db/articles.js'
@@ -28,6 +34,12 @@ const DF_SAMPLE = 5000
 const ISLAND_JACCARD = 0.25
 /** Unread articles this recent get rescored when the profile changes */
 const RESCORE_WINDOW_DAYS = 14
+/** A class needs this many seen articles before its affinity counts */
+const CLASS_MIN_SEEN = 5
+/** Pseudo-count pulling small classes toward the average engagement rate */
+const CLASS_SHRINK = 5
+/** Weight of one class affinity in the interest score (a top term weighs 1) */
+const CLASS_WEIGHT = 1
 
 const STOPWORDS = new Set(`
 a about above after again against all also am an and any are as at be because been before being below between
@@ -69,7 +81,43 @@ export interface InterestIsland {
   terms: InterestTerm[]
 }
 
+export type ClassKind = 'theme' | 'format'
+
+export interface InterestClass {
+  kind: ClassKind
+  class_id: string
+  affinity: number
+  seen: number
+  engaged: number
+  muted: number
+}
+
+export interface ArticleClasses {
+  theme?: string | null
+  format?: string | null
+}
+
 let profileCache: Map<string, { weight: number; muted: boolean }> | null = null
+let classCache: Map<string, { affinity: number; muted: boolean }> | null = null
+
+function classKey(kind: ClassKind, id: string): string {
+  return `${kind}:${id}`
+}
+
+function loadClassProfile(): Map<string, { affinity: number; muted: boolean }> {
+  if (classCache) return classCache
+  const rows = getDb().prepare('SELECT kind, class_id, affinity, muted FROM interest_classes').all() as Array<{ kind: ClassKind; class_id: string; affinity: number; muted: number }>
+  classCache = new Map(rows.map(r => [classKey(r.kind, r.class_id), { affinity: r.affinity, muted: r.muted === 1 }]))
+  return classCache
+}
+
+/** A muted class counts as a full "not interested", whatever was measured */
+function classContribution(kind: ClassKind, id: string | null | undefined): number {
+  if (!id) return 0
+  const entry = loadClassProfile().get(classKey(kind, id))
+  if (!entry) return 0
+  return (entry.muted ? -1 : entry.affinity) * CLASS_WEIGHT
+}
 
 function loadProfile(): Map<string, { weight: number; muted: boolean }> {
   if (profileCache) return profileCache
@@ -80,14 +128,14 @@ function loadProfile(): Map<string, { weight: number; muted: boolean }> {
 
 export function invalidateInterestProfile(): void {
   profileCache = null
+  classCache = null
 }
 
 /** Interest score of one article against the current profile. */
-export function scoreInterest(title: string, titleTranslated?: string | null): number {
+export function scoreInterest(title: string, titleTranslated?: string | null, classes?: ArticleClasses): number {
   const profile = loadProfile()
-  if (profile.size === 0) return 0
-  let score = 0
-  for (const term of tokenize(`${title} ${titleTranslated ?? ''}`)) {
+  let score = classContribution('theme', classes?.theme) + classContribution('format', classes?.format)
+  for (const term of profile.size > 0 ? tokenize(`${title} ${titleTranslated ?? ''}`) : []) {
     const entry = profile.get(term)
     if (!entry) continue
     score += entry.muted ? -entry.weight : entry.weight
@@ -105,6 +153,78 @@ export function getInterestIslands(): InterestIsland[] {
   return [...byIsland.entries()]
     .map(([id, terms]) => ({ id, terms }))
     .sort((a, b) => b.terms.reduce((s, t) => s + t.weight, 0) - a.terms.reduce((s, t) => s + t.weight, 0))
+}
+
+export function getInterestClasses(): InterestClass[] {
+  return getDb().prepare(`
+    SELECT kind, class_id, affinity, seen, engaged, muted FROM interest_classes
+    ORDER BY kind DESC, affinity DESC
+  `).all() as InterestClass[]
+}
+
+export function setInterestClassMuted(kind: ClassKind, classId: string, muted: boolean): boolean {
+  const result = getDb().prepare('UPDATE interest_classes SET muted = ? WHERE kind = ? AND class_id = ?').run(muted ? 1 : 0, kind, classId)
+  if (result.changes > 0) invalidateInterestProfile()
+  return result.changes > 0
+}
+
+/**
+ * Affinity per class from the articles the reader has seen in the window.
+ * The engagement rate of a class is shrunk toward the overall rate (small
+ * classes stay near 0), then compared to it on a log2 scale: twice the
+ * average engagement is +0.5, half is -0.5, clamped to -1..1. Muted flags
+ * survive; classes seen fewer than CLASS_MIN_SEEN times are dropped.
+ */
+export function rebuildClassAffinities(): { classes: number } {
+  const db = getDb()
+  const rows = db.prepare(`
+    SELECT theme, format,
+      (CASE WHEN liked_at IS NOT NULL THEN 3 ELSE 0 END)
+      + (CASE WHEN bookmarked_at IS NOT NULL THEN 2 ELSE 0 END)
+      + (CASE WHEN read_at IS NOT NULL THEN 1 ELSE 0 END) AS weight
+    FROM active_articles
+    WHERE seen_at IS NOT NULL
+      AND classified_at IS NOT NULL
+      AND seen_at >= datetime('now', '-${FEEDBACK_WINDOW_DAYS} days')
+  `).all() as Array<{ theme: string | null; format: string | null; weight: number }>
+
+  const stats = new Map<string, { kind: ClassKind; id: string; seen: number; engaged: number }>()
+  let totalWeight = 0
+  for (const row of rows) {
+    totalWeight += row.weight
+    for (const [kind, id] of [['theme', row.theme], ['format', row.format]] as Array<[ClassKind, string | null]>) {
+      if (!id) continue
+      const key = classKey(kind, id)
+      const entry = stats.get(key) ?? { kind, id, seen: 0, engaged: 0 }
+      entry.seen++
+      entry.engaged += row.weight
+      stats.set(key, entry)
+    }
+  }
+
+  const overall = rows.length > 0 ? totalWeight / rows.length : 0
+  const kept = [...stats.values()].filter(s => s.seen >= CLASS_MIN_SEEN)
+  // Muted rows are never deleted, so a reader's "not interested" survives a
+  // class falling out of the window; the upsert refreshes their numbers
+  const upsert = db.prepare(`
+    INSERT INTO interest_classes (kind, class_id, affinity, seen, engaged, muted, updated_at)
+    VALUES (?, ?, ?, ?, ?, 0, datetime('now'))
+    ON CONFLICT(kind, class_id) DO UPDATE SET
+      affinity = excluded.affinity, seen = excluded.seen, engaged = excluded.engaged, updated_at = excluded.updated_at
+  `)
+  db.transaction(() => {
+    db.prepare('DELETE FROM interest_classes WHERE muted = 0').run()
+    for (const s of kept) {
+      let affinity = 0
+      if (overall > 0) {
+        const rate = (s.engaged + overall * CLASS_SHRINK) / (s.seen + CLASS_SHRINK)
+        affinity = Math.max(-1, Math.min(1, Math.log2(rate / overall) / 2))
+      }
+      upsert.run(s.kind, s.id, Math.round(affinity * 1000) / 1000, s.seen, s.engaged)
+    }
+  })()
+  invalidateInterestProfile()
+  return { classes: kept.length }
 }
 
 export function setInterestMuted(term: string, muted: boolean): boolean {
@@ -232,14 +352,22 @@ export function rebuildInterestProfile(): { terms: number; islands: number } {
 export function recalculateInterestScores(): { updated: number } {
   const db = getDb()
   const rows = db.prepare(`
-    SELECT id, title, title_translated FROM active_articles
+    SELECT id, title, title_translated, theme, format FROM active_articles
     WHERE seen_at IS NULL AND fetched_at >= datetime('now', '-${RESCORE_WINDOW_DAYS} days')
-  `).all() as Array<{ id: number; title: string; title_translated: string | null }>
+  `).all() as Array<{ id: number; title: string; title_translated: string | null } & ArticleClasses>
   const update = db.prepare('UPDATE articles SET interest_score = ? WHERE id = ?')
   db.transaction(() => {
-    for (const row of rows) update.run(scoreInterest(row.title, row.title_translated), row.id)
+    for (const row of rows) update.run(scoreInterest(row.title, row.title_translated, row), row.id)
   })()
   return { updated: rows.length }
+}
+
+/** Rescore one article, e.g. once the model has given it a theme and format. */
+export function rescoreArticleInterest(articleId: number): void {
+  const row = getDb().prepare('SELECT title, title_translated, theme, format FROM active_articles WHERE id = ?')
+    .get(articleId) as ({ title: string; title_translated: string | null } & ArticleClasses) | undefined
+  if (!row) return
+  setArticleInterestScore(articleId, scoreInterest(row.title, row.title_translated, row))
 }
 
 /** Score one freshly inserted article against the current profile. */
@@ -256,6 +384,7 @@ export function maybeRebuildInterestProfile(force = false): boolean {
   if (!force && Date.now() - lastRebuildAt < REBUILD_INTERVAL_MS) return false
   lastRebuildAt = Date.now()
   rebuildInterestProfile()
+  rebuildClassAffinities()
   recalculateInterestScores()
   return true
 }

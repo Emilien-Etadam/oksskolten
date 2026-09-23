@@ -169,6 +169,18 @@ CREATE UNIQUE INDEX idx_articles_feed_guid ON articles(feed_id, guid) WHERE guid
 
 -- Fork additions (87_feature_intelligence.md); articles also carry
 -- rule_boost REAL DEFAULT 0, quality_score REAL, interest_score REAL DEFAULT 0
+-- Interest affinity per article class (87_feature_intelligence.md)
+CREATE TABLE interest_classes (
+  kind       TEXT NOT NULL,                        -- 'theme' | 'format'
+  class_id   TEXT NOT NULL,
+  affinity   REAL NOT NULL DEFAULT 0,              -- -1..1
+  seen       INTEGER NOT NULL DEFAULT 0,
+  engaged    REAL NOT NULL DEFAULT 0,
+  muted      INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (kind, class_id)
+);
+
 -- Article classification (87_feature_classification.md); articles also carry
 -- format TEXT, theme TEXT, classified_at TEXT, classify_pending_at TEXT,
 -- indexed by idx_articles_format / idx_articles_theme
