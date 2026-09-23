@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Routes, Route, Outlet } from 'react-router-dom'
 import { LocaleContext } from '@/i18n'
 import { KeyboardNavigationProvider } from '@/contexts/keyboard-navigation-context'
@@ -21,8 +21,12 @@ let swrInfiniteReturn: any = {
 // Control useSWR return value for /api/feeds
 let swrFeedsData: any = undefined
 
+let lastGetKey: ((index: number, prev: unknown) => string | null) | undefined
 vi.mock('swr/infinite', () => ({
-  default: () => swrInfiniteReturn,
+  default: (getKey: (index: number, prev: unknown) => string | null) => {
+    lastGetKey = getKey
+    return swrInfiniteReturn
+  },
 }))
 
 vi.mock('swr', async () => {
@@ -179,6 +183,8 @@ function renderArticleList(initialPath = '/inbox') {
         <Routes>
           <Route element={<OutletWrapper />}>
             <Route path="feeds/:feedId" element={<ArticleList />} />
+            <Route path="themes/:themeId" element={<ArticleList />} />
+            <Route path="formats/:formatId" element={<ArticleList />} />
             <Route path="*" element={<ArticleList />} />
           </Route>
         </Routes>
@@ -209,6 +215,26 @@ describe('ArticleList', () => {
       isValidating: false,
       mutate: vi.fn(),
     }
+  })
+
+  it('lists only unread articles of a theme or format', () => {
+    renderArticleList('/themes/AI')
+    expect(lastGetKey!(0, null)).toMatch(/theme=AI/)
+    expect(lastGetKey!(0, null)).toMatch(/unread=1/)
+    renderArticleList('/formats/QUESTION')
+    expect(lastGetKey!(0, null)).toMatch(/format=QUESTION/)
+    expect(lastGetKey!(0, null)).toMatch(/unread=1/)
+  })
+
+  it('offers the read articles once a theme is all read', () => {
+    swrInfiniteReturn = {
+      ...swrInfiniteReturn,
+      data: [{ articles: [], total: 0, has_more: false, total_all: 3 }],
+      isLoading: false,
+    }
+    renderArticleList('/themes/AI')
+    fireEvent.click(screen.getByText('Show read articles'))
+    expect(lastGetKey!(0, null)).not.toMatch(/unread=1/)
   })
 
   it('shows skeleton when loading', () => {

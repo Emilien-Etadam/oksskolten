@@ -54,7 +54,9 @@ export const ArticleList = forwardRef<ArticleListHandle, object>(function Articl
   const currentFeed = feedId && feedsData ? feedsData.feeds.find(f => f.id === feedId) : undefined
   const categoryId = categoryIdParam ? Number(categoryIdParam) : undefined
   const [showReadArticles, setShowReadArticles] = useState(false)
-  const categoryUnreadOnly = !!categoryId && settings.categoryUnreadOnly === 'on'
+  // Theme and format lists are reading queues: read articles stay out of them
+  // unless the reader asks for them, like categories with the unread-only option
+  const categoryUnreadOnly = (!!categoryId && settings.categoryUnreadOnly === 'on') || !!formatId || !!themeId
   const unreadOnly = isInbox || isRecommended || (categoryUnreadOnly && !showReadArticles)
   const bookmarkedOnly = isBookmarks
   const likedOnly = isLikes
