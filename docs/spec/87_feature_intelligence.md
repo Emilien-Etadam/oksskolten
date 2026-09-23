@@ -99,7 +99,15 @@ A feed whose every article is opened lands near 0.86; likes push it further; a f
 
 The profile is stored in `interest_terms` and rebuilt at most hourly by the score cron (`maybeRebuildInterestProfile()`), or on demand from Settings → General → Your interests. Each rebuild rescores the unread articles of the last 14 days; a new article is scored at insertion against the cached profile.
 
-`interest_score` of an article is the sum of the weights of the profile terms its title mentions, muted terms subtracting. `GET /api/articles?unread=1&sort=recommended` orders by `interest_score DESC`, then `trust + quality`, then date. `/recommended` is that list, without day separators since it is not chronological.
+### Class affinities
+
+With article classification on ([87_feature_classification.md](./87_feature_classification.md)), `rebuildClassAffinities()` also learns how the reader treats each theme and format. Over the articles seen in the last 90 days that carry a classification, each class gets an engagement rate (same weights: like 3, bookmark 2, opened 1; a seen but never opened article counts 0), shrunk toward the overall rate with 5 pseudo-articles, then compared to it: `affinity = clamp(log2(rate / overall) / 2, -1, 1)`. Twice the average engagement is +0.5, half is -0.5. Classes seen fewer than 5 times are dropped. Rows live in `interest_classes (kind, class_id, affinity, seen, engaged, muted)`; muted rows survive every rebuild and count as -1. The classifier rescores an article as soon as it gets its theme and format.
+
+`GET /api/interests` returns `{ islands, classes }`; `PATCH /api/interests/classes/:kind/:classId` with `{ muted }` mutes a class. Settings → General → Your interests shows the affinities as chips above the islands.
+
+### Score
+
+`interest_score` of an article is the sum of the weights of the profile terms its title mentions, muted terms subtracting, plus the affinities of its theme and format (a top term weighs 1, so does a full affinity). `GET /api/articles?unread=1&sort=recommended` orders by `interest_score DESC`, then `trust + quality`, then date. `/recommended` is that list, without day separators since it is not chronological.
 
 ## API
 

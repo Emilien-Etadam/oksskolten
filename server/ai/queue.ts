@@ -4,6 +4,7 @@ import { getArticleById, updateArticleContent, updateScore } from '../db/article
 import { getFeedById } from '../db/feeds.js'
 import { translateArticle, translateTitle, summarizeArticle, evaluateArticleRelevance } from './tasks.js'
 import { classifyArticle, isClassificationEnabled } from './classify.js'
+import { rescoreArticleInterest } from '../intelligence/interests.js'
 import { Semaphore } from '../fetcher/util.js'
 import { logger } from '../logger.js'
 import { DEFAULT_LANGUAGE } from '../../shared/lang.js'
@@ -126,6 +127,8 @@ async function processClassify(item: QueueItem): Promise<void> {
     classified_at: nowIso(),
     classify_pending_at: null,
   })
+  // The interest score counts the reader's affinity for the new theme/format
+  rescoreArticleInterest(item.articleId)
   log.debug(`classified article ${item.articleId}: ${r.format ?? `?${r.formatTop}`} / ${r.theme ?? `?${r.themeTop}`} (${r.ms} ms)`)
 }
 

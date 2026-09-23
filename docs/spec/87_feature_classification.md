@@ -61,6 +61,7 @@ The `classify` ingest step (new and clipped articles) enqueues task `classify` o
 ### Frontend
 
 - Sidebar: "Themes" and "Formats" sections under smart folders, collapsible, hidden while classification is off.
+- `/themes/:id` and `/formats/:id` list unread articles only; once all are read, the empty state offers "Show read articles", as categories do with the unread-only option.
 - Hidden categories: the sidebar lists feeds flat, sorted by name, with drag-and-drop to folders disabled (there is no folder to drop into), and the tab bar above article lists (`category-tabs.tsx`) links to `/themes/:id` instead of `/categories/:id`.
 - Settings → Integration → Article classification: switch, model, thresholds, theme editor, live test, backfill and reclassify.
 

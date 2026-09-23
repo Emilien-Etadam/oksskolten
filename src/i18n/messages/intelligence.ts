@@ -49,11 +49,16 @@ export const intelligence = {
   'rules.delete': { ja: '削除', en: 'Delete', zh: '删除'},
 
   'interests.title': { ja: 'あなたの関心', en: 'Your interests', zh: '我的兴趣'},
-  'interests.desc': { ja: 'いいね・ブックマーク・開いた記事から学んだテーマ。よく一緒に現れる語は同じ島にまとまります。語をクリックするとミュート（おすすめから外す）できます。', en: 'Themes learned from what you like, bookmark and open. Terms that keep appearing together form an island. Click a term to mute it, so it stops boosting recommendations.', zh: '从您点赞、收藏和打开的文章中学习到的主题。经常一起出现的词构成一个「岛」。点击一个词可将其静音，不再推动推荐。'},
+  'interests.desc': { ja: 'いいね・ブックマーク・開いた記事から学んだテーマ。よく一緒に現れる語は同じ島にまとまります。語をクリックするとミュート（おすすめから外す）できます。記事の分類が有効なら、よく読むテーマと形式も学習します。', en: 'Themes learned from what you like, bookmark and open. Terms that keep appearing together form an island. Click a term to mute it, so it stops boosting recommendations. With article classification on, it also learns which themes and formats you read more, or less, than average.', zh: '从您点赞、收藏和打开的文章中学习到的主题。经常一起出现的词构成一个「岛」。点击一个词可将其静音，不再推动推荐。启用文章分类后，还会学习您比平均更常读或更少读的主题和形式。'},
   'interests.empty': { ja: '関心プロファイルはまだありません。記事にいいねやブックマークをすると学習が始まります。', en: 'No interest profile yet. Like, bookmark or open a few articles and it will build itself.', zh: '还没有兴趣画像。点赞、收藏或打开几篇文章后会自动生成。'},
   'interests.rebuild': { ja: '今すぐ再学習', en: 'Rebuild now', zh: '立即重建'},
   'interests.rebuilt': { ja: '関心プロファイルを更新しました', en: 'Interest profile rebuilt', zh: '兴趣画像已重建'},
   'interests.island': { ja: '島 ${n}', en: 'Island ${n}', zh: '岛 ${n}'},
+  'interests.classAffinity': {
+    ja: '平均的な記事と比べた関心度（${seen} 件の既読から）。クリックでミュート',
+    en: 'Engagement against an average article (from ${seen} seen). Click to mute',
+    zh: '与普通文章相比的参与度（基于 ${seen} 篇已看文章）。点击静音',
+  },
   'interests.muted': { ja: 'ミュート中', en: 'muted', zh: '已静音'},
 
   'classification.title': { ja: '記事の分類', en: 'Article classification', zh: '文章分类'},
