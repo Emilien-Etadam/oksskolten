@@ -38,6 +38,26 @@ export const PRE_CLEAN_SELECTORS: string[] = [
 
   // Embeds that are never content
   'instaread-player',
+
+  // Cookie consent banners and modals. On a paywalled page the consent text
+  // can outweigh the teaser left beside it, and Readability returns it as the
+  // article. Known CMPs by their root element, then home-grown ones by name;
+  // the substring rules skip the page shells, which some sites tag with a
+  // "cookie-consent-open" style class while the banner is up.
+  '#didomi-host',
+  '#onetrust-consent-sdk',
+  '#onetrust-banner-sdk',
+  '#CybotCookiebotDialog',
+  '#axeptio_overlay',
+  '#sd-cmp',
+  '#usercentrics-root',
+  '#tarteaucitronRoot',
+  '#cmpbox',
+  '.qc-cmp2-container',
+  '.cc-window',
+  ...['cookie-consent', 'cookieconsent', 'cookie-banner', 'cookiebanner', 'cookie-notice', 'cookienotice']
+    .flatMap(name => [`[id*="${name}" i]`, `[class*="${name}" i]`])
+    .map(sel => `${sel}:not(html):not(body):not(main):not(article)`),
 ]
 
 // ---------------------------------------------------------------------------

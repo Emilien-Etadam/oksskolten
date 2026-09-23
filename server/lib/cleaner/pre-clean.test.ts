@@ -28,6 +28,35 @@ function preCleanHtml(html: string, url: string): Document {
 }
 
 describe('preClean', () => {
+  describe('removes cookie consent banners', () => {
+    it('removes a home-grown consent modal', () => {
+      const doc = preCleanHtml(
+        '<body><div id="modalCookieConsentSettings" class="modal-cookie-consent-settings modal fade"><h5>Paramétrez vos cookies</h5></div>'
+        + '<div id="modalCookieConsent" class="modal"><p>Bienvenue</p></div><h2 class="article-chapo">Le chapô</h2></body>',
+        'https://www.glitz.paris/fr/article',
+      )
+      expect(doc.body.textContent).not.toContain('cookies')
+      expect(doc.body.textContent).not.toContain('Bienvenue')
+      expect(doc.body.textContent).toContain('Le chapô')
+    })
+
+    it('removes known CMP roots', () => {
+      const doc = preCleanHtml(
+        '<body><div id="didomi-host">consent</div><div id="onetrust-consent-sdk">consent</div><p>article</p></body>',
+        'https://example.com',
+      )
+      expect(doc.body.textContent).toBe('article')
+    })
+
+    it('keeps a page shell tagged while the banner is up', () => {
+      const doc = preCleanHtml(
+        '<body class="cookie-consent-open"><main class="has-cookie-banner"><p>article</p></main></body>',
+        'https://example.com',
+      )
+      expect(doc.body.textContent).toContain('article')
+    })
+  })
+
   describe('removes safe elements', () => {
     it('removes script tags (non-math)', () => {
       const doc = preCleanHtml('<body><script>evil()</script><p>safe</p></body>', 'https://example.com')
