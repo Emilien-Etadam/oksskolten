@@ -26,6 +26,7 @@ import { Toaster } from 'sonner'
 import { FetchProgressProvider } from './contexts/fetch-progress-context'
 import { useArticleAutoRefresh } from './hooks/use-article-auto-refresh'
 import { TooltipProvider } from './components/ui/tooltip'
+import type { ClassificationOverview } from '../shared/classification'
 
 export interface AppLayoutContext {
   settings: Settings
@@ -133,7 +134,7 @@ export function useAppLayout() {
 }
 
 function ArticleListPage() {
-  const { feedId, categoryId, folderId } = useParams<{ feedId?: string; categoryId?: string; folderId?: string }>()
+  const { feedId, categoryId, folderId, formatId, themeId } = useParams<{ feedId?: string; categoryId?: string; folderId?: string; formatId?: string; themeId?: string }>()
   const location = useLocation()
   const { t } = useI18n()
   const isInbox = location.pathname === '/inbox'
@@ -145,6 +146,7 @@ function ArticleListPage() {
   const isClips = location.pathname === '/clips'
   const { data: feedsData } = useSWR<{ feeds: Array<{ id: number; name: string; type: string; category_id: number | null; category_name: string | null }>; clip_feed_id: number | null }>('/api/feeds', fetcher)
   const { data: categoriesData } = useSWR<{ categories: Array<{ id: number; name: string }> }>('/api/categories', fetcher)
+  const { data: classification } = useSWR<ClassificationOverview>(formatId || themeId ? '/api/classification' : null, fetcher)
 
   const headerName = isHistory
     ? t('feeds.history')
@@ -160,6 +162,10 @@ function ArticleListPage() {
               ? t('recommended.title')
               : folderId
                 ? smartFoldersData?.folders.find(f => f.id === Number(folderId))?.name ?? null
+            : formatId
+              ? classification?.formats.find(f => f.id === formatId)?.label ?? formatId
+            : themeId
+              ? classification?.themes.find(c => c.id === themeId)?.label ?? themeId
             : feedId
           ? feedsData?.feeds.find(f => f.id === Number(feedId))?.name ?? null
           : categoryId
@@ -276,7 +282,7 @@ function ArticleDetailPage() {
 
 // Determine the "page type" for animation decisions
 function getPageType(pathname: string): 'detail' | 'list' {
-  if (pathname === '/' || pathname === '/inbox' || pathname === '/bookmarks' || pathname === '/likes' || pathname === '/history' || pathname === '/clips' || pathname === '/stories' || pathname === '/recommended' || pathname.startsWith('/smart/') || pathname.startsWith('/feeds/') || pathname.startsWith('/categories/') || pathname.startsWith('/settings') || pathname.startsWith('/chat')) {
+  if (pathname === '/' || pathname === '/inbox' || pathname === '/bookmarks' || pathname === '/likes' || pathname === '/history' || pathname === '/clips' || pathname === '/stories' || pathname === '/recommended' || pathname.startsWith('/smart/') || pathname.startsWith('/feeds/') || pathname.startsWith('/categories/') || pathname.startsWith('/formats/') || pathname.startsWith('/themes/') || pathname.startsWith('/settings') || pathname.startsWith('/chat')) {
     return 'list'
   }
   return 'detail'
@@ -358,6 +364,8 @@ function AnimatedRoutes() {
             <Route path="/stories" element={<StoriesPageWrapper />} />
             <Route path="/feeds/:feedId" element={<ArticleListPage />} />
             <Route path="/categories/:categoryId" element={<ArticleListPage />} />
+            <Route path="/formats/:formatId" element={<ArticleListPage />} />
+            <Route path="/themes/:themeId" element={<ArticleListPage />} />
             <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
             <Route path="/settings/:tab" element={<SettingsPageWrapper />} />
             <Route path="/chat" element={<ChatPageWrapper />} />

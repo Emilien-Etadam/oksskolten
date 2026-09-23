@@ -22,6 +22,7 @@ import { SidebarNavItem } from '@/components/layout/sidebar-nav-item'
 import { FeedListHeader } from './feed-list-header'
 import { FeedAiFilterDialog } from './feed-ai-filter-dialog'
 import { SmartFolderList } from './smart/smart-folder-list'
+import { ClassificationList } from './classification-list'
 import { SearchDialog } from '@/components/ui/search-dialog'
 import { CommandPalette } from '@/components/command-palette'
 import { useGlobalShortcuts } from '@/hooks/use-global-shortcuts'
@@ -507,6 +508,8 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
           <SidebarNavItem icon={Plus} label={t('modal.addNew')} onClick={() => setFeedModalOpen(true)} className="text-muted hover:text-text" />
 
           <SmartFolderList onNavigate={onClose} />
+
+          <ClassificationList onNavigate={onClose} />
 
           <div className="px-2 pt-4 pb-1">
             <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted">{t('feeds.title')}</h2>

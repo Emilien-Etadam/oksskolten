@@ -121,6 +121,10 @@ Five features borrowed from RSSMonster's smart layer, all running on SQLite and 
 - **Feed trust and article quality** — a per-feed trust score from what you actually read of it, and a per-article quality score (thin body, clickbait or shouting title, promotional markers, link density). Both feed the front page ranking; trust is a sortable column in Settings → Feeds
 - **Interest islands and Recommended** — an interest profile learned from what you like, bookmark and open, grouped into islands of co-occurring terms you can mute; the *Recommended* list ranks unread articles against it
 
+### Article classification
+
+Your local vLLM server gives every article a **format** (news, question, discussion, guide, review, release…) and a **theme** from a list you edit, shown as sidebar sections with unread counts and usable in smart folders (`format:question theme:ai`). Each class is a one-token decision read from logprobs ([notjev](https://github.com/9pings/notjev)): when the model hesitates the article stays unclassified instead of getting a guess. Enable it in Settings → Integration. See [`87_feature_classification.md`](docs/spec/87_feature_classification.md)
+
 ### Feed management and diagnostics
 
 **Settings → Feeds**, an empty "under development" placeholder upstream, now holds two sections:

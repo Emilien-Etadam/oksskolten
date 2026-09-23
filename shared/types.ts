@@ -90,6 +90,9 @@ export interface ArticleListItem {
   similar_count?: number
   /** Comma-separated ids of similar articles (bidirectional pairs), list queries only */
   similar_ids?: string | null
+  /** Classification (FORMATS id / theme id); null when not classified or undecided */
+  format?: string | null
+  theme?: string | null
 }
 
 export interface ArticleDetail extends ArticleListItem {

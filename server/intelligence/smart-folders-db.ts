@@ -62,6 +62,8 @@ function buildConditions(query: SmartQuery, opts?: { likeText?: boolean }): { wh
   if (query.liked) conditions.push('a.liked_at IS NOT NULL')
   if (query.feedId) { conditions.push('a.feed_id = @feedId'); params.feedId = query.feedId }
   if (query.categoryId) { conditions.push('a.category_id = @categoryId'); params.categoryId = query.categoryId }
+  if (query.format) { conditions.push('a.format = @format'); params.format = query.format }
+  if (query.theme) { conditions.push('a.theme = @theme'); params.theme = query.theme }
   const since = smartQuerySince(query)
   if (since) { conditions.push('COALESCE(a.published_at, a.fetched_at) >= @since'); params.since = since }
   if (opts?.likeText && query.text) {

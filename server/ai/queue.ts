@@ -3,6 +3,7 @@ import { getDb } from '../db/connection.js'
 import { getArticleById, updateArticleContent, updateScore } from '../db/articles.js'
 import { getFeedById } from '../db/feeds.js'
 import { translateArticle, translateTitle, summarizeArticle, evaluateArticleRelevance } from './tasks.js'
+import { classifyArticle, isClassificationEnabled } from './classify.js'
 import { Semaphore } from '../fetcher/util.js'
 import { logger } from '../logger.js'
 import { DEFAULT_LANGUAGE } from '../../shared/lang.js'
@@ -10,7 +11,7 @@ import type { ArticleDetail } from '../../shared/types.js'
 
 const log = logger.child('ai-queue')
 
-export type AiQueueTask = 'translate' | 'summarize' | 'filter'
+export type AiQueueTask = 'translate' | 'summarize' | 'filter' | 'classify'
 
 interface QueueItem {
   articleId: number
@@ -24,6 +25,8 @@ const RESUME_MIN_AGE_MS = 10 * 60 * 1000
 const RESUME_BATCH_LIMIT = 50
 
 const queue: QueueItem[] = []
+/** Low-priority work (classification backfill): drained only when the queue is empty */
+const backlog: QueueItem[] = []
 const pending = new Set<string>()
 let concurrencyLimit = 1
 let semaphore = new Semaphore(1)
@@ -67,10 +70,11 @@ function ensureSemaphore(): Semaphore {
   return semaphore
 }
 
-const PENDING_COLUMN: Record<AiQueueTask, 'translate_pending_at' | 'summarize_pending_at' | 'filter_pending_at'> = {
+const PENDING_COLUMN: Record<AiQueueTask, 'translate_pending_at' | 'summarize_pending_at' | 'filter_pending_at' | 'classify_pending_at'> = {
   translate: 'translate_pending_at',
   summarize: 'summarize_pending_at',
   filter: 'filter_pending_at',
+  classify: 'classify_pending_at',
 }
 
 function markPending(task: AiQueueTask, articleId: number, value: string | null): void {
@@ -101,6 +105,28 @@ async function processFilter(item: QueueItem): Promise<void> {
   if (!keep) {
     log.info(`ai-filter hid article ${item.articleId} ("${article.title.slice(0, 60)}")`)
   }
+}
+
+async function processClassify(item: QueueItem): Promise<void> {
+  const article = getArticleById(item.articleId)
+  // An article hidden by its feed's AI filter is never shown: skip the calls
+  if (!article || article.filtered_at || !isClassificationEnabled()) {
+    markPending('classify', item.articleId, null)
+    return
+  }
+
+  const r = await classifyArticle({
+    title: article.title,
+    feedName: article.feed_name,
+    body: article.full_text || article.excerpt || article.summary,
+  })
+  updateArticleContent(item.articleId, {
+    format: r.format,
+    theme: r.theme,
+    classified_at: nowIso(),
+    classify_pending_at: null,
+  })
+  log.debug(`classified article ${item.articleId}: ${r.format ?? `?${r.formatTop}`} / ${r.theme ?? `?${r.themeTop}`} (${r.ms} ms)`)
 }
 
 /**
@@ -203,6 +229,8 @@ async function processItem(item: QueueItem): Promise<void> {
       await processTranslate(item)
     } else if (item.task === 'summarize') {
       await processSummarize(item)
+    } else if (item.task === 'classify') {
+      await processClassify(item)
     } else {
       await processFilter(item)
     }
@@ -223,24 +251,24 @@ async function drainQueue(): Promise<void> {
   draining = true
   const sem = ensureSemaphore()
   try {
-    while (queue.length > 0) {
-      const item = queue.shift()!
+    while (queue.length > 0 || backlog.length > 0) {
+      const item = queue.shift() ?? backlog.shift()!
       await sem.run(() => processItem(item))
     }
   } finally {
     draining = false
-    if (queue.length > 0) void drainQueue()
+    if (queue.length > 0 || backlog.length > 0) void drainQueue()
   }
 }
 
-function enqueue(task: AiQueueTask, articleId: number, opts?: { skipMark?: boolean }): void {
+function enqueue(task: AiQueueTask, articleId: number, opts?: { skipMark?: boolean; lowPriority?: boolean }): void {
   const key = pendingKey(task, articleId)
   if (pending.has(key)) return
   pending.add(key)
   if (!opts?.skipMark) {
     markPending(task, articleId, nowIso())
   }
-  queue.push({ articleId, task, targetLang: getTargetLang() })
+  ;(opts?.lowPriority ? backlog : queue).push({ articleId, task, targetLang: getTargetLang() })
   void drainQueue()
 }
 
@@ -265,6 +293,45 @@ export function enqueueAiFilter(articleId: number, feedId: number): void {
   enqueue('filter', articleId)
 }
 
+/** Queue the format/theme classification of an article. No-op while disabled. */
+export function enqueueClassify(articleId: number): void {
+  if (!isClassificationEnabled()) return
+  enqueue('classify', articleId)
+}
+
+/** Articles never classified, capped per call so a huge archive is fed in slices */
+const BACKFILL_BATCH_LIMIT = 5000
+
+/**
+ * Queue every active article that has never been classified. Returns how
+ * many were queued; calling it again picks up where the queue left off.
+ */
+export function enqueueClassifyBackfill(): number {
+  if (!isClassificationEnabled()) return 0
+  const rows = getDb().prepare(`
+    SELECT id FROM active_articles
+    WHERE classified_at IS NULL AND filtered_at IS NULL
+    ORDER BY published_at DESC
+    LIMIT ?
+  `).all(BACKFILL_BATCH_LIMIT) as Array<{ id: number }>
+  let queued = 0
+  for (const row of rows) {
+    if (pending.has(pendingKey('classify', row.id))) continue
+    // No pending marker: thousands of row writes (and search-index syncs) for
+    // work that is simply re-queued by clicking again after a restart
+    enqueue('classify', row.id, { skipMark: true, lowPriority: true })
+    queued++
+  }
+  return queued
+}
+
+/** Number of classification tasks waiting or running in this process */
+export function countPendingClassify(): number {
+  let n = 0
+  for (const key of pending) if (key.startsWith('classify:')) n++
+  return n
+}
+
 export function isAutoTranslateEnabled(): boolean {
   return getSetting('reading.auto_translate') === 'on'
 }
@@ -281,20 +348,23 @@ export function isAutoSummarizeEnabled(): boolean {
 export function resumePendingAiTasks(): void {
   const translateOn = isAutoTranslateEnabled()
   const summarizeOn = isAutoSummarizeEnabled()
+  const classifyOn = isClassificationEnabled()
 
   const cutoff = new Date(Date.now() - RESUME_MIN_AGE_MS).toISOString()
   const rows = getDb().prepare(`
-    SELECT id, translate_pending_at, summarize_pending_at, filter_pending_at
+    SELECT id, translate_pending_at, summarize_pending_at, filter_pending_at, classify_pending_at
     FROM active_articles
     WHERE (translate_pending_at IS NOT NULL AND translate_pending_at < ?)
        OR (summarize_pending_at IS NOT NULL AND summarize_pending_at < ?)
        OR (filter_pending_at IS NOT NULL AND filter_pending_at < ?)
+       OR (classify_pending_at IS NOT NULL AND classify_pending_at < ?)
     LIMIT ?
-  `).all(cutoff, cutoff, cutoff, RESUME_BATCH_LIMIT) as Array<{
+  `).all(cutoff, cutoff, cutoff, cutoff, RESUME_BATCH_LIMIT) as Array<{
     id: number
     translate_pending_at: string | null
     summarize_pending_at: string | null
     filter_pending_at: string | null
+    classify_pending_at: string | null
   }>
 
   let resumed = 0
@@ -310,6 +380,10 @@ export function resumePendingAiTasks(): void {
     // The filter has no global toggle: it runs whenever a feed defines a criterion
     if (row.filter_pending_at && row.filter_pending_at < cutoff) {
       enqueue('filter', row.id, { skipMark: true })
+      resumed++
+    }
+    if (classifyOn && row.classify_pending_at && row.classify_pending_at < cutoff) {
+      enqueue('classify', row.id, { skipMark: true })
       resumed++
     }
   }
@@ -341,6 +415,7 @@ export function translateArticleTitle(articleId: number): void {
 /** @internal test helper */
 export function _resetAiQueueForTests(): void {
   queue.length = 0
+  backlog.length = 0
   pending.clear()
   concurrencyLimit = 1
   semaphore = new Semaphore(1)

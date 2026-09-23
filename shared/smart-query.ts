@@ -10,6 +10,7 @@
  *   bookmarked:true        is:bookmarked
  *   liked:true             is:liked
  *   feed:<id>              category:<id>
+ *   format:<id>            theme:<id>        (classification ids, any case)
  *   @today @yesterday @week @month   since:3d | since:2w | since:1m
  *   sort:score | sort:date
  *
@@ -22,6 +23,9 @@ export interface SmartQuery {
   liked?: boolean
   feedId?: number
   categoryId?: number
+  /** Classification ids, uppercase (FORMATS / themes) */
+  format?: string
+  theme?: string
   /** Relative window in days; 1 = today (calendar day), 2 = since yesterday */
   sinceDays?: number
   sort?: 'score' | 'date'
@@ -105,6 +109,12 @@ export function parseSmartQuery(raw: string): SmartQuery {
           if (Number.isInteger(n) && n > 0) query.categoryId = n; else handled = false
           break
         }
+        case 'format':
+        case 'theme': {
+          const v = value.trim().toUpperCase()
+          if (/^[A-Z0-9_]{1,40}$/.test(v)) query[key] = v; else handled = false
+          break
+        }
         case 'since': {
           const d = parseSince(value)
           if (d === undefined) handled = false; else query.sinceDays = d
@@ -144,5 +154,5 @@ export function smartQuerySince(query: SmartQuery, now: Date = new Date()): stri
 /** Whether the query names filters the client can preview without a search index. */
 export function smartQueryHasFilters(query: SmartQuery): boolean {
   return query.unread !== undefined || !!query.bookmarked || !!query.liked
-    || !!query.feedId || !!query.categoryId || !!query.sinceDays
+    || !!query.feedId || !!query.categoryId || !!query.format || !!query.theme || !!query.sinceDays
 }

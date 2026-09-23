@@ -19,6 +19,9 @@ export interface ArticlePagesParams {
   isRecommended: boolean
   feedId: number | undefined
   categoryId: number | undefined
+  /** Classification ids (formats / themes) */
+  format?: string
+  theme?: string
   unreadOnly: boolean
   bookmarkedOnly: boolean
   likedOnly: boolean
@@ -32,6 +35,8 @@ export function useArticlePages({
   isRecommended,
   feedId,
   categoryId,
+  format,
+  theme,
   unreadOnly,
   bookmarkedOnly,
   likedOnly,
@@ -50,6 +55,8 @@ export function useArticlePages({
     if (isRecommended) params.set('sort', 'recommended')
     if (feedId) params.set('feed_id', String(feedId))
     if (categoryId) params.set('category_id', String(categoryId))
+    if (format) params.set('format', format)
+    if (theme) params.set('theme', theme)
     if (unreadOnly) params.set('unread', '1')
     if (bookmarkedOnly) params.set('bookmarked', '1')
     if (likedOnly) params.set('liked', '1')
