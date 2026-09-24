@@ -65,6 +65,18 @@ describe('GET /api/articles/images/:filename authentication', () => {
     expect(res.headers['content-type']).toBe('image/png')
   })
 
+  it('announces the format the bytes hold, not the one the name claims', async () => {
+    // Archived before download-time sniffing: a Blogger `.png` that is a JPEG
+    fs.writeFileSync(path.join(tmpDir, '1_jpegnamedpng.png'), Buffer.from([0xff, 0xd8, 0xff, 0xe0]))
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/articles/images/1_jpegnamedpng.png',
+      cookies: { [MEDIA_COOKIE]: sessionToken(app) },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.headers['content-type']).toBe('image/jpeg')
+  })
+
   it('200: Authorization header still works', async () => {
     const res = await app.inject({
       method: 'GET',
