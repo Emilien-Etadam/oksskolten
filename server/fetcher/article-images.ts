@@ -2,6 +2,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import crypto from 'node:crypto'
 import { safeFetch } from './ssrf.js'
+import { sniffImageType } from './image-type.js'
 import { USER_AGENT } from './http.js'
 import { getSetting } from '../db/settings.js'
 import { updateArticleContent, markImagesArchived, clearImagesArchived, getUnarchivedArticlesByFeed } from '../db/articles.js'
@@ -65,19 +66,6 @@ export function extractByDotPath(obj: unknown, dotPath: string): unknown {
     current = (current as Record<string, unknown>)[key]
   }
   return current
-}
-
-function extFromUrl(url: string): string {
-  try {
-    const pathname = new URL(url).pathname
-    const ext = path.extname(pathname).split('?')[0].toLowerCase()
-    if (['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.avif'].includes(ext)) {
-      return ext
-    }
-  } catch {
-    // ignore
-  }
-  return '.jpg'
 }
 
 async function uploadImageToRemote(
@@ -181,8 +169,18 @@ export async function archiveArticleImages(
         continue
       }
 
+      // A 200 is not proof of a picture: keep the remote URL rather than
+      // store an HTML error page or a truncated file as the article's image
+      const type = sniffImageType(buffer)
+      if (!type) {
+        errors++
+        continue
+      }
+
       const hash = crypto.createHash('sha256').update(imageUrl).digest('hex').slice(0, 12)
-      const ext = extFromUrl(imageUrl)
+      // Name the file after what arrived, not after the URL: CDNs such as
+      // Blogger re-encode images and keep the original extension
+      const ext = type.ext
       const filename = `${articleId}_${hash}${ext}`
 
       if (remoteConfig) {

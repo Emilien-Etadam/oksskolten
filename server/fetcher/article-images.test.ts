@@ -45,6 +45,16 @@ vi.mock('../db/feeds.js', () => ({
 
 import { extractByDotPath, isImageArchivingEnabled, deleteArticleImages, archiveArticleImages, archiveFeedImages, sweepAutoArchiveFeeds } from './article-images.js'
 
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+
+function mockBody(buf: Buffer): void {
+  mockSafeFetch.mockResolvedValue({
+    ok: true,
+    headers: new Map([['content-length', String(buf.length)]]),
+    arrayBuffer: () => Promise.resolve(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)),
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
@@ -153,7 +163,7 @@ describe('archiveArticleImages', () => {
       return undefined
     })
 
-    const fakeImageBuffer = Buffer.from('fake-image-data')
+    const fakeImageBuffer = Buffer.concat([PNG_SIGNATURE, Buffer.from('fake-image-data')])
     mockSafeFetch.mockResolvedValue({
       ok: true,
       headers: new Map([['content-length', String(fakeImageBuffer.length)]]),
@@ -175,6 +185,34 @@ describe('archiveArticleImages', () => {
     expect(files).toHaveLength(1)
     expect(files[0]).toMatch(/^1_/)
 
+    fs.rmSync(tmpDir, { recursive: true })
+  })
+
+  it('keeps the remote URL when the body is not an image', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reader-archive-'))
+    mockGetSetting.mockImplementation((key: string) => key === 'images.storage_path' ? tmpDir : undefined)
+    mockBody(Buffer.from('<!DOCTYPE html><html><body>Sorry</body></html>'))
+
+    const fullText = '![photo](https://blogger.googleusercontent.com/img/b/x/s563/photo.png)'
+    const result = await archiveArticleImages(2, fullText)
+
+    expect(result.downloaded).toBe(0)
+    expect(result.errors).toBe(1)
+    expect(result.rewrittenText).toBe(fullText)
+    expect(fs.readdirSync(tmpDir)).toHaveLength(0)
+    fs.rmSync(tmpDir, { recursive: true })
+  })
+
+  it('names the file after the bytes, not the URL extension', async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reader-archive-'))
+    mockGetSetting.mockImplementation((key: string) => key === 'images.storage_path' ? tmpDir : undefined)
+    mockBody(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]))
+
+    const result = await archiveArticleImages(3, '![photo](https://blogger.googleusercontent.com/img/b/x/s563/photo.png)')
+
+    expect(result.downloaded).toBe(1)
+    expect(result.rewrittenText).toMatch(/\/api\/articles\/images\/3_[0-9a-f]{12}\.jpg\)/)
+    expect(fs.readdirSync(tmpDir)[0]).toMatch(/\.jpg$/)
     fs.rmSync(tmpDir, { recursive: true })
   })
 
@@ -253,7 +291,7 @@ function enableLocalArchiving(tmpDir: string): void {
 }
 
 function mockImageResponse(): void {
-  const buf = Buffer.from('fake-image-data')
+  const buf = Buffer.concat([PNG_SIGNATURE, Buffer.from('fake-image-data')])
   mockSafeFetch.mockResolvedValue({
     ok: true,
     headers: new Map([['content-length', String(buf.length)]]),

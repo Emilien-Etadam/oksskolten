@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireMediaAuth } from '../../auth/guards.js'
 import { getArticleById } from '../../db.js'
 import { archiveArticleImages, isImageArchivingEnabled } from '../../fetcher/article-images.js'
+import { sniffImageType } from '../../fetcher/image-type.js'
 import { archiveArticleVideos, isVideoArchivingEnabled, findArchivableVideos } from '../../fetcher/article-videos.js'
 import { getSetting } from '../../db/settings.js'
 import path from 'node:path'
@@ -11,6 +12,20 @@ import { dataPath } from '../../paths.js'
 import { NumericIdParams, parseOrBadRequest } from '../../lib/validation.js'
 
 const FilenameParams = z.object({ filename: z.string() })
+
+function sniffFileType(filepath: string): string | null {
+  let fd: number | undefined
+  try {
+    fd = fs.openSync(filepath, 'r')
+    const head = Buffer.alloc(1024)
+    const read = fs.readSync(fd, head, 0, head.length, 0)
+    return sniffImageType(head.subarray(0, read))?.mime ?? null
+  } catch {
+    return null
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd)
+  }
+}
 
 export async function articleMediaRoutes(api: FastifyInstance): Promise<void> {
   // --- Image archiving ---
@@ -133,7 +148,10 @@ export async function archivedMediaRoutes(api: FastifyInstance): Promise<void> {
         '.svg': 'image/svg+xml',
         '.avif': 'image/avif',
       }
-      const contentType = mimeMap[ext] || 'application/octet-stream'
+      // Files archived before the format was sniffed at download time carry
+      // the URL's extension, which may not match their bytes (Blogger serves
+      // a `.png` as JPEG or WebP): announce what the file really holds
+      const contentType = sniffFileType(filepath) ?? mimeMap[ext] ?? 'application/octet-stream'
 
       reply.header('Content-Type', contentType)
       reply.header('Cache-Control', 'public, max-age=31536000, immutable')

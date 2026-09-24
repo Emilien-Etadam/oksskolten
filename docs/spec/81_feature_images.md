@@ -66,7 +66,7 @@ The per-feed flag piggybacks on the global feature: while `images.enabled` is of
 Images archived in local mode are served via `GET /api/articles/images/:filename`.
 
 - Path traversal protection: `path.basename(filename) !== filename || filename.includes('..')` → 400
-- MIME type: based on file extension (`.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.svg`, `.avif`)
+- MIME type: sniffed from the file's first bytes (PNG, JPEG, GIF, WebP, AVIF, SVG), falling back to the extension. At download time a body that is not an image is not stored and the article keeps the remote URL; the stored file is named after its real format, since CDNs such as Blogger re-encode images under the original name
 - Cache: `Cache-Control: public, max-age=31536000, immutable`
 - Authentication: `requireMediaAuth`, not the `requireAuth` the rest of the API uses. The reader reaches this URL through an `<img>` tag the browser loads by itself, with no chance to attach the `Authorization` header the session runs on; every archived image would answer 401 and render broken. The request therefore also authenticates with the `media_token` cookie — the same JWT, `HttpOnly`, scoped to `/api/articles` (`docs/spec/40_auth.md`). This is why the route is registered outside the authenticated scope in `server/routes/index.ts`.
 

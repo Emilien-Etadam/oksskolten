@@ -23,7 +23,7 @@ export function useReadOnScroll({ autoMarkRead, listRef, absorbedIdsRef, feedId,
     batchQueue.current.clear()
     markSeenOnServer(ids)
       .then(() => globalMutate(
-        (key: string) => typeof key === 'string' && key.startsWith('/api/feeds'),
+        (key: string) => typeof key === 'string' && (key.startsWith('/api/feeds') || key === '/api/classification'),
       ))
       .catch(() => {})
   }, [globalMutate])
