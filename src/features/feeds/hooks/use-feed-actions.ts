@@ -66,12 +66,14 @@ export function useFeedActions({
   async function handleMarkAllReadFeed(feed: FeedWithCounts) {
     await apiPost(`/api/feeds/${feed.id}/mark-all-seen`)
     void mutateFeeds()
+    void globalMutate('/api/classification')
     onMarkAllRead?.()
   }
 
   async function handleMarkAllReadCategory(category: Category) {
     await apiPost(`/api/categories/${category.id}/mark-all-seen`)
     void mutateFeeds()
+    void globalMutate('/api/classification')
     onMarkAllRead?.()
   }
 

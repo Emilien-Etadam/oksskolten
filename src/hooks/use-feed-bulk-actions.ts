@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { mutate as globalMutate } from 'swr'
 import { apiPost, apiPatch, apiDelete } from '../lib/fetcher'
 import type { FeedWithCounts } from '../../shared/types'
 import type { KeyedMutator } from 'swr'
@@ -56,6 +57,7 @@ export function useFeedBulkActions({
     clearSelection()
     await Promise.all(selected.map(f => apiPost(`/api/feeds/${f.id}/mark-all-seen`)))
     void mutateFeeds()
+    void globalMutate('/api/classification')
     onMarkAllRead?.()
   }, [getSelectedFeeds, mutateFeeds, clearSelection, onMarkAllRead])
 
