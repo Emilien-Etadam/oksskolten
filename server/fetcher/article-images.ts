@@ -2,7 +2,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import crypto from 'node:crypto'
 import { safeFetch } from './ssrf.js'
-import { sniffImageType } from './image-type.js'
+import { sniffImageType, sniffImageFile } from './image-type.js'
 import { USER_AGENT } from './http.js'
 import { fetchFullText } from './content.js'
 import { getSetting } from '../db/settings.js'
@@ -11,7 +11,7 @@ import type { ArticleWithLocalImages } from '../db/articles/media.js'
 import { getFeedById, getAutoArchiveFeeds } from '../db/feeds.js'
 import type { Feed } from '../db/types.js'
 import { logger } from '../logger.js'
-import { dataPath } from '../paths.js'
+import { dataPath, formerDataDirs } from '../paths.js'
 
 const log = logger.child('fetcher')
 
@@ -382,20 +382,48 @@ async function recoverImageSources(
 }
 
 /**
- * Point articles back at the web for archived images whose files are gone.
+ * Copy a missing file back from a directory an earlier run stored it in, as
+ * long as what sits there is a picture. Returns the directory it came from.
+ */
+function copyFromFormerDir(file: string, formerDirs: string[], imagesDir: string): string | null {
+  const name = path.basename(file)
+  for (const dir of formerDirs) {
+    const source = path.join(dir, name)
+    if (!sniffImageFile(source)) continue
+    try {
+      fs.mkdirSync(imagesDir, { recursive: true })
+      fs.copyFileSync(source, path.join(imagesDir, name))
+      return dir
+    } catch (err) {
+      log.warn(`Could not copy ${source} into ${imagesDir}: ${err instanceof Error ? err.message : err}`)
+    }
+  }
+  return null
+}
+
+/**
+ * Bring back archived images whose files are gone.
  *
  * Once archived, an article's text refers to `/api/articles/images/<file>`.
- * When that file disappears — the storage directory was wiped, moved, or is
- * not the one this process reads — the reader shows a broken image with no
- * way back to the original. This finds those references, restores the URL
- * each file came from (see recoverImageSources) in the text and its
- * translation, and clears the archived mark so the auto-archive sweep can
- * download the pictures again. It runs at every startup: an article whose
- * files are all present costs one existence check per image.
+ * When that file is not where this process looks — the storage directory
+ * was wiped, moved, or resolved differently by an earlier run — the reader
+ * shows a broken image with no way back to the original. For each such file
+ * this first looks in the directories earlier runs may have used and copies
+ * it back. Failing that, it restores the URL the file came from (see
+ * recoverImageSources) in the text and its translation, and clears the
+ * archived mark so the auto-archive sweep can download the picture again.
+ * It runs at every startup: an article whose files are all present costs
+ * one existence check per image.
  */
-export async function repairLostArchivedImages(): Promise<{ articles: number; restored: number; unresolved: number }> {
-  const totals = { articles: 0, restored: 0, unresolved: 0 }
+export async function repairLostArchivedImages(
+  formerImageDirs: string[] = formerDataDirs().map(dir => path.join(dir, 'articles', 'images')),
+): Promise<{ articles: number; recovered: number; restored: number; unresolved: number }> {
+  const totals = { articles: 0, recovered: 0, restored: 0, unresolved: 0 }
   const imagesDir = getImagesDir()
+  // The default location is a former one too when a custom storage path is set
+  const formerDirs = [...new Set([...formerImageDirs, dataPath('articles', 'images')].map(dir => path.resolve(dir)))]
+    .filter(dir => dir !== path.resolve(imagesDir))
+  const recoveredFrom = new Set<string>()
   const feedsToSweep = new Set<number>()
   let afterId = 0
 
@@ -406,7 +434,17 @@ export async function repairLostArchivedImages(): Promise<{ articles: number; re
     for (const article of batch) {
       afterId = article.id
       const referenced = new Set([...localImageFiles(article.full_text), ...localImageFiles(article.full_text_translated)])
-      const missing = [...referenced].filter(file => !fs.existsSync(path.join(imagesDir, path.basename(file))))
+      const missing: string[] = []
+      for (const file of referenced) {
+        if (fs.existsSync(path.join(imagesDir, path.basename(file)))) continue
+        const from = copyFromFormerDir(file, formerDirs, imagesDir)
+        if (from) {
+          recoveredFrom.add(from)
+          totals.recovered++
+        } else {
+          missing.push(file)
+        }
+      }
       if (missing.length === 0) continue
 
       const sources = await recoverImageSources(article, missing)
@@ -429,6 +467,9 @@ export async function repairLostArchivedImages(): Promise<{ articles: number; re
     }
   }
 
+  if (totals.recovered > 0) {
+    log.warn(`Copied ${totals.recovered} archived images into ${imagesDir} from ${[...recoveredFrom].join(', ')}`)
+  }
   if (totals.restored > 0 || totals.unresolved > 0) {
     log.warn(
       `Archived images missing from ${imagesDir}: ${totals.restored} pointed back at their source ` +

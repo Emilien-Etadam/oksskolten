@@ -443,9 +443,9 @@ describe('repairLostArchivedImages', () => {
     }))
     mockFetchFullText.mockResolvedValue({ fullText: `[![](${SRC})](${FULL})`, ogImage: null, excerpt: null, title: null })
 
-    const result = await repairLostArchivedImages()
+    const result = await repairLostArchivedImages([])
 
-    expect(result).toEqual({ articles: 1, restored: 1, unresolved: 0 })
+    expect(result).toEqual({ articles: 1, recovered: 0, restored: 1, unresolved: 0 })
     expect(mockUpdateArticleContent).toHaveBeenCalledWith(41428, {
       full_text: `Intro\n\n[![](${SRC})](${FULL})\n\nText`,
       full_text_translated: `Intro (en)\n\n[![](${SRC})](${FULL})`,
@@ -458,7 +458,7 @@ describe('repairLostArchivedImages', () => {
     const file = `41428_${archivedImageHash(og)}.jpg`
     serve(articleWith(`![](/api/articles/images/${file})\n\nText`, { og_image: og }))
 
-    await repairLostArchivedImages()
+    await repairLostArchivedImages([])
 
     expect(mockFetchFullText).not.toHaveBeenCalled()
     expect(mockUpdateArticleContent).toHaveBeenCalledWith(41428, expect.objectContaining({ full_text: `![](${og})\n\nText` }))
@@ -468,7 +468,7 @@ describe('repairLostArchivedImages', () => {
     serve(articleWith(`[![](${LOCAL})](${FULL})`))
     mockFetchFullText.mockRejectedValue(new Error('HTTP 404'))
 
-    const result = await repairLostArchivedImages()
+    const result = await repairLostArchivedImages([])
 
     expect(result.restored).toBe(1)
     expect(mockUpdateArticleContent).toHaveBeenCalledWith(41428, expect.objectContaining({ full_text: `[![](${FULL})](${FULL})` }))
@@ -478,9 +478,9 @@ describe('repairLostArchivedImages', () => {
     serve(articleWith(`![](${LOCAL})`))
     mockFetchFullText.mockResolvedValue({ fullText: 'No pictures any more', ogImage: null, excerpt: null, title: null })
 
-    const result = await repairLostArchivedImages()
+    const result = await repairLostArchivedImages([])
 
-    expect(result).toEqual({ articles: 0, restored: 0, unresolved: 1 })
+    expect(result).toEqual({ articles: 0, recovered: 0, restored: 0, unresolved: 1 })
     expect(mockUpdateArticleContent).not.toHaveBeenCalled()
     expect(mockClearImagesArchived).not.toHaveBeenCalled()
   })
@@ -489,16 +489,48 @@ describe('repairLostArchivedImages', () => {
     fs.writeFileSync(path.join(tmpDir, FILE), PNG_SIGNATURE)
     serve(articleWith(`[![](${LOCAL})](${FULL})`))
 
-    const result = await repairLostArchivedImages()
+    const result = await repairLostArchivedImages([])
 
-    expect(result).toEqual({ articles: 0, restored: 0, unresolved: 0 })
+    expect(result).toEqual({ articles: 0, recovered: 0, restored: 0, unresolved: 0 })
     expect(mockFetchFullText).not.toHaveBeenCalled()
     expect(mockUpdateArticleContent).not.toHaveBeenCalled()
   })
 
+  // The server once resolved its data directory from where it was started:
+  // files archived under ~/.oksskolten/data went missing once it looked
+  // under ./data instead
+  it('copies a missing file back from a directory an earlier run used, text untouched', async () => {
+    const formerDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reader-former-'))
+    fs.writeFileSync(path.join(formerDir, FILE), PNG_SIGNATURE)
+    serve(articleWith(`[![](${LOCAL})](${FULL})`))
+
+    const result = await repairLostArchivedImages([formerDir])
+
+    expect(result).toEqual({ articles: 0, recovered: 1, restored: 0, unresolved: 0 })
+    expect(fs.readFileSync(path.join(tmpDir, FILE))).toEqual(PNG_SIGNATURE)
+    expect(fs.existsSync(path.join(formerDir, FILE))).toBe(true)
+    expect(mockFetchFullText).not.toHaveBeenCalled()
+    expect(mockUpdateArticleContent).not.toHaveBeenCalled()
+    expect(mockClearImagesArchived).not.toHaveBeenCalled()
+    fs.rmSync(formerDir, { recursive: true, force: true })
+  })
+
+  it('leaves a former copy that is not a picture where it is', async () => {
+    const formerDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reader-former-'))
+    fs.writeFileSync(path.join(formerDir, FILE), '<!DOCTYPE html><html>Sorry</html>')
+    serve(articleWith(`[![](${LOCAL})](${FULL})`))
+    mockFetchFullText.mockRejectedValue(new Error('HTTP 404'))
+
+    const result = await repairLostArchivedImages([formerDir])
+
+    expect(result).toEqual({ articles: 1, recovered: 0, restored: 1, unresolved: 0 })
+    expect(fs.existsSync(path.join(tmpDir, FILE))).toBe(false)
+    fs.rmSync(formerDir, { recursive: true, force: true })
+  })
+
   it('walks the archive in batches until none is left', async () => {
     mockGetArticlesWithLocalImages.mockReturnValue([])
-    await repairLostArchivedImages()
+    await repairLostArchivedImages([])
     expect(mockGetArticlesWithLocalImages).toHaveBeenCalledWith(0, expect.any(Number))
   })
 })

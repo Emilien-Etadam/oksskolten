@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { sniffImageType } from './image-type.js'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { sniffImageType, sniffImageFile } from './image-type.js'
 
 const bytes = (...b: number[]) => Uint8Array.from(b)
 const text = (s: string) => new TextEncoder().encode(s)
@@ -22,5 +25,15 @@ describe('sniffImageType', () => {
     expect(sniffImageType(text('<!DOCTYPE html><html></html>'))).toBeNull()
     expect(sniffImageType(text('{"error":"forbidden"}'))).toBeNull()
     expect(sniffImageType(bytes())).toBeNull()
+  })
+})
+
+describe('sniffImageFile', () => {
+  it('reads the format of a stored file, and null for one that is missing', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'reader-sniff-'))
+    fs.writeFileSync(path.join(dir, 'named.png'), bytes(0xff, 0xd8, 0xff, 0xe0))
+    expect(sniffImageFile(path.join(dir, 'named.png'))?.mime).toBe('image/jpeg')
+    expect(sniffImageFile(path.join(dir, 'missing.png'))).toBeNull()
+    fs.rmSync(dir, { recursive: true, force: true })
   })
 })
