@@ -4,8 +4,10 @@ import crypto from 'node:crypto'
 import { safeFetch } from './ssrf.js'
 import { sniffImageType } from './image-type.js'
 import { USER_AGENT } from './http.js'
+import { fetchFullText } from './content.js'
 import { getSetting } from '../db/settings.js'
-import { updateArticleContent, markImagesArchived, clearImagesArchived, getUnarchivedArticlesByFeed } from '../db/articles.js'
+import { updateArticleContent, markImagesArchived, clearImagesArchived, getUnarchivedArticlesByFeed, getArticlesWithLocalImages } from '../db/articles.js'
+import type { ArticleWithLocalImages } from '../db/articles/media.js'
 import { getFeedById, getAutoArchiveFeeds } from '../db/feeds.js'
 import type { Feed } from '../db/types.js'
 import { logger } from '../logger.js'
@@ -56,6 +58,14 @@ export function getRemoteConfig(): RemoteUploadConfig | null {
   }
 
   return { uploadUrl, headers, fieldName, respPath }
+}
+
+/**
+ * The part of an archived file's name that identifies where it came from:
+ * the first 12 hex digits of its source URL's SHA-256.
+ */
+export function archivedImageHash(imageUrl: string): string {
+  return crypto.createHash('sha256').update(imageUrl).digest('hex').slice(0, 12)
 }
 
 export function extractByDotPath(obj: unknown, dotPath: string): unknown {
@@ -177,7 +187,7 @@ export async function archiveArticleImages(
         continue
       }
 
-      const hash = crypto.createHash('sha256').update(imageUrl).digest('hex').slice(0, 12)
+      const hash = archivedImageHash(imageUrl)
       // Name the file after what arrived, not after the URL: CDNs such as
       // Blogger re-encode images and keep the original extension
       const ext = type.ext
@@ -284,6 +294,151 @@ export async function sweepAutoArchiveFeeds(feedId?: number, limit = SWEEP_LIMIT
       log.warn(`Image auto-archive sweep failed for feed ${feed.id}:`, err)
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Archives whose files are gone
+// ---------------------------------------------------------------------------
+
+const LOCAL_IMAGE_PREFIX = '/api/articles/images/'
+/** `<articleId>_<hash>.<ext>`, as archiveArticleImages names its files. */
+const ARCHIVED_FILENAME = /^\d+_([0-9a-f]{12})(?:\.[a-z0-9]+)?$/i
+const REPAIR_BATCH = 50
+
+/** Every local image file a text points at. */
+function localImageFiles(text: string | null): string[] {
+  if (!text) return []
+  return [...text.matchAll(/\/api\/articles\/images\/([^)\s"'<>]+)/g)].map(m => m[1])
+}
+
+/** URLs of a text's markdown images, read exactly as archiveArticleImages reads them. */
+function markdownImageUrls(md: string): string[] {
+  return [...md.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)].map(m => m[1])
+}
+
+/** A link to the picture itself rather than to a page about it. */
+function isImageLink(url: string): boolean {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return false
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false
+  // Blogger's full-size links may carry no extension (…/img/a/AVvXs…=s1600)
+  if (/(^|\.)(googleusercontent\.com|bp\.blogspot\.com)$/i.test(parsed.hostname)) return true
+  return /\.(jpe?g|png|gif|webp|avif)$/i.test(parsed.pathname)
+}
+
+/** Where a local image links to, when the text wraps it in a link: `[![alt](local)](href)`. */
+function linkTargetOf(text: string, file: string): string | null {
+  const local = (LOCAL_IMAGE_PREFIX + file).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const m = new RegExp(`\\[!\\[[^\\]]*\\]\\(${local}\\)\\]\\(([^)\\s]+)\\)`).exec(text)
+  return m ? m[1] : null
+}
+
+/**
+ * The remote URL each missing file was downloaded from. A file is named after
+ * the hash of its source URL, so a candidate URL either is its source or is
+ * not: the article's og:image first, then the images of its page, extracted
+ * again. An image the page no longer holds falls back to the full-size
+ * picture it linked to, when it linked to one — Blogger always does.
+ */
+async function recoverImageSources(
+  article: ArticleWithLocalImages,
+  missing: string[],
+): Promise<Map<string, string>> {
+  const byHash = new Map<string, string>()
+  for (const file of missing) {
+    const m = ARCHIVED_FILENAME.exec(file)
+    if (m) byHash.set(m[1].toLowerCase(), file)
+  }
+
+  const sources = new Map<string, string>()
+  const offer = (url: string | null | undefined) => {
+    if (!url || !/^https?:\/\//i.test(url)) return
+    const file = byHash.get(archivedImageHash(url))
+    if (file && !sources.has(file)) sources.set(file, url)
+  }
+
+  offer(article.og_image)
+  if (sources.size < byHash.size) {
+    try {
+      const feed = getFeedById(article.feed_id)
+      const page = await fetchFullText(article.url, { requiresJsChallenge: feed?.requires_js_challenge === 1 })
+      offer(page.ogImage)
+      for (const url of markdownImageUrls(page.fullText)) offer(url)
+    } catch (err) {
+      log.debug(`Could not re-extract ${article.url} to trace its lost images: ${err instanceof Error ? err.message : err}`)
+    }
+  }
+
+  for (const file of missing) {
+    if (sources.has(file)) continue
+    const href = linkTargetOf(article.full_text ?? '', file)
+    if (href && isImageLink(href)) sources.set(file, href)
+  }
+  return sources
+}
+
+/**
+ * Point articles back at the web for archived images whose files are gone.
+ *
+ * Once archived, an article's text refers to `/api/articles/images/<file>`.
+ * When that file disappears — the storage directory was wiped, moved, or is
+ * not the one this process reads — the reader shows a broken image with no
+ * way back to the original. This finds those references, restores the URL
+ * each file came from (see recoverImageSources) in the text and its
+ * translation, and clears the archived mark so the auto-archive sweep can
+ * download the pictures again. It runs at every startup: an article whose
+ * files are all present costs one existence check per image.
+ */
+export async function repairLostArchivedImages(): Promise<{ articles: number; restored: number; unresolved: number }> {
+  const totals = { articles: 0, restored: 0, unresolved: 0 }
+  const imagesDir = getImagesDir()
+  const feedsToSweep = new Set<number>()
+  let afterId = 0
+
+  for (;;) {
+    const batch = getArticlesWithLocalImages(afterId, REPAIR_BATCH)
+    if (batch.length === 0) break
+
+    for (const article of batch) {
+      afterId = article.id
+      const referenced = new Set([...localImageFiles(article.full_text), ...localImageFiles(article.full_text_translated)])
+      const missing = [...referenced].filter(file => !fs.existsSync(path.join(imagesDir, path.basename(file))))
+      if (missing.length === 0) continue
+
+      const sources = await recoverImageSources(article, missing)
+      totals.unresolved += missing.length - sources.size
+      if (sources.size === 0) continue
+
+      const restore = (text: string | null): string | null => {
+        if (!text) return text
+        for (const [file, url] of sources) text = text.split(LOCAL_IMAGE_PREFIX + file).join(url)
+        return text
+      }
+      updateArticleContent(article.id, {
+        full_text: restore(article.full_text),
+        full_text_translated: restore(article.full_text_translated),
+      })
+      clearImagesArchived(article.id)
+      feedsToSweep.add(article.feed_id)
+      totals.articles++
+      totals.restored += sources.size
+    }
+  }
+
+  if (totals.restored > 0 || totals.unresolved > 0) {
+    log.warn(
+      `Archived images missing from ${imagesDir}: ${totals.restored} pointed back at their source ` +
+      `in ${totals.articles} articles, ${totals.unresolved} could not be traced`,
+    )
+  }
+  // Archive the restored pictures again rather than waiting for the sweep
+  // that follows each fetch, which takes 50 articles per feed at a time
+  for (const feedId of feedsToSweep) await sweepAutoArchiveFeeds(feedId, SWEEP_LIMIT_BACKLOG)
+  return totals
 }
 
 /**

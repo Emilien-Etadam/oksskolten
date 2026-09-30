@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import path from 'node:path'
 import os from 'node:os'
 import fs from 'node:fs'
@@ -7,8 +7,10 @@ import fs from 'node:fs'
 // Mocks
 // ---------------------------------------------------------------------------
 
-const { mockSafeFetch, mockGetSetting, mockUpdateArticleContent, mockMarkImagesArchived, mockClearImagesArchived, mockGetUnarchivedArticlesByFeed, mockGetFeedById, mockGetAutoArchiveFeeds } = vi.hoisted(() => ({
+const { mockSafeFetch, mockGetSetting, mockUpdateArticleContent, mockMarkImagesArchived, mockClearImagesArchived, mockGetUnarchivedArticlesByFeed, mockGetArticlesWithLocalImages, mockGetFeedById, mockGetAutoArchiveFeeds, mockFetchFullText } = vi.hoisted(() => ({
   mockSafeFetch: vi.fn(),
+  mockGetArticlesWithLocalImages: vi.fn(),
+  mockFetchFullText: vi.fn(),
   mockGetSetting: vi.fn(),
   mockUpdateArticleContent: vi.fn(),
   mockMarkImagesArchived: vi.fn(),
@@ -32,6 +34,11 @@ vi.mock('../db/articles.js', () => ({
   markImagesArchived: (...args: unknown[]) => mockMarkImagesArchived(...args),
   clearImagesArchived: (...args: unknown[]) => mockClearImagesArchived(...args),
   getUnarchivedArticlesByFeed: (...args: unknown[]) => mockGetUnarchivedArticlesByFeed(...args),
+  getArticlesWithLocalImages: (...args: unknown[]) => mockGetArticlesWithLocalImages(...args),
+}))
+
+vi.mock('./content.js', () => ({
+  fetchFullText: (...args: unknown[]) => mockFetchFullText(...args),
 }))
 
 vi.mock('../db/feeds.js', () => ({
@@ -43,7 +50,7 @@ vi.mock('../db/feeds.js', () => ({
 // Module under test (loaded after mocks)
 // ---------------------------------------------------------------------------
 
-import { extractByDotPath, isImageArchivingEnabled, deleteArticleImages, archiveArticleImages, archiveFeedImages, sweepAutoArchiveFeeds } from './article-images.js'
+import { extractByDotPath, isImageArchivingEnabled, deleteArticleImages, archiveArticleImages, archiveFeedImages, sweepAutoArchiveFeeds, archivedImageHash, repairLostArchivedImages } from './article-images.js'
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
@@ -388,5 +395,110 @@ describe('sweepAutoArchiveFeeds', () => {
     expect(mockGetUnarchivedArticlesByFeed).not.toHaveBeenCalled()
 
     fs.rmSync(tmpDir, { recursive: true })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// repairLostArchivedImages
+// ---------------------------------------------------------------------------
+
+describe('repairLostArchivedImages', () => {
+  // A Blogger picture: shown at w556-h640, linked to its s724 original
+  const SRC = 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEi/w556-h640/Capture%20d\'%C3%A9cran.png'
+  const FULL = 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEi/s724/Capture%20d\'%C3%A9cran.png'
+  const FILE = `41428_${archivedImageHash(SRC)}.png`
+  const LOCAL = `/api/articles/images/${FILE}`
+
+  let tmpDir: string
+
+  function articleWith(fullText: string, extra: Record<string, unknown> = {}) {
+    return {
+      id: 41428,
+      feed_id: 7,
+      url: 'https://www.example-blog.com/2026/09/post.html',
+      full_text: fullText,
+      full_text_translated: null,
+      og_image: null,
+      ...extra,
+    }
+  }
+
+  function serve(...articles: Array<ReturnType<typeof articleWith>>): void {
+    mockGetArticlesWithLocalImages.mockReturnValueOnce(articles).mockReturnValue([])
+  }
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reader-repair-'))
+    mockGetSetting.mockImplementation((key: string) => key === 'images.storage_path' ? tmpDir : undefined)
+    mockGetFeedById.mockReturnValue({ id: 7, requires_js_challenge: 0 })
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('restores the exact source URL found on the page again, in the text and its translation', async () => {
+    serve(articleWith(`Intro\n\n[![](${LOCAL})](${FULL})\n\nText`, {
+      full_text_translated: `Intro (en)\n\n[![](${LOCAL})](${FULL})`,
+    }))
+    mockFetchFullText.mockResolvedValue({ fullText: `[![](${SRC})](${FULL})`, ogImage: null, excerpt: null, title: null })
+
+    const result = await repairLostArchivedImages()
+
+    expect(result).toEqual({ articles: 1, restored: 1, unresolved: 0 })
+    expect(mockUpdateArticleContent).toHaveBeenCalledWith(41428, {
+      full_text: `Intro\n\n[![](${SRC})](${FULL})\n\nText`,
+      full_text_translated: `Intro (en)\n\n[![](${SRC})](${FULL})`,
+    })
+    expect(mockClearImagesArchived).toHaveBeenCalledWith(41428)
+  })
+
+  it('finds the lead image in og_image without fetching the page', async () => {
+    const og = 'https://cdn.example.com/hero.jpg'
+    const file = `41428_${archivedImageHash(og)}.jpg`
+    serve(articleWith(`![](/api/articles/images/${file})\n\nText`, { og_image: og }))
+
+    await repairLostArchivedImages()
+
+    expect(mockFetchFullText).not.toHaveBeenCalled()
+    expect(mockUpdateArticleContent).toHaveBeenCalledWith(41428, expect.objectContaining({ full_text: `![](${og})\n\nText` }))
+  })
+
+  it('falls back to the full-size picture the image linked to when the page is gone', async () => {
+    serve(articleWith(`[![](${LOCAL})](${FULL})`))
+    mockFetchFullText.mockRejectedValue(new Error('HTTP 404'))
+
+    const result = await repairLostArchivedImages()
+
+    expect(result.restored).toBe(1)
+    expect(mockUpdateArticleContent).toHaveBeenCalledWith(41428, expect.objectContaining({ full_text: `[![](${FULL})](${FULL})` }))
+  })
+
+  it('leaves an image it cannot trace in place, and the article marked archived', async () => {
+    serve(articleWith(`![](${LOCAL})`))
+    mockFetchFullText.mockResolvedValue({ fullText: 'No pictures any more', ogImage: null, excerpt: null, title: null })
+
+    const result = await repairLostArchivedImages()
+
+    expect(result).toEqual({ articles: 0, restored: 0, unresolved: 1 })
+    expect(mockUpdateArticleContent).not.toHaveBeenCalled()
+    expect(mockClearImagesArchived).not.toHaveBeenCalled()
+  })
+
+  it('does not touch an article whose archived files are all there', async () => {
+    fs.writeFileSync(path.join(tmpDir, FILE), PNG_SIGNATURE)
+    serve(articleWith(`[![](${LOCAL})](${FULL})`))
+
+    const result = await repairLostArchivedImages()
+
+    expect(result).toEqual({ articles: 0, restored: 0, unresolved: 0 })
+    expect(mockFetchFullText).not.toHaveBeenCalled()
+    expect(mockUpdateArticleContent).not.toHaveBeenCalled()
+  })
+
+  it('walks the archive in batches until none is left', async () => {
+    mockGetArticlesWithLocalImages.mockReturnValue([])
+    await repairLostArchivedImages()
+    expect(mockGetArticlesWithLocalImages).toHaveBeenCalledWith(0, expect.any(Number))
   })
 })

@@ -20,6 +20,7 @@ import { registerApi } from './api.js'
 import { registerChatApi } from './ai/index.js'
 import { registerAuthRoutes } from './auth/index.js'
 import { fetchAllFeeds } from './fetcher.js'
+import { repairLostArchivedImages } from './fetcher/article-images.js'
 import { ensureSearchIndex, rebuildSearchIndex, isSearchReady, syncAllScoredArticlesToSearch } from './search/sync.js'
 
 // --- Startup guards ---
@@ -43,6 +44,11 @@ try {
 } catch (err) {
   log.error('Similar-article link re-check failed:', err)
 }
+
+// --- Archived images whose files are gone (background: may re-fetch pages) ---
+repairLostArchivedImages().catch((err) => {
+  log.error('Lost archived image repair failed:', err)
+})
 
 // --- Dev seed data ---
 if (process.env.NODE_ENV === 'development') {

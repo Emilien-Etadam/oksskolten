@@ -32,6 +32,7 @@ import {
   getRetryArticles,
   markImagesArchived,
   getUnarchivedArticlesByFeed,
+  getArticlesWithLocalImages,
   clearImagesArchived,
   deleteArticle,
   // Categories
@@ -793,6 +794,20 @@ describe('Article image archiving & deletion', () => {
     seedArticle(feed.id, { full_text: 'three' })
 
     expect(getUnarchivedArticlesByFeed(feed.id, 2)).toHaveLength(2)
+  })
+
+  it('getArticlesWithLocalImages lists archived articles pointing at a local image, in id order', () => {
+    const feed = seedFeed()
+    const local = seedArticle(feed.id, { full_text: '![](/api/articles/images/1_abcdef012345.png)' })
+    const translatedOnly = seedArticle(feed.id, { full_text: '![](https://example.com/a.png)' })
+    updateArticleContent(translatedOnly, { full_text_translated: '![](/api/articles/images/2_abcdef012345.png)' })
+    const remote = seedArticle(feed.id, { full_text: '![](https://example.com/b.png)' })
+    seedArticle(feed.id, { full_text: '![](/api/articles/images/4_abcdef012345.png)' }) // never archived
+    for (const id of [local, translatedOnly, remote]) markImagesArchived(id)
+
+    expect(getArticlesWithLocalImages(0, 10).map(r => r.id)).toEqual([local, translatedOnly])
+    expect(getArticlesWithLocalImages(local, 10).map(r => r.id)).toEqual([translatedOnly])
+    expect(getArticlesWithLocalImages(0, 1).map(r => r.id)).toEqual([local])
   })
 
   it('deleteArticle returns true for existing article', () => {

@@ -383,6 +383,18 @@ state the on-open path produces. While the global `images.enabled` toggle is
 off the sweeps are a no-op, since they reuse its storage configuration. See
 [`81_feature_images.md`](docs/spec/81_feature_images.md).
 
+## Archived images whose files are gone point back at their source
+
+An archived article keeps `/api/articles/images/<file>` in its text, and the
+original URL is gone from it. When the file disappears, the reader showed a
+broken image for good: a Blogger post's pictures answered `404 Image not found`.
+`repairLostArchivedImages()` runs at every startup, finds references to missing
+files, and recovers each file's source URL from the hash in its name — checked
+against the stored `og_image`, then against the page's images extracted again —
+falling back to the full-size picture the image linked to. The text and its
+translation get the remote URL back, the article leaves the archived state, and
+its feed is swept so auto-archive downloads the pictures again.
+
 ## RSS-Bridge feeds are stored with a fetchable URL
 
 `queryRssBridge()` stored whatever URL RSS-Bridge's `findfeed` returned. A
