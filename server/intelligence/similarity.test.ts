@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { computeTitleSimilarity, detectAndStoreSimilarArticles } from './similarity.js'
+import {
+  computeTitleSimilarity,
+  computeWordOverlap,
+  titlesMatch,
+  detectAndStoreSimilarArticles,
+  pruneStaleSimilarities,
+} from './similarity.js'
 
 const {
   mockMeiliSearch,
@@ -8,6 +14,10 @@ const {
   mockMarkArticleSeen,
   mockInsertSimilarity,
   mockGetFeedArticleIdsInWindow,
+  mockGetSimilarityPairs,
+  mockDeleteSimilarities,
+  mockGetSetting,
+  mockUpsertSetting,
 } = vi.hoisted(() => ({
   mockMeiliSearch: vi.fn(),
   mockIsSearchReady: vi.fn(),
@@ -15,7 +25,17 @@ const {
   mockMarkArticleSeen: vi.fn(),
   mockInsertSimilarity: vi.fn(),
   mockGetFeedArticleIdsInWindow: vi.fn(),
+  mockGetSimilarityPairs: vi.fn(),
+  mockDeleteSimilarities: vi.fn(),
+  mockGetSetting: vi.fn(),
+  mockUpsertSetting: vi.fn(),
 }))
+
+// Two long, unrelated French titles that share only letter pairs: they
+// cleared the bigram threshold and showed up as "also covered by".
+const JEWELLER = 'Charles Broudarge, joaillier… mais aussi commanditaire, et en 49 ans de vie, quel parcours !'
+const UNKNOWN = '« Équation à une inconnue » : tous les moyens sont bons pour retrouver celle qui a fait vibrer le cœur d\'Olivier !'
+const COMICS = '« Histoire de la BD en bande dessinée » : des images pour raconter le 9e art…'
 
 vi.mock('../search/client.js', () => ({
   meiliSearch: mockMeiliSearch,
@@ -30,6 +50,12 @@ vi.mock('../db.js', () => ({
 vi.mock('./similarity-db.js', () => ({
   insertSimilarity: mockInsertSimilarity,
   getFeedArticleIdsInWindow: mockGetFeedArticleIdsInWindow,
+  getSimilarityPairs: mockGetSimilarityPairs,
+  deleteSimilarities: mockDeleteSimilarities,
+}))
+vi.mock('../db/settings.js', () => ({
+  getSetting: mockGetSetting,
+  upsertSetting: mockUpsertSetting,
 }))
 
 describe('computeTitleSimilarity', () => {
@@ -91,6 +117,76 @@ describe('computeTitleSimilarity', () => {
       'Apple、iPhone 17を正式発表',
     )
     expect(score).toBeGreaterThan(0.4)
+  })
+
+  it('lets long unrelated French titles through on letter pairs alone', () => {
+    // Why the word check exists: this is above the 0.4 threshold
+    expect(computeTitleSimilarity(JEWELLER, UNKNOWN)).toBeGreaterThan(0.4)
+    expect(computeTitleSimilarity(JEWELLER, COMICS)).toBeGreaterThan(0.4)
+  })
+})
+
+describe('computeWordOverlap', () => {
+  it('is 0 for titles with no word in common', () => {
+    expect(computeWordOverlap(JEWELLER, UNKNOWN)).toBe(0)
+    expect(computeWordOverlap(JEWELLER, COMICS)).toBe(0)
+  })
+
+  it('folds accents and stems, so inflected words still meet', () => {
+    expect(computeWordOverlap(
+      'Microsoft rachète Discord pour 12 milliards de dollars',
+      'Discord racheté par Microsoft pour 12 milliards',
+    )).toBeGreaterThan(0.8)
+  })
+
+  it('ignores stopwords and years', () => {
+    // Left with {choisir, aspirateur, robot} against {choisir, box, internet}
+    expect(computeWordOverlap(
+      'Comment choisir son aspirateur robot en 2026',
+      'Comment choisir sa box internet en 2026',
+    )).toBeCloseTo(2 / 6)
+  })
+
+  it('keeps numbers as words', () => {
+    expect(computeWordOverlap('Linux 7.2 est sorti', 'Linux 7.3 est sorti')).toBeLessThan(1)
+  })
+
+  it('stands aside for scripts written without spaces', () => {
+    expect(computeWordOverlap('Appleが新型iPhone 17を発表', 'Apple、iPhone 17を正式発表')).toBeNull()
+  })
+
+  it('stands aside for titles made of stopwords alone', () => {
+    expect(computeWordOverlap('What is it?', 'What is it?')).toBeNull()
+  })
+})
+
+describe('titlesMatch', () => {
+  it('rejects unrelated titles that only share letter pairs', () => {
+    expect(titlesMatch(JEWELLER, UNKNOWN)).toBe(false)
+    expect(titlesMatch(JEWELLER, COMICS)).toBe(false)
+  })
+
+  it('accepts the same story told by two sources', () => {
+    expect(titlesMatch('Apple announces iPhone 17', 'Apple unveils new iPhone 17')).toBe(true)
+    expect(titlesMatch(
+      'Le Sénat adopte la réforme des retraites',
+      'Réforme des retraites : le Sénat vote le texte',
+    )).toBe(true)
+    expect(titlesMatch(
+      'Tesla recalls 2 million vehicles over Autopilot concerns',
+      'Tesla to recall 2M cars over Autopilot safety concerns',
+    )).toBe(true)
+  })
+
+  it('rejects titles that share a template but not a subject', () => {
+    expect(titlesMatch(
+      'Test du Pixel 11 Pro : un smartphone presque parfait',
+      'Test de la Renault 5 électrique : une citadine presque parfaite',
+    )).toBe(false)
+  })
+
+  it('keeps matching Japanese titles on characters alone', () => {
+    expect(titlesMatch('Appleが新型iPhone 17を発表', 'Apple、iPhone 17を正式発表')).toBe(true)
   })
 })
 
@@ -196,6 +292,17 @@ describe('detectAndStoreSimilarArticles', () => {
     expect(mockInsertSimilarity).not.toHaveBeenCalled()
   })
 
+  it('skips candidates close in letters but sharing no words', async () => {
+    mockMeiliSearch.mockResolvedValue({ hits: [{ id: 2 }, { id: 3 }], estimatedTotalHits: 2 })
+    mockGetArticlesByIds.mockReturnValue([
+      { id: 2, feed_id: 20, title: UNKNOWN, published_at: null, read_at: '2026-01-01T00:00:00Z' },
+      { id: 3, feed_id: 20, title: COMICS, published_at: null, read_at: null },
+    ])
+    await detectAndStoreSimilarArticles(1, JEWELLER, 10, '2026-01-01T00:00:00Z')
+    expect(mockInsertSimilarity).not.toHaveBeenCalled()
+    expect(mockMarkArticleSeen).not.toHaveBeenCalled()
+  })
+
   it('marks the new article as seen when a similar article was already read', async () => {
     mockMeiliSearch.mockResolvedValue({ hits: [{ id: 2 }], estimatedTotalHits: 1 })
     mockGetArticlesByIds.mockReturnValue([
@@ -242,5 +349,36 @@ describe('detectAndStoreSimilarArticles', () => {
   it('does not read same-feed siblings for articles outside Reddit', async () => {
     await detectAndStoreSimilarArticles(1, 'Some title', 10, '2026-01-01T00:00:00Z', 'https://example.com/post')
     expect(mockGetFeedArticleIdsInWindow).not.toHaveBeenCalled()
+  })
+})
+
+describe('pruneStaleSimilarities', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGetSetting.mockReturnValue(undefined)
+    mockGetSimilarityPairs.mockReturnValue([])
+  })
+
+  it('removes the links the current rule rejects, once per pair', () => {
+    mockGetSimilarityPairs.mockReturnValue([
+      { article_id: 1, similar_to_id: 2, title: JEWELLER, similar_title: UNKNOWN },
+      { article_id: 2, similar_to_id: 1, title: UNKNOWN, similar_title: JEWELLER },
+      { article_id: 3, similar_to_id: 4, title: 'Apple announces iPhone 17', similar_title: 'Apple unveils new iPhone 17' },
+      { article_id: 4, similar_to_id: 3, title: 'Apple unveils new iPhone 17', similar_title: 'Apple announces iPhone 17' },
+    ])
+    expect(pruneStaleSimilarities()).toBe(1)
+    expect(mockDeleteSimilarities).toHaveBeenCalledWith([[1, 2]])
+    expect(mockUpsertSetting).toHaveBeenCalledWith('similarity.rule_version', expect.any(String))
+  })
+
+  it('does nothing once the stored links were checked under the current rule', () => {
+    pruneStaleSimilarities()
+    const version = mockUpsertSetting.mock.calls[0][1]
+    vi.clearAllMocks()
+    mockGetSetting.mockReturnValue(version)
+
+    expect(pruneStaleSimilarities()).toBe(0)
+    expect(mockGetSimilarityPairs).not.toHaveBeenCalled()
+    expect(mockUpsertSetting).not.toHaveBeenCalled()
   })
 })

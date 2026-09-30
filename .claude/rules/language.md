@@ -19,6 +19,7 @@ These files may contain Japanese or other non-English text by nature. Do not har
 - `src/lib/i18n.ts` — UI i18n dictionary (`ja` / `en` translation pairs)
 - `src/lib/demo/i18n.ts` — Demo mode i18n dictionary
 - `server/lib/cleaner/boilerplate-text.ts` — Multilingual boilerplate patterns for scraping
+- `server/intelligence/stopwords.ts` — English/French stopwords ignored in article titles
 - `src/data/articleFonts.ts` — Font sample text and CSS font names
 - `server/providers/translate/markdown-to-tagged.ts` — CJK punctuation character set definitions
 - `src/lib/demo/seed/*.json` — Demo seed data

@@ -38,7 +38,7 @@ POST /api/articles/:id/archive-images
         ├─ Filename: {articleId}_{sha256(url).slice(0,12)}{ext}
         │
         ├─ Local mode:
-        │   - Save to images.storage_path (default: data/articles/images/)
+        │   - Save to images.storage_path (default: {data dir}/articles/images/, see below)
         │   - Rewrite URL to /api/articles/images/{filename}
         │
         ├─ Remote mode:
@@ -69,6 +69,23 @@ Images archived in local mode are served via `GET /api/articles/images/:filename
 - MIME type: sniffed from the file's first bytes (PNG, JPEG, GIF, WebP, AVIF, SVG), falling back to the extension. At download time a body that is not an image is not stored and the article keeps the remote URL; the stored file is named after its real format, since CDNs such as Blogger re-encode images under the original name
 - Cache: `Cache-Control: public, max-age=31536000, immutable`
 - Authentication: `requireMediaAuth`, not the `requireAuth` the rest of the API uses. The reader reaches this URL through an `<img>` tag the browser loads by itself, with no chance to attach the `Authorization` header the session runs on; every archived image would answer 401 and render broken. The request therefore also authenticates with the `media_token` cookie — the same JWT, `HttpOnly`, scoped to `/api/articles` (`docs/spec/40_auth.md`). This is why the route is registered outside the authenticated scope in `server/routes/index.ts`.
+
+### Storage Location
+
+Without `images.storage_path`, images are stored under `{data dir}/articles/images/` (videos under `{data dir}/articles/videos/`). The data dir comes from `resolveDataDir()` (`server/paths.ts`): `DATA_DIR` when set, otherwise the directory of the database file when `DATABASE_URL` names a local file, otherwise `./data` if it exists in the working directory, otherwise `~/.oksskolten/data`.
+
+The database step keeps archived media next to the database whatever directory the server is started from. Before it existed, a bare-metal install with `DATABASE_URL=file:/var/lib/oksskolten/data/rss.db` stored its images under `~/.oksskolten/data` while `/opt/oksskolten/data` did not exist, then looked for them under `/opt/oksskolten/data` once that directory appeared: every archived image answered `404 Image not found`. The Docker compose files set `DATABASE_URL=file:/data/rss.db`, so media now land on the `/data` volume instead of `/app/data` inside the container.
+
+### Lost Archives (`repairLostArchivedImages()`)
+
+Once archived, an article's text points at `/api/articles/images/{file}`. If that file disappears — the storage directory was wiped, moved, or is not the one the serving process reads — the reader shows a broken image and the original URL is no longer in the text. `repairLostArchivedImages()` (`server/fetcher/article-images.ts`) runs in the background at every startup:
+
+- Walks archived articles whose `full_text` or `full_text_translated` contains `/api/articles/images/` (`getArticlesWithLocalImages()`, 50 per batch, in id order) and checks that each referenced file exists in the images directory. Articles whose files are all present cost one existence check per image.
+- Looks for each missing file in the directories earlier runs may have used — `./data/articles/images` in the working directory, `~/.oksskolten/data/articles/images` (`formerDataDirs()`), and the default location when a custom `images.storage_path` is set — and copies it back when what sits there is a picture (`sniffImageFile()`). The text is left alone and the old copy stays in place.
+- For each file still missing, recovers the URL it was downloaded from. The file name holds `sha256(sourceUrl).slice(0, 12)` (`archivedImageHash()`), so a candidate URL either is the source or is not: the article's stored `og_image` first (the hero `ensureLeadImage()` prepends), then the images of the page extracted again with `fetchFullText()` (only when `og_image` did not account for every file).
+- An image still untraced falls back to the target of the link wrapping it (`[![alt](local)](href)`) when that target is a picture: an image extension, or a `googleusercontent.com` / `bp.blogspot.com` host, since Blogger links every picture to its full-size original.
+- Replaces the local URL with the recovered one in `full_text` and `full_text_translated`, clears `images_archived_at`, and sweeps the article's feed (`sweepAutoArchiveFeeds(feedId, SWEEP_LIMIT_BACKLOG)`) so feeds with auto-archive download the pictures again.
+- An image with no recoverable source keeps its local URL and its article stays archived; the next startup tries again. The pass logs one warning for the copied files (with the directories they came from) and one for the restored URLs, naming the images directory it checked.
 
 ### Image Deletion
 

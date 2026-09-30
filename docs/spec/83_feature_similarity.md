@@ -17,13 +17,14 @@ Users subscribing to multiple feeds covering the same topics (e.g., tech news) s
 
 ### Detection Algorithm
 
-**Two-stage: Meilisearch title search + Bigram Dice Coefficient**
+**Two-stage: Meilisearch title search + Bigram Dice Coefficient + shared words**
 
 1. After a new article is inserted, search Meilisearch using the article's title as query
 2. Filter candidates: within ±3 days of `published_at`, OR with no `published_at` at all (see note below)
 3. Exclude same-feed candidates (`feed_id != X`) in application code, except two Reddit posts of **different subreddits**: an aggregator feed (a Reddit multi) carries a crosspost and its original side by side, same title, same feed. Same subreddit stays excluded, so a thread posted daily under one title is not folded into its previous editions
 4. Compute bigram Dice coefficient between the new article's title and each candidate's title
-5. Accept matches with score >= 0.4
+5. Keep candidates with score >= 0.4
+6. Of those, accept only titles that share at least half of their significant words (word Dice >= 0.5, see below)
 
 > `buildMeiliDoc()` indexes a missing `published_at` as `0` (1970) so Meilisearch's filterable attribute stays numeric. A plain ±3-day range filter would then permanently exclude every undated article from ever matching, since epoch 0 never falls inside a real window — the filter explicitly ORs in `published_at = 0` to let those candidates through.
 
@@ -31,7 +32,17 @@ Users subscribing to multiple feeds covering the same topics (e.g., tech news) s
 Dice(A, B) = 2 × |bigrams(A) ∩ bigrams(B)| / (|bigrams(A)| + |bigrams(B)|)
 ```
 
-Where `bigrams(s)` extracts character bigrams from each word after lowercasing and stripping punctuation. The threshold of 0.4 catches rephrased headlines ("Apple announces iPhone 17" vs "Apple unveils new iPhone 17") while rejecting unrelated articles that share common words.
+Where `bigrams(s)` extracts character bigrams from each word after lowercasing and stripping punctuation. The threshold of 0.4 catches rephrased headlines ("Apple announces iPhone 17" vs "Apple unveils new iPhone 17").
+
+Bigrams alone are not enough on long titles: the set of letter pairs saturates, and two unrelated French sentences share "es", "de", "ou", "re"… Two such titles with no word in common scored 0.42 and 0.41. The second check (`computeWordOverlap()`) therefore compares words: the same Dice formula over each title's significant words, which are lowercased with accents folded, split on anything that is not a letter or digit, stripped of English/French stopwords (`server/intelligence/stopwords.ts`, shared with the interest profile) and of four-digit years, and cut to their first 6 letters so inflections still meet ("annonce" / "annoncées"). Numbers are kept whatever their length. `titlesMatch()` requires both checks.
+
+The word check stands aside, leaving bigrams to decide alone, when a title is written in a script without spaces (Han, Hiragana, Katakana, Thai), where a "word" would be a whole clause, or when a title has no significant word at all.
+
+Titles built on the same template around a different subject can still pass ("Les nouveautés de Firefox 140" / "Les nouveautés de Chrome 140"): telling them apart would need word frequencies, which this check does not have.
+
+### Re-checking stored links
+
+`pruneStaleSimilarities()` runs at startup. When the `similarity.rule_version` setting differs from the rule version in `similarity.ts`, it re-checks every stored pair with `titlesMatch()`, deletes the rejected ones in both directions, then records the version, so the pass runs once per rule change. Articles already marked `seen_at` because of a rejected link stay seen: `seen_at` does not record why it was set.
 
 No LLM or embedding costs — uses existing Meilisearch keyword search infrastructure.
 
@@ -62,7 +73,7 @@ insertArticle()
   → syncArticleToSearch()           [existing, fire-and-forget]
   → detectAndStoreSimilarArticles() [new, fire-and-forget]
       → Meilisearch title search (exclude same feed, ±3 day window)
-      → Bigram Dice filter (>= 0.4)
+      → Bigram Dice filter (>= 0.4) + shared-word filter (>= 0.5)
       → INSERT INTO article_similarities (bidirectional)
       → If similar article has read_at → markArticleSeen(new article)
 ```
@@ -121,8 +132,9 @@ Sorted by similarity score descending.
 | File | Purpose |
 |------|---------|
 | `migrations/0004_article_similarities.sql` | Schema |
-| `server/db/similarities.ts` | DB functions: insertSimilarity, getSimilarArticles, findReadSimilarArticle |
-| `server/similarity.ts` | Detection logic: detectAndStoreSimilarArticles, computeTitleSimilarity |
+| `server/intelligence/similarity-db.ts` | DB functions: insertSimilarity, getSimilarArticles, findReadSimilarArticle, getSimilarityPairs, deleteSimilarities |
+| `server/intelligence/similarity.ts` | Detection logic: detectAndStoreSimilarArticles, computeTitleSimilarity, computeWordOverlap, titlesMatch, pruneStaleSimilarities |
+| `server/intelligence/stopwords.ts` | English/French stopwords, shared with the interest profile |
 | `server/fetcher.ts` | Hook: calls detectAndStoreSimilarArticles after insertArticle |
 | `server/routes/articles.ts` | Endpoint: GET /api/articles/:id/similar |
 | `server/db/articles.ts` | similar_count subquery in getArticles, getArticleByUrl, getArticleById |

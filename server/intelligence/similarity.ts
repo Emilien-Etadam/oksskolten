@@ -1,12 +1,27 @@
 import { meiliSearch } from '../search/client.js'
 import { isSearchReady } from '../search/sync.js'
 import { getArticlesByIds, markArticleSeen } from '../db.js'
-import { insertSimilarity, getFeedArticleIdsInWindow } from './similarity-db.js'
+import { getSetting, upsertSetting } from '../db/settings.js'
+import { insertSimilarity, getFeedArticleIdsInWindow, getSimilarityPairs, deleteSimilarities } from './similarity-db.js'
+import { STOPWORDS } from './stopwords.js'
 import { logger } from '../logger.js'
 
 const log = logger.child('similarity')
 
 const SIMILARITY_THRESHOLD = 0.4
+/**
+ * Share of significant words two titles must also have in common (Dice over
+ * their word sets). Character bigrams alone saturate on long titles: two
+ * unrelated French sentences share "es", "de", "ou", "re"… and clear 0.4
+ * without a single word in common.
+ */
+const WORD_OVERLAP_THRESHOLD = 0.5
+/** Words are compared on their first letters, so "annonce" meets "annoncées". */
+const STEM_LENGTH = 6
+/** Scripts written without spaces, where a "word" would be a whole clause. */
+const UNSPACED_SCRIPT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}]/u
+/** A year tells no story apart: "Best films of 2026", "Best games of 2026". */
+const YEAR = /^(?:19|20)\d\d$/
 const TIME_WINDOW_DAYS = 3
 const MAX_CANDIDATES = 10
 /** Cap on same-feed siblings read from the database (see below). */
@@ -40,6 +55,87 @@ export function computeTitleSimilarity(a: string, b: string): number {
   for (const bg of setA) if (setB.has(bg)) intersection++
 
   return (2 * intersection) / (setA.size + setB.size)
+}
+
+const foldAccents = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '')
+const FOLDED_STOPWORDS = new Set([...STOPWORDS].map(foldAccents))
+
+/**
+ * The words of a title that can say what it is about: accents folded,
+ * stopwords and years dropped, long words cut to their stem. Numbers stay
+ * whatever their length: the "17" of "iPhone 17" is as telling as a word.
+ */
+function significantWords(title: string): Set<string> {
+  const words = new Set<string>()
+  for (const word of foldAccents(title).toLowerCase().split(/[^\p{L}\p{N}]+/u)) {
+    if (!word) continue
+    if (/^\p{N}+$/u.test(word)) {
+      if (!YEAR.test(word)) words.add(word)
+      continue
+    }
+    if (word.length < 2 || FOLDED_STOPWORDS.has(word)) continue
+    words.add(word.length > STEM_LENGTH ? word.slice(0, STEM_LENGTH) : word)
+  }
+  return words
+}
+
+/**
+ * Dice coefficient over the titles' significant words, or null where words
+ * cannot be compared: a script written without spaces, or a title made of
+ * stopwords alone.
+ */
+export function computeWordOverlap(a: string, b: string): number | null {
+  if (UNSPACED_SCRIPT.test(a) || UNSPACED_SCRIPT.test(b)) return null
+  const wordsA = significantWords(a)
+  const wordsB = significantWords(b)
+  if (wordsA.size === 0 || wordsB.size === 0) return null
+
+  let shared = 0
+  for (const w of wordsA) if (wordsB.has(w)) shared++
+  return (2 * shared) / (wordsA.size + wordsB.size)
+}
+
+function sharesEnoughWords(a: string, b: string): boolean {
+  const overlap = computeWordOverlap(a, b)
+  return overlap === null || overlap >= WORD_OVERLAP_THRESHOLD
+}
+
+/**
+ * Whether two titles tell the same story: close in characters, and sharing
+ * enough of their words wherever words can be compared.
+ */
+export function titlesMatch(a: string, b: string): boolean {
+  return computeTitleSimilarity(a, b) >= SIMILARITY_THRESHOLD && sharesEnoughWords(a, b)
+}
+
+/** Bumped whenever titlesMatch changes, so links stored under the old rule are re-checked once. */
+const RULE_VERSION = '2'
+const RULE_VERSION_KEY = 'similarity.rule_version'
+
+/**
+ * Drop the stored links the current rule rejects, once per rule change.
+ * Links made before titles had to share words join long unrelated titles,
+ * and the "also covered by" banner keeps showing them until they are gone.
+ * Returns the number of links removed.
+ */
+export function pruneStaleSimilarities(): number {
+  if (getSetting(RULE_VERSION_KEY) === RULE_VERSION) return 0
+
+  const stale: Array<[number, number]> = []
+  const checked = new Set<string>()
+  for (const pair of getSimilarityPairs()) {
+    const low = Math.min(pair.article_id, pair.similar_to_id)
+    const high = Math.max(pair.article_id, pair.similar_to_id)
+    const key = `${low}:${high}`
+    if (checked.has(key)) continue
+    checked.add(key)
+    if (!titlesMatch(pair.title, pair.similar_title)) stale.push([low, high])
+  }
+
+  deleteSimilarities(stale)
+  upsertSetting(RULE_VERSION_KEY, RULE_VERSION)
+  if (stale.length > 0) log.info(`Removed ${stale.length} similar-article links the current rule rejects`)
+  return stale.length
 }
 
 /** Subreddit an article URL belongs to, or null when it is not a Reddit post. */
@@ -124,7 +220,7 @@ export async function detectAndStoreSimilarArticles(
       if (candidate.feed_id === feedId && !comparableWithinFeed(url, candidate.url)) continue
 
       const score = computeTitleSimilarity(title, candidate.title)
-      if (score < SIMILARITY_THRESHOLD) continue
+      if (score < SIMILARITY_THRESHOLD || !sharesEnoughWords(title, candidate.title)) continue
 
       insertSimilarity(articleId, candidate.id, score)
 

@@ -18,6 +18,28 @@ export function getUnarchivedArticlesByFeed(
   `).all(feedId, limit) as Array<{ id: number; full_text: string }>
 }
 
+export interface ArticleWithLocalImages {
+  id: number
+  feed_id: number
+  url: string
+  full_text: string | null
+  full_text_translated: string | null
+  og_image: string | null
+}
+
+/**
+ * Archived articles whose text points at a locally stored image, in id
+ * order after `afterId`. Feeds the repair of archives whose files are gone.
+ */
+export function getArticlesWithLocalImages(afterId: number, limit: number): ArticleWithLocalImages[] {
+  return getDb().prepare(`
+    SELECT id, feed_id, url, full_text, full_text_translated, og_image FROM active_articles
+    WHERE id > ? AND images_archived_at IS NOT NULL
+      AND (full_text LIKE '%/api/articles/images/%' OR full_text_translated LIKE '%/api/articles/images/%')
+    ORDER BY id LIMIT ?
+  `).all(afterId, limit) as ArticleWithLocalImages[]
+}
+
 export function markImagesArchived(articleId: number): void {
   getDb().prepare("UPDATE articles SET images_archived_at = datetime('now') WHERE id = ?").run(articleId)
 }

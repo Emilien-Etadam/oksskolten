@@ -91,8 +91,9 @@ The MCP server (`server/chat/mcp-server.ts`) starts with stdio transport when ex
 The MCP server can be used directly from Claude Code, giving you the same chat experience as the web UI. The data directory resolves in this order:
 
 1. `DATA_DIR` environment variable
-2. `./data` (project checkout or Docker container)
-3. `~/.oksskolten/data/` (standalone fallback)
+2. The directory of the database file, when `DATABASE_URL` names a local file
+3. `./data` (project checkout or Docker container)
+4. `~/.oksskolten/data/` (standalone fallback)
 
 #### Option 1: Local development (Node.js required)
 

@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+
 /**
  * Tell an image's real format from its first bytes. The URL's extension is
  * not enough: Blogger (googleusercontent) and other CDNs re-encode pictures
@@ -41,4 +43,19 @@ export function sniffImageType(buf: Uint8Array): ImageType | null {
     return { ext: '.svg', mime: 'image/svg+xml' }
   }
   return null
+}
+
+/** The format of a stored file, from its first bytes; null when unreadable or not an image. */
+export function sniffImageFile(filepath: string): ImageType | null {
+  let fd: number | undefined
+  try {
+    fd = fs.openSync(filepath, 'r')
+    const head = Buffer.alloc(1024)
+    const read = fs.readSync(fd, head, 0, head.length, 0)
+    return sniffImageType(head.subarray(0, read))
+  } catch {
+    return null
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd)
+  }
 }

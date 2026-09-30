@@ -25,6 +25,38 @@ export function insertSimilarity(articleId: number, similarToId: number, score: 
   })()
 }
 
+export interface SimilarityPair {
+  article_id: number
+  similar_to_id: number
+  title: string
+  similar_title: string
+}
+
+/** Every stored link with the titles at both ends, to re-check them against the matching rule. */
+export function getSimilarityPairs(): SimilarityPair[] {
+  return getDb()
+    .prepare(
+      `SELECT s.article_id, s.similar_to_id, a.title, b.title AS similar_title
+       FROM article_similarities s
+       JOIN active_articles a ON a.id = s.article_id
+       JOIN active_articles b ON b.id = s.similar_to_id`,
+    )
+    .all() as SimilarityPair[]
+}
+
+/** Delete links in both directions, in one transaction. */
+export function deleteSimilarities(pairs: Array<[number, number]>): void {
+  if (pairs.length === 0) return
+  const db = getDb()
+  const stmt = db.prepare('DELETE FROM article_similarities WHERE article_id = ? AND similar_to_id = ?')
+  db.transaction(() => {
+    for (const [a, b] of pairs) {
+      stmt.run(a, b)
+      stmt.run(b, a)
+    }
+  })()
+}
+
 /**
  * Get similar articles for a given article ID.
  */

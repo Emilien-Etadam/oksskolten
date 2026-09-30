@@ -29,6 +29,7 @@ export {
 export type { RetryStats, FeedArticleIdentity } from './articles/retry.js'
 export {
   getUnarchivedArticlesByFeed,
+  getArticlesWithLocalImages,
   markImagesArchived,
   clearImagesArchived,
   markVideosArchived,
