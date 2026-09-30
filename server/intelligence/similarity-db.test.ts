@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setupTestDb } from '../__tests__/helpers/testDb.js'
-import { insertSimilarity, getSimilarArticles, findReadSimilarArticle, getFeedArticleIdsInWindow } from './similarity-db.js'
+import { insertSimilarity, getSimilarArticles, findReadSimilarArticle, getFeedArticleIdsInWindow, getSimilarityPairs, deleteSimilarities } from './similarity-db.js'
 import { getDb } from '../db/connection.js'
 
 function seedFeedAndArticles() {
@@ -98,5 +98,29 @@ describe('getFeedArticleIdsInWindow', () => {
       .toEqual([3, 2])
     expect(getFeedArticleIdsInWindow(2, 2, '2025-12-29T00:00:00.000Z', '2026-01-04T00:00:00.000Z', 10))
       .toEqual([3])
+  })
+})
+
+describe('getSimilarityPairs', () => {
+  it('returns every stored direction with the titles at both ends', () => {
+    insertSimilarity(1, 2, 0.5)
+    expect(getSimilarityPairs()).toEqual(expect.arrayContaining([
+      { article_id: 1, similar_to_id: 2, title: 'Article A', similar_title: 'Article B' },
+      { article_id: 2, similar_to_id: 1, title: 'Article B', similar_title: 'Article A' },
+    ]))
+    expect(getSimilarityPairs()).toHaveLength(2)
+  })
+})
+
+describe('deleteSimilarities', () => {
+  it('removes a link in both directions and leaves the others', () => {
+    insertSimilarity(1, 2, 0.5)
+    insertSimilarity(1, 3, 0.5)
+    deleteSimilarities([[1, 2]])
+    const rows = getDb().prepare('SELECT article_id, similar_to_id FROM article_similarities').all() as any[]
+    expect(rows.map(r => [r.article_id, r.similar_to_id])).toEqual(
+      expect.arrayContaining([[1, 3], [3, 1]]),
+    )
+    expect(rows).toHaveLength(2)
   })
 })

@@ -10,7 +10,7 @@ import rateLimit from '@fastify/rate-limit'
 import multipart from '@fastify/multipart'
 import cron, { type ScheduledTask } from 'node-cron'
 import { runMigrations, getSetting, upsertSetting, getOrCreateJwtSecret, ensureClipFeed, recalculateScores, purgeExpiredArticles, shrinkMemory } from './db.js'
-import { maybeRebuildInterestProfile, recalculateFeedTrust } from './intelligence/index.js'
+import { maybeRebuildInterestProfile, recalculateFeedTrust, pruneStaleSimilarities } from './intelligence/index.js'
 import { logger } from './logger.js'
 import { findProjectRoot } from './paths.js'
 
@@ -36,6 +36,13 @@ runMigrations()
 
 // --- Ensure virtual feed for clipped articles exists ---
 ensureClipFeed()
+
+// --- Similar-article links stored under an older matching rule ---
+try {
+  pruneStaleSimilarities()
+} catch (err) {
+  log.error('Similar-article link re-check failed:', err)
+}
 
 // --- Dev seed data ---
 if (process.env.NODE_ENV === 'development') {

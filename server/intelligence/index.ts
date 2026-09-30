@@ -8,7 +8,7 @@ export {
   rescoreArticleInterest,
   _resetInterestsForTests,
 } from './interests.js'
-export { detectAndStoreSimilarArticles, computeTitleSimilarity } from './similarity.js'
+export { detectAndStoreSimilarArticles, computeTitleSimilarity, titlesMatch, pruneStaleSimilarities } from './similarity.js'
 export { insertSimilarity, getSimilarArticles, findReadSimilarArticle } from './similarity-db.js'
 export type { SimilarArticle } from './similarity-db.js'
 export { recalculateFeedTrust, getFeedTrust } from './trust.js'

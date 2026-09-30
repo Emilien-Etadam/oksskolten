@@ -234,6 +234,19 @@ case — while a thread posted under the same title in the same subreddit every
 day stays separate. `detectAndStoreSimilarArticles()` takes the article's URL
 for it.
 
+## Similar titles must share words
+
+The bigram score saturates on long titles: two unrelated French sentences share
+enough letter pairs ("es", "de", "ou"…) to clear 0.4, and a jewellery blog post
+was shown as "also covered by" two comics reviews without a word in common.
+`titlesMatch()` in `server/intelligence/similarity.ts` now also requires half of
+the titles' significant words in common — accents folded, English/French
+stopwords and years dropped, words cut to 6 letters — except for scripts written
+without spaces, where bigrams still decide alone. The stopword list moved to
+`server/intelligence/stopwords.ts`, shared with the interest profile.
+`pruneStaleSimilarities()` re-checks the stored links once at startup and drops
+the ones the rule now rejects.
+
 ## A browser-shaped retry before the solver
 
 Article fetches announce themselves as `RSSReader/1.0`, and sites behind a WAF
