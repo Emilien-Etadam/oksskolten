@@ -65,6 +65,29 @@ describe('GET /api/articles/images/:filename authentication', () => {
     expect(res.headers['content-type']).toBe('image/png')
   })
 
+  // The handler once called reply.send(stream) without returning the reply:
+  // Fastify answered the resolved handler with an empty body of its own, and
+  // every archived image reached the browser as a 200 with zero bytes.
+  it('sends the whole file', async () => {
+    const picture = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64 * 1024, 7)])
+    fs.writeFileSync(path.join(tmpDir, '1_large.png'), picture)
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/articles/images/1_large.png',
+      cookies: { [MEDIA_COOKIE]: sessionToken(app) },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.rawPayload.equals(picture)).toBe(true)
+
+    // The reader adds a version query to get past caches of the empty answers
+    const versioned = await app.inject({
+      method: 'GET',
+      url: '/api/articles/images/1_large.png?v=2',
+      cookies: { [MEDIA_COOKIE]: sessionToken(app) },
+    })
+    expect(versioned.rawPayload.equals(picture)).toBe(true)
+  })
+
   it('announces the format the bytes hold, not the one the name claims', async () => {
     // Archived before download-time sniffing: a Blogger `.png` that is a JPEG
     fs.writeFileSync(path.join(tmpDir, '1_jpegnamedpng.png'), Buffer.from([0xff, 0xd8, 0xff, 0xe0]))

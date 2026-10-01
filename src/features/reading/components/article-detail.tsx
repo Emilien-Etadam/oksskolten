@@ -5,6 +5,7 @@ import { renderMarkdown } from '@/lib/markdown'
 import { isRedditArticleUrl, redditImageLinksToMarkdown } from '../../../../shared/reddit-images'
 import { sanitizeHtml } from '@/lib/sanitize'
 import { markVideoCards } from '@/lib/video-card'
+import { versionArchivedMediaUrls } from '@/lib/archived-media'
 import { fetcher, apiPost } from '@/lib/fetcher'
 import { queueSeenIds } from '@/lib/offlineQueue'
 import { useSWRConfig } from 'swr'
@@ -121,7 +122,7 @@ export function ArticleDetail({ articleUrl, enableZapNavigation = false }: Artic
     // Reddit articles stored before ingestion rewrote image links still carry
     // them as plain URLs — rewrite at render time so their pictures show
     if (isRedditArticleUrl(article.url)) md = redditImageLinksToMarkdown(md)
-    return markVideoCards(sanitizeHtml(renderMarkdown(md)))
+    return markVideoCards(sanitizeHtml(renderMarkdown(versionArchivedMediaUrls(md))))
   }, [article, viewMode, isUserLang, fullTextTranslated, t])
 
   const { rewrittenHtml: displayContent } = useRewriteInternalLinks(

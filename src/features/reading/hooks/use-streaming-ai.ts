@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import { renderMarkdown } from '@/lib/markdown'
+import { versionArchivedMediaUrls } from '@/lib/archived-media'
 import { sanitizeHtml } from '@/lib/sanitize'
 import { streamPost } from '@/lib/fetcher'
 import type { useMetrics } from './use-metrics'
@@ -68,7 +69,8 @@ export function useStreamingAI(
       const boldCount = (text.match(/\*\*/g) || []).length
       if (boldCount % 2 !== 0) text += '**'
     }
-    const html = renderMarkdown(text)
+    // A streamed translation repeats the article's archived image URLs
+    const html = renderMarkdown(versionArchivedMediaUrls(text))
     return sanitizeHtml(html)
   }, [streamingText, options.fixUnclosedBold])
 

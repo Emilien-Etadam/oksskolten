@@ -491,6 +491,25 @@ describe('ArticleDetail title translation', () => {
     expect(screen.getByText('Titre traduit')).toBeTruthy()
     expect(screen.queryByText('Original Title')).toBeNull()
   })
+
+  // Browsers cached the empty answers the image route once sent, for a year
+  it('loads archived images under a versioned URL', () => {
+    mockUseTranslate.mockReturnValue({
+      viewMode: 'original',
+      setViewMode: vi.fn(),
+      translating: false,
+      translatingText: '',
+      fullTextTranslated: null,
+      handleTranslate: vi.fn(),
+      translatingHtml: '',
+      error: null,
+    })
+
+    renderWithArticle({ ...baseArticle, full_text: '![](/api/articles/images/1_abcdef012345.png)\n\nBody' })
+
+    const img = document.querySelector('.prose img')
+    expect(img?.getAttribute('src')).toMatch(/^\/api\/articles\/images\/1_abcdef012345\.png\?v=\d+$/)
+  })
 })
 
 describe('ArticleDetail empty body recovery', () => {
