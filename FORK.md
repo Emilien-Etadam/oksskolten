@@ -383,6 +383,20 @@ state the on-open path produces. While the global `images.enabled` toggle is
 off the sweeps are a no-op, since they reuse its storage configuration. See
 [`81_feature_images.md`](docs/spec/81_feature_images.md).
 
+## Archived media are sent, not answered empty
+
+`GET /api/articles/images/:filename` and its video sibling called
+`reply.send(stream)` in an async handler without returning the reply. A stream
+is written only once the file is read, after the handler has resolved, and
+Fastify answers a handler that resolves with `undefined` by sending an empty
+body itself: every archived image and video went out as a `200` with zero
+bytes, shown as an image that "contains errors". Earlier fixes chased the
+format and the storage directory; the tests had stopped checking bodies,
+blaming the injection harness. The handlers now return the reply, and the tests
+compare the bytes. Browsers kept the empty answers for a year (`immutable`), so
+`versionArchivedMediaUrls()` (`src/lib/archived-media.ts`) adds `?v=2` to
+archived media URLs when an article is rendered.
+
 ## Archived media live next to the database
 
 The data directory followed the working directory (`./data` if it existed,

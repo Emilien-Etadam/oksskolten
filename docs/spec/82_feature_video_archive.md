@@ -84,6 +84,12 @@ itself and cannot send the `Authorization` header, so the route runs
 `requireMediaAuth` and accepts the `media_token` cookie
 (`docs/spec/40_auth.md`).
 
+Both answers stream the file and return the reply, like the image route: sent
+without the return, the stream lost to the empty body Fastify sends for an async
+handler that resolves with `undefined`, and the player received nothing. The
+reader adds the same version query as for images (`versionArchivedMediaUrls()`)
+so caches holding those empty answers are bypassed.
+
 ### No CSP change
 
 An archived video is served from this origin, and `default-src 'self'` covers

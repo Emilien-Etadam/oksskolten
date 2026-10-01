@@ -141,7 +141,11 @@ export async function archivedMediaRoutes(api: FastifyInstance): Promise<void> {
 
       reply.header('Content-Type', contentType)
       reply.header('Cache-Control', 'public, max-age=31536000, immutable')
-      reply.send(fs.createReadStream(filepath))
+      // Return the reply: a stream is written once the file is read, after
+      // this async handler has resolved, and Fastify answers a handler that
+      // resolves with undefined by sending an empty body of its own. Every
+      // archived image went out as a 200 with zero bytes.
+      return reply.send(fs.createReadStream(filepath))
     },
   )
 
@@ -177,9 +181,9 @@ export async function archivedMediaRoutes(api: FastifyInstance): Promise<void> {
       reply.header('Cache-Control', 'public, max-age=31536000, immutable')
 
       const range = request.headers.range
+      // Returned for the same reason as the image route's stream
       if (!range) {
-        reply.send(fs.createReadStream(filepath))
-        return
+        return reply.send(fs.createReadStream(filepath))
       }
 
       const parsed = parseByteRange(range, size)
@@ -192,7 +196,7 @@ export async function archivedMediaRoutes(api: FastifyInstance): Promise<void> {
       reply.status(206)
       reply.header('Content-Range', `bytes ${start}-${end}/${size}`)
       reply.header('Content-Length', end - start + 1)
-      reply.send(fs.createReadStream(filepath, { start, end }))
+      return reply.send(fs.createReadStream(filepath, { start, end }))
     },
   )
 }

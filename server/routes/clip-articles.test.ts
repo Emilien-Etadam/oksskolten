@@ -728,9 +728,8 @@ describe('POST /api/articles/:id/archive-video', () => {
 // GET /api/articles/videos/:filename
 // ---------------------------------------------------------------------------
 
-// Bodies are not asserted here: a file stream sent through app.inject arrives
-// empty in this harness, which is why the image route's tests check headers
-// only. The range arithmetic is covered directly by parseByteRange below.
+// The bodies once arrived empty, here and in browsers alike: the handler sent
+// its stream without returning the reply. They are asserted now.
 describe('GET /api/articles/videos/:filename', () => {
   let tmpDir: string
   const filename = '1_abc123.mp4'
@@ -748,6 +747,7 @@ describe('GET /api/articles/videos/:filename', () => {
     expect(res.statusCode).toBe(200)
     expect(res.headers['content-type']).toBe('video/mp4')
     expect(res.headers['accept-ranges']).toBe('bytes')
+    expect(res.body).toBe(body)
   })
 
   it('206: answers a byte range, which is how a player seeks', async () => {
@@ -759,6 +759,7 @@ describe('GET /api/articles/videos/:filename', () => {
 
     expect(res.statusCode).toBe(206)
     expect(res.headers['content-range']).toBe('bytes 2-5/10')
+    expect(res.body).toBe('2345')
   })
 
   it('206: an open-ended range runs to the end of the file', async () => {
@@ -770,6 +771,7 @@ describe('GET /api/articles/videos/:filename', () => {
 
     expect(res.statusCode).toBe(206)
     expect(res.headers['content-range']).toBe('bytes 7-9/10')
+    expect(res.body).toBe('789')
   })
 
   it('206: a suffix range asks for the last bytes', async () => {
