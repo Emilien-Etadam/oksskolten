@@ -4,6 +4,7 @@ import { ChatInlineTrigger } from '@/features/chat'
 import { Bookmark, ThumbsUp, CloudUpload, CloudCheck, Trash2, Languages, Sparkles, Film, FileVideo } from 'lucide-react'
 import { mentionsVideo } from '../../../../shared/video'
 import { useI18n } from '@/i18n'
+import { GitBackupChip } from './git-backup-chip'
 import type { ArticleDetail } from '../../../../shared/types'
 
 interface ArticleToolbarProps {
@@ -129,6 +130,7 @@ export function ArticleToolbar({
           <FileVideo className="w-3.5 h-3.5" />
         </ActionChip>
       )}
+      <GitBackupChip url={article.url} />
       {article.full_text && (
         <ActionChip onClick={() => navigate(`/${article.url.replace(/^https?:\/\//, '')}.md`)} tooltip={t('article.rawMarkdown')}>
           <svg className="w-5 h-3.5" viewBox="20 25 160 78" fill="currentColor">

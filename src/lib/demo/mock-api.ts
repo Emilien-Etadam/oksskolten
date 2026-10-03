@@ -203,6 +203,7 @@ export async function demoFetcher(url: string): Promise<unknown> {
   if (path === '/api/stories') return { stories: [] }
   if (path === '/api/rules') return { rules: [] }
   if (path === '/api/interests') return { islands: [] }
+  if (path === '/api/git-backups') return { configured: false, forgejo_url: null, backups: [] }
 
   // Fallback: return empty object for unknown GETs
   return {}

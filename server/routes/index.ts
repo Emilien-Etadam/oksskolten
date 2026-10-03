@@ -9,6 +9,7 @@ import { adminRoutes } from './admin.js'
 import { statsRoutes } from './stats.js'
 import { commentRoutes } from './comments.js'
 import { registerIntelligenceRoutes } from '../intelligence/index.js'
+import { gitBackupRoutes } from '../git-backup/index.js'
 
 export function registerApi(app: FastifyInstance): void {
   // Outside the authenticated scope below on purpose: archived images and
@@ -31,5 +32,6 @@ export function registerApi(app: FastifyInstance): void {
     await api.register(statsRoutes)
     await registerIntelligenceRoutes(api)
     await api.register(commentRoutes)
+    await api.register(gitBackupRoutes)
   })
 }

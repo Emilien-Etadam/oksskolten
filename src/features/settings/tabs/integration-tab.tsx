@@ -6,6 +6,7 @@ import { TaskModelSection } from '../sections/task-model-section'
 import { ClassificationSection } from '../sections/classification-section'
 import { GithubSection } from '../sections/github-section'
 import { DiscordSection } from '../sections/discord-section'
+import { GitBackupSection } from '../sections/git-backup-section'
 
 export function IntegrationTab() {
   const { settings } = useAppLayout()
@@ -22,6 +23,8 @@ export function IntegrationTab() {
       <GithubSection t={t} settings={settings} />
       <Separator />
       <DiscordSection t={t} />
+      <Separator />
+      <GitBackupSection t={t} />
     </>
   )
 }

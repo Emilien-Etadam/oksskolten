@@ -20,6 +20,7 @@ export async function aiSettingsRoutes(api: FastifyInstance): Promise<void> {
     deepl: 'api_key.deepl',
     github: 'github.token',
     discord: 'discord.bot_token',
+    forgejo: 'git_backup.forgejo_token',
   }
 
   api.get('/api/settings/api-keys/:provider', async (request, reply) => {

@@ -132,6 +132,10 @@ Your local vLLM server gives every article a **format** (news, question, discuss
 - **Diagnostics** — the feeds that are failing or disabled, each with the pipeline stage that broke, the likely cause in plain words, the raw error one click away, and re-detect / retry / re-enable buttons. `Retry all` re-enables and re-fetches the whole list
 - **Management table** — every subscription with its article, unread and per-week counts, last article date and status. Search, sort on any column, filter by category or status, and select feeds (Shift+Click for ranges) to move, fetch, mark read, re-enable or delete them in bulk
 
+### Git backup
+
+Archive the GitHub repositories you consider strategic on your own Forgejo (or Gitea) instance, from Settings → Integration or from the archive chip on any article that points at a repository. Forgejo clones and stores the code itself, so the repository data is not copied into Oksskolten. Syncs run only when you ask. Each one is checked first: if upstream deleted or rewrote an archived version tag or force-pushed the default branch, the sync is held back. You then choose to freeze the archive as it is, or accept the loss. Floating tags (`nightly`, `v4`) and short-lived branches are ignored. See [`86_feature_git_backup.md`](docs/spec/86_feature_git_backup.md)
+
 ### Tooling and fixes
 
 - **E2E smoke tests** (`npm run test:e2e`) — Playwright builds the app, boots the real server against a scratch database, and checks the front page, the inbox → reader flow, and the mobile bottom bar
