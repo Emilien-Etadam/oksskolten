@@ -13,6 +13,7 @@ export { useKeyboardNavSetting, type KeyboardNavSetting } from './use-keyboard-n
 export { useLayout } from './use-layout'
 export { useMascot, type MascotChoice } from './use-mascot'
 export { useShowFeedActivity, type ShowFeedActivity } from './use-show-feed-activity'
+export { useSimpleMode, type SimpleMode } from './use-simple-mode'
 export { useShowThumbnails, type ShowThumbnails } from './use-show-thumbnails'
 export { useUnreadIndicator, type UnreadIndicator } from './use-unread-indicator'
 export { useDarkMode } from './use-dark-mode'

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extractDomain } from './url'
+import { extractDomain, isGithubStarsFeedUrl } from './url'
 
 describe('extractDomain', () => {
   it('extracts hostname from a standard URL', () => {
@@ -20,5 +20,16 @@ describe('extractDomain', () => {
 
   it('returns null for empty string', () => {
     expect(extractDomain('')).toBeNull()
+  })
+})
+
+describe('isGithubStarsFeedUrl', () => {
+  it('matches the canonical stars feed URL', () => {
+    expect(isGithubStarsFeedUrl('https://github.com/stars/octocat')).toBe(true)
+  })
+
+  it('rejects other GitHub URLs', () => {
+    expect(isGithubStarsFeedUrl('https://github.com/octocat/hello/releases.atom')).toBe(false)
+    expect(isGithubStarsFeedUrl('https://github.com/trending')).toBe(false)
   })
 })
