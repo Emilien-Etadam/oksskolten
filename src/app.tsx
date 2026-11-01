@@ -19,6 +19,7 @@ const SettingsPage = lazy(() => import('@/features/settings/settings-page').then
 const ChatPage = lazy(() => import('@/features/chat/chat-page').then(m => ({ default: m.ChatPage })))
 const FrontPage = lazy(() => import('@/features/reading/pages/front-page').then(m => ({ default: m.FrontPage })))
 const StoriesPage = lazy(() => import('@/features/reading/pages/stories-page').then(m => ({ default: m.StoriesPage })))
+const JournalPage = lazy(() => import('@/features/reading/pages/journal-page').then(m => ({ default: m.JournalPage })))
 import { AuthShell } from './lib/auth-shell'
 import { ErrorBoundary } from './components/auth/error-boundary'
 import { HintBanner } from './components/ui/hint-banner'
@@ -242,12 +243,26 @@ function StoriesPageWrapper() {
   )
 }
 
+function JournalPageWrapper() {
+  const { t } = useI18n()
+  return (
+    <PageLayout feedName={t('journal.title')}>
+      <HintBanner storageKey="hint-dismissed-journal">{t('hint.journal')}</HintBanner>
+      <Suspense>
+        <JournalPage />
+      </Suspense>
+    </PageLayout>
+  )
+}
+
 function FrontPageWrapper() {
   const { t } = useI18n()
   const { settings } = useAppLayout()
+  // Simple mode opens on the journal instead of the front page
+  if (settings.simpleMode === 'on') return <Navigate to="/journal" replace />
   return (
     <PageLayout feedName={t('frontpage.title')}>
-      {settings.simpleMode !== 'on' && <CategoryTabs />}
+      <CategoryTabs />
       <Suspense>
         <FrontPage />
       </Suspense>
@@ -284,7 +299,7 @@ function ArticleDetailPage() {
 
 // Determine the "page type" for animation decisions
 function getPageType(pathname: string): 'detail' | 'list' {
-  if (pathname === '/' || pathname === '/inbox' || pathname === '/bookmarks' || pathname === '/likes' || pathname === '/history' || pathname === '/clips' || pathname === '/stories' || pathname === '/recommended' || pathname.startsWith('/smart/') || pathname.startsWith('/feeds/') || pathname.startsWith('/categories/') || pathname.startsWith('/formats/') || pathname.startsWith('/themes/') || pathname.startsWith('/settings') || pathname.startsWith('/chat')) {
+  if (pathname === '/' || pathname === '/inbox' || pathname === '/bookmarks' || pathname === '/likes' || pathname === '/history' || pathname === '/clips' || pathname === '/stories' || pathname === '/journal' || pathname === '/recommended' || pathname.startsWith('/smart/') || pathname.startsWith('/feeds/') || pathname.startsWith('/categories/') || pathname.startsWith('/formats/') || pathname.startsWith('/themes/') || pathname.startsWith('/settings') || pathname.startsWith('/chat')) {
     return 'list'
   }
   return 'detail'
@@ -364,6 +379,7 @@ function AnimatedRoutes() {
             <Route path="/recommended" element={<ArticleListPage />} />
             <Route path="/smart/:folderId" element={<ArticleListPage />} />
             <Route path="/stories" element={<StoriesPageWrapper />} />
+            <Route path="/journal" element={<JournalPageWrapper />} />
             <Route path="/feeds/:feedId" element={<ArticleListPage />} />
             <Route path="/categories/:categoryId" element={<ArticleListPage />} />
             <Route path="/formats/:formatId" element={<ArticleListPage />} />

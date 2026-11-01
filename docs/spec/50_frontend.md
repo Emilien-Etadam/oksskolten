@@ -15,6 +15,7 @@
 /clips                         → Clipped articles list
 /recommended                   → Unread articles ranked by the interest profile
 /stories                       → Top stories (events covered by several sources)
+/journal                       → Journal: on-demand sourced digest by theme (home page in simple mode)
 /smart/:folderId               → Smart folder (saved query) articles list
 /feeds/:feedId                 → Articles by feed (clip feeds also use this route)
 /categories/:categoryId        → Articles by category
@@ -42,11 +43,12 @@ A reading preference (`reading.simple_mode`, Settings → Reading, on by default
 
 | Surface | Kept | Hidden |
 |---------|------|--------|
-| Sidebar | Search, Bookmarks, Clips, GitHub Releases, Add, Themes | Inbox, Top stories, Recommended, Likes, History, Chat, Smart folders, Formats, the feed list |
-| Bottom tab bar | Search, Bookmarks, Menu | Inbox, Chat |
+| Sidebar | Journal, Search, Bookmarks, Clips, GitHub Releases, Add, Themes | Inbox, Top stories, Recommended, Likes, History, Chat, Smart folders, Formats, the feed list |
+| Bottom tab bar | Journal, Search, Bookmarks, Menu | Inbox, Chat |
 | Section bar above lists | — | the whole bar (themes are in the sidebar) |
 
 - **GitHub Releases**: each enabled starred-releases feed (URL `https://github.com/stars/<user>`, see [86](./86_feature_github_releases.md)) gets its own sidebar entry with its unread count, since the feed list that would otherwise show it is hidden.
+- **Home page**: `/` redirects to `/journal` ([92](./92_feature_journal.md)) instead of showing the front page.
 - **Feed list fallback**: the feed list is hidden only while article classification is on. Without themes the sidebar would offer nothing to read, so the feed list stays.
 
 ### Command Palette & Keyboard Shortcuts

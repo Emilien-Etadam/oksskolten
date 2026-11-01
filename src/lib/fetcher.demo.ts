@@ -8,6 +8,7 @@ export const fetcher = demoFetcher
 
 export const apiPost = demoApiPost
 export const apiPatch = demoApiPatch as (url: string, body: unknown) => Promise<unknown>
+export const apiPut = demoApiPatch as (url: string, body: unknown) => Promise<unknown>
 export const apiDelete = demoApiDelete
 
 export type { OpmlPreviewFeed, OpmlPreviewResponse } from './fetcher'

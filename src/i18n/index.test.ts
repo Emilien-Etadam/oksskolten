@@ -10,6 +10,7 @@ import { feeds } from './messages/feeds.js'
 import { intelligence } from './messages/intelligence.js'
 import { reading } from './messages/reading.js'
 import { settings } from './messages/settings.js'
+import { journal } from './messages/journal.js'
 
 function makeWrapper(locale: 'ja' | 'en') {
   return ({ children }: { children: React.ReactNode }) =>
@@ -50,12 +51,12 @@ describe('useI18n', () => {
 
 describe('message dictionary', () => {
   it('has no duplicate keys across domain files', () => {
-    const sum = [common, reading, feeds, intelligence, chat, auth, settings]
+    const sum = [common, reading, feeds, intelligence, chat, auth, settings, journal]
       .reduce((n, part) => n + Object.keys(part).length, 0)
     expect(sum).toBe(Object.keys(dict).length)
   })
 
-  it('contains 821 keys', () => {
-    expect(Object.keys(dict).length).toBe(821)
+  it('contains 863 keys', () => {
+    expect(Object.keys(dict).length).toBe(863)
   })
 })

@@ -4,7 +4,7 @@ import useSWR from 'swr'
 import { fetcher, apiPatch } from '@/lib/fetcher'
 import { useI18n } from '@/i18n'
 import { MD_BREAKPOINT } from '@/lib/breakpoints'
-import { Inbox, Plus, ChevronRight, Bookmark, ThumbsUp, Clock, Paperclip, Search, Command, ArrowBigUp, AlertTriangle, MessagesSquare, Flame, Sparkles, Github } from 'lucide-react'
+import { Inbox, Plus, ChevronRight, Bookmark, ThumbsUp, Clock, Paperclip, Search, Command, ArrowBigUp, AlertTriangle, MessagesSquare, Flame, Sparkles, Github, Newspaper } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { useFetchProgressContext } from '@/contexts/fetch-progress-context'
@@ -77,6 +77,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
   const isChat = location.pathname.startsWith('/chat')
   const isStories = location.pathname === '/stories'
   const isRecommended = location.pathname === '/recommended'
+  const isJournal = location.pathname === '/journal'
   const selectedFeedId = feedId ? Number(feedId) : null
   const selectedCategoryId = categoryId ? Number(categoryId) : null
   const [aiFilterFeed, setAiFilterFeed] = useState<FeedWithCounts | null>(null)
@@ -499,6 +500,8 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
         <FeedListHeader onClose={onClose} onCollapse={onCollapse} />
 
         <nav className="flex-1 overflow-y-auto overscroll-contain py-2 px-2">
+          <SidebarNavItem icon={Newspaper} label={t('journal.title')} selected={isJournal} onClick={() => { void navigate('/journal'); onClose() }} />
+
           {!simple && <SidebarNavItem icon={Inbox} label={t('feeds.inbox')} selected={isInbox && selectedFeedId === null} onClick={() => { void navigate('/inbox'); onClose() }} badge={totalUnread > 0 ? <UnreadBadge count={totalUnread} /> : undefined} />}
 
           <SidebarNavItem icon={Search} label={t('search.title')} onClick={() => setSearchOpen(true)} className="group/search">

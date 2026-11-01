@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Inbox, Search, Bookmark, MessagesSquare, Menu } from 'lucide-react'
+import { Inbox, Search, Bookmark, MessagesSquare, Menu, Newspaper } from 'lucide-react'
 import { useAppLayout } from '../../app'
 import { useI18n } from '@/i18n'
 import { SearchDialog } from '../ui/search-dialog'
@@ -24,6 +24,7 @@ export function BottomNav() {
 
   // Simple mode drops the destinations its sidebar hides (inbox, chat)
   const items = [
+    ...(simple ? [{ icon: Newspaper, label: t('journal.title'), selected: location.pathname === '/journal', onClick: () => { void navigate('/journal') } }] : []),
     ...(simple ? [] : [{ icon: Inbox, label: t('feeds.inbox'), selected: location.pathname === '/inbox', onClick: () => { void navigate('/inbox') } }]),
     { icon: Search, label: t('search.title'), selected: false, onClick: () => setSearchOpen(true) },
     { icon: Bookmark, label: t('feeds.bookmarks'), selected: location.pathname === '/bookmarks', onClick: () => { void navigate('/bookmarks') } },
