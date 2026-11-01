@@ -1,6 +1,7 @@
 import notjev from 'notjev'
 import { getSetting, upsertSetting } from '../db.js'
 import { getVllmBaseUrl, getVllmApiKey } from './providers/llm/vllm.js'
+import { toWellFormedText, truncateChars } from '../lib/text.js'
 import {
   FORMATS,
   DEFAULT_THEMES,
@@ -115,7 +116,8 @@ export interface ClassifyResult {
 }
 
 export function buildClassifyState(input: ClassifyInput): string {
-  const body = (input.body ?? '').replace(/\s+/g, ' ').trim().slice(0, BODY_CHARS)
+  const cleaned = (input.body ?? '').replace(/\s+/g, ' ').trim()
+  const body = truncateChars(cleaned, BODY_CHARS)
   return `Title: ${input.title}\nSource: ${input.feedName ?? 'unknown'}\n\n${body}\n`
 }
 
@@ -137,7 +139,8 @@ export async function classifyArticle(input: ClassifyInput): Promise<ClassifyRes
     apiKey: getVllmApiKey() || undefined,
     model,
   })
-  const state = buildClassifyState(input)
+  // Lone surrogates make the inference server's tokenizer reject the request
+  const state = toWellFormedText(buildClassifyState(input))
   // Sequential on purpose: the second request reuses the server's prefix
   // cache for the shared article text
   const format = await client.decide({

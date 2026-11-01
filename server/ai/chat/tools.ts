@@ -20,6 +20,7 @@ import { summarizeArticle, translateArticle } from '../tasks.js'
 import { getSetting } from '../../db/settings.js'
 import { DEFAULT_LANGUAGE } from '../../../shared/lang.js'
 import { articleUrlToPath } from '../../../shared/url.js'
+import { truncateChars } from '../../lib/text.js'
 
 /** Convert a UTC datetime string from SQLite to a local-time ISO-like string */
 function toLocalTime(utc: string | null, timeZone?: string): string | null {
@@ -121,7 +122,7 @@ const getArticleTool: ToolDef = {
     const article = getArticleById(input.article_id as number)
     if (!article) return JSON.stringify({ error: 'Article not found' })
     const truncate = (text: string | null | undefined, limit: number) =>
-      text && text.length > limit ? text.slice(0, limit) + '\n… (truncated)' : text ?? null
+      text && text.length > limit ? truncateChars(text, limit) + '\n… (truncated)' : text ?? null
     return JSON.stringify({
       id: article.id,
       feed_name: article.feed_name,
