@@ -47,14 +47,31 @@ export function getLastPeriodEnd(): string | null {
   return row?.period_end ?? null
 }
 
-function periodWhere(start: string | null): string {
+/**
+ * Articles published this long before the period starts are left out even
+ * when they arrive in it: a newly added feed brings its whole backlog, years
+ * old, in one fetch. The slack still covers feeds that publish late.
+ */
+export const MAX_PUBLISHED_BEFORE_PERIOD = '-7 days'
+
+/** SQL for the period start, and its parameters. A null start looks back FIRST_EDITION_LOOKBACK from the end. */
+function periodStart(start: string | null, end: string): { sql: string; params: string[] } {
   return start === null
-    ? 'a.created_at > datetime(?, ?) AND a.created_at <= ?'
-    : 'a.created_at > ? AND a.created_at <= ?'
+    ? { sql: 'datetime(?, ?)', params: [end, FIRST_EDITION_LOOKBACK] }
+    : { sql: '?', params: [start] }
+}
+
+function periodWhere(start: string | null): string {
+  const from = periodStart(start, '').sql
+  // Undated articles (or dates SQLite cannot parse) stay in: arrival is all we know
+  return `a.created_at > ${from} AND a.created_at <= ?
+    AND (a.published_at IS NULL OR datetime(a.published_at) IS NULL
+         OR datetime(a.published_at) >= datetime(${from}, ?))`
 }
 
 function periodParams(start: string | null, end: string): string[] {
-  return start === null ? [end, FIRST_EDITION_LOOKBACK, end] : [start, end]
+  const from = periodStart(start, end).params
+  return [...from, end, ...from, MAX_PUBLISHED_BEFORE_PERIOD]
 }
 
 /** Articles arrived in (start, end], best first. A null start looks back FIRST_EDITION_LOOKBACK. */
