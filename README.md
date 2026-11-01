@@ -85,6 +85,7 @@ Everything below was added on top of upstream before the two projects diverged; 
 ### Reading experience
 
 - **Front page (La Une)** — `/` is a newspaper-style front page: a hero article picked by score, then the top unread articles of each category. The chat-first home screen it replaces is still there, at `/chat`
+- **Simple mode** — on by default: the sidebar keeps only search, bookmarks, clips, GitHub releases and themes. Everything else stays reachable by URL, and one switch in Settings → Reading brings the full navigation back
 - **Category tabs** — a horizontal section bar above article lists (Inbox plus one tab per category, with per-category unread counts)
 - **Bottom tab bar** — newspaper-app-style bottom navigation (Inbox, Search, Read Later, Chat, Menu), shown when the sidebar is closed. The sidebar's collapsed state now persists across reloads
 - **Swipe between articles** — swipe left/right, or press the arrow keys, to move through the list you came from

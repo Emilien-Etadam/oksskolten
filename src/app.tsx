@@ -137,6 +137,7 @@ function ArticleListPage() {
   const { feedId, categoryId, folderId, formatId, themeId } = useParams<{ feedId?: string; categoryId?: string; folderId?: string; formatId?: string; themeId?: string }>()
   const location = useLocation()
   const { t } = useI18n()
+  const { settings } = useAppLayout()
   const isInbox = location.pathname === '/inbox'
   const isRecommended = location.pathname === '/recommended'
   const { data: smartFoldersData } = useSWR<{ folders: Array<{ id: number; name: string }> }>(folderId ? '/api/smart-folders' : null, fetcher)
@@ -180,7 +181,7 @@ function ArticleListPage() {
       feedName={headerName}
       feedListProps={{ onMarkAllRead: revalidateArticles, onArticleMoved: revalidateArticles }}
     >
-      <CategoryTabs />
+      {settings.simpleMode !== 'on' && <CategoryTabs />}
       {isInbox && <HintBanner storageKey="hint-dismissed-inbox">{t('hint.inbox')}</HintBanner>}
       {isBookmarks && <HintBanner storageKey="hint-dismissed-bookmarks">{t('hint.bookmarks')}</HintBanner>}
       {isLikes && <HintBanner storageKey="hint-dismissed-likes">{t('hint.likes')}</HintBanner>}
@@ -243,9 +244,10 @@ function StoriesPageWrapper() {
 
 function FrontPageWrapper() {
   const { t } = useI18n()
+  const { settings } = useAppLayout()
   return (
     <PageLayout feedName={t('frontpage.title')}>
-      <CategoryTabs />
+      {settings.simpleMode !== 'on' && <CategoryTabs />}
       <Suspense>
         <FrontPage />
       </Suspense>

@@ -12,6 +12,7 @@ import { useUnreadIndicator } from './use-unread-indicator'
 import { useInternalLinks } from './use-internal-links'
 import { useShowThumbnails } from './use-show-thumbnails'
 import { useShowFeedActivity } from './use-show-feed-activity'
+import { useSimpleMode } from './use-simple-mode'
 import { useChatPosition } from './use-chat-position'
 import { useArticleOpenMode, type ArticleOpenMode } from './use-article-open-mode'
 import { useCategoryUnreadOnly } from './use-category-unread-only'
@@ -39,6 +40,7 @@ interface Prefs {
   'reading.internal_links': string | null
   'reading.show_thumbnails': string | null
   'reading.show_feed_activity': string | null
+  'reading.simple_mode': string | null
   'appearance.highlight_theme': string | null
   'appearance.font_family': string | null
   'reading.chat_position': string | null
@@ -85,6 +87,7 @@ export function useSettings() {
   const indicatorStyle = currentTheme.indicatorStyle ?? 'dot'
   const { showThumbnails, setShowThumbnails } = useShowThumbnails()
   const { showFeedActivity, setShowFeedActivity } = useShowFeedActivity()
+  const { simpleMode, setSimpleMode } = useSimpleMode()
   const { chatPosition, setChatPosition } = useChatPosition()
   const { articleOpenMode, setArticleOpenMode } = useArticleOpenMode()
   const { categoryUnreadOnly, setCategoryUnreadOnly } = useCategoryUnreadOnly()
@@ -138,6 +141,8 @@ export function useSettings() {
   showThumbnailsRef.current = showThumbnails
   const showFeedActivityRef = useRef(showFeedActivity)
   showFeedActivityRef.current = showFeedActivity
+  const simpleModeRef = useRef(simpleMode)
+  simpleModeRef.current = simpleMode
   const chatPositionRef = useRef(chatPosition)
   chatPositionRef.current = chatPosition
   const articleOpenModeRef = useRef(articleOpenMode)
@@ -184,6 +189,8 @@ export function useSettings() {
         validate: v => v === 'on' || v === 'off' },
       { key: 'reading.show_feed_activity', setter: setShowFeedActivity, backfillRef: showFeedActivityRef,
         validate: v => v === 'on' || v === 'off' },
+      { key: 'reading.simple_mode', setter: setSimpleMode, backfillRef: simpleModeRef,
+        validate: v => v === 'on' || v === 'off' },
       { key: 'reading.chat_position', setter: setChatPosition, backfillRef: chatPositionRef,
         validate: v => v === 'fab' || v === 'inline' },
       { key: 'reading.article_open_mode', setter: setArticleOpenMode, backfillRef: articleOpenModeRef,
@@ -226,7 +233,7 @@ export function useSettings() {
     if (Object.keys(backfill).length > 0) {
       apiPatch('/api/settings/preferences', backfill).catch(() => {})
     }
-  }, [prefs, setTheme, setDateMode, setAutoMarkRead, setAutoTranslate, setAutoSummarize, setGithubReleaseTypes, setAutoTranslateScope, setShowUnreadIndicator, setInternalLinks, setShowThumbnails, setShowFeedActivity, setChatPosition, setArticleOpenMode, setCategoryUnreadOnly, setLayout, setMascot, setHighlightTheme, setArticleFont, setKeyboardNavigation, setKeybindings])
+  }, [prefs, setTheme, setDateMode, setAutoMarkRead, setAutoTranslate, setAutoSummarize, setGithubReleaseTypes, setAutoTranslateScope, setShowUnreadIndicator, setInternalLinks, setShowThumbnails, setShowFeedActivity, setSimpleMode, setChatPosition, setArticleOpenMode, setCategoryUnreadOnly, setLayout, setMascot, setHighlightTheme, setArticleFont, setKeyboardNavigation, setKeybindings])
 
   // Hydrate custom themes from DB
   useEffect(() => {
@@ -340,6 +347,7 @@ export function useSettings() {
     syncedSetInternalLinks,
     syncedSetShowThumbnails,
     syncedSetShowFeedActivity,
+    syncedSetSimpleMode,
     syncedSetChatPosition,
     syncedSetArticleOpenMode,
     syncedSetCategoryUnreadOnly,
@@ -376,6 +384,7 @@ export function useSettings() {
       syncedSetInternalLinks: make<'on' | 'off'>('reading.internal_links', setInternalLinks),
       syncedSetShowThumbnails: make<'on' | 'off'>('reading.show_thumbnails', setShowThumbnails),
       syncedSetShowFeedActivity: make<'on' | 'off'>('reading.show_feed_activity', setShowFeedActivity),
+      syncedSetSimpleMode: make<'on' | 'off'>('reading.simple_mode', setSimpleMode),
       syncedSetChatPosition: make<'fab' | 'inline'>('reading.chat_position', setChatPosition),
       syncedSetArticleOpenMode: make<ArticleOpenMode>('reading.article_open_mode', setArticleOpenMode),
       syncedSetCategoryUnreadOnly: make<'on' | 'off'>('reading.category_unread_only', setCategoryUnreadOnly),
@@ -401,7 +410,7 @@ export function useSettings() {
     }
     // scheduleSave and dirtyKeysRef are stable refs; remaining setters are useState/useCallback-stable
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setDateMode, setAutoMarkRead, setAutoTranslate, setAutoSummarize, setGithubReleaseTypes, setAutoTranslateScope, setShowUnreadIndicator, setInternalLinks, setShowThumbnails, setShowFeedActivity, setChatPosition, setArticleOpenMode, setCategoryUnreadOnly, setLayout, setArticleFont, setMascot])
+  }, [setDateMode, setAutoMarkRead, setAutoTranslate, setAutoSummarize, setGithubReleaseTypes, setAutoTranslateScope, setShowUnreadIndicator, setInternalLinks, setShowThumbnails, setShowFeedActivity, setSimpleMode, setChatPosition, setArticleOpenMode, setCategoryUnreadOnly, setLayout, setArticleFont, setMascot])
 
   // Special: theme setter updates 2 keys + resets highlight
   const syncedSetTheme = useCallback((name: string) => {
@@ -462,6 +471,8 @@ export function useSettings() {
     setShowThumbnails: syncedSetShowThumbnails,
     showFeedActivity,
     setShowFeedActivity: syncedSetShowFeedActivity,
+    simpleMode,
+    setSimpleMode: syncedSetSimpleMode,
     chatPosition,
     setChatPosition: syncedSetChatPosition,
     articleOpenMode,

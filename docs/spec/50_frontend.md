@@ -36,6 +36,19 @@ The frontend prepends `https://` to the splat path to reconstruct the original a
 Paths ending with `.md` are treated as Markdown source view pages (`ArticleRawPage`).
 
 
+### Simple Mode
+
+A reading preference (`reading.simple_mode`, Settings → Reading, on by default) that trims the navigation for readers who only want a short, curated view. It hides entry points only: every route keeps working from its URL, and turning the mode off restores the full sidebar.
+
+| Surface | Kept | Hidden |
+|---------|------|--------|
+| Sidebar | Search, Bookmarks, Clips, GitHub Releases, Add, Themes | Inbox, Top stories, Recommended, Likes, History, Chat, Smart folders, Formats, the feed list |
+| Bottom tab bar | Search, Bookmarks, Menu | Inbox, Chat |
+| Section bar above lists | — | the whole bar (themes are in the sidebar) |
+
+- **GitHub Releases**: each enabled starred-releases feed (URL `https://github.com/stars/<user>`, see [86](./86_feature_github_releases.md)) gets its own sidebar entry with its unread count, since the feed list that would otherwise show it is hidden.
+- **Feed list fallback**: the feed list is hidden only while article classification is on. Without themes the sidebar would offer nothing to read, so the feed list stays.
+
 ### Command Palette & Keyboard Shortcuts
 
 The command palette (`Cmd+K`) provides unified access to navigation, actions, feeds, and appearance settings. It uses `cmdk` (shadcn/ui `CommandDialog`).
