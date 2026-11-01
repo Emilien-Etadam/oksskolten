@@ -9,6 +9,7 @@ import { Semaphore } from '../fetcher/util.js'
 import { logger } from '../logger.js'
 import { DEFAULT_LANGUAGE } from '../../shared/lang.js'
 import type { ArticleDetail } from '../../shared/types.js'
+import { truncateChars } from '../lib/text.js'
 
 const log = logger.child('ai-queue')
 
@@ -96,7 +97,7 @@ async function processFilter(item: QueueItem): Promise<void> {
   }
 
   const body = article.summary || article.full_text || article.excerpt || ''
-  const text = `${article.title}\n\n${body}`.slice(0, FILTER_TEXT_MAX_CHARS)
+  const text = truncateChars(`${article.title}\n\n${body}`, FILTER_TEXT_MAX_CHARS)
 
   const { keep } = await evaluateArticleRelevance(text, criterion, { provider: 'vllm' })
   updateArticleContent(item.articleId, {

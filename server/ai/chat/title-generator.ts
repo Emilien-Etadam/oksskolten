@@ -1,6 +1,7 @@
 import { SUB_AGENT_MODELS } from '../../../shared/models.js'
 import { getProvider } from '../providers/llm/index.js'
 import { updateConversation } from '../../db.js'
+import { truncateChars } from '../../lib/text.js'
 
 const TITLE_MAX_LENGTH = 50
 const TITLE_MIN_LENGTH = 4
@@ -25,7 +26,7 @@ export async function generateConversationTitle(
     maxTokens: 100,
     systemInstruction: 'Summarize the conversation into a short title (15-30 characters). Output only the title — no decoration or brackets. Generate the title in the same language as the user message.',
     messages: [
-      { role: 'user', content: `User: ${userMessage}\n\nAI: ${assistantResponse.slice(0, 500)}` },
+      { role: 'user', content: `User: ${userMessage}\n\nAI: ${truncateChars(assistantResponse, 500)}` },
     ],
   })
 
