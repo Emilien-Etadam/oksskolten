@@ -12,8 +12,14 @@ export const FIRST_EDITION_LOOKBACK = '-1 day'
 /** A running edition older than this was cut short (restart, crash) */
 const STALE_RUNNING_MINUTES = 30
 
-/** Feeds the journal never covers: clips, and starred GitHub releases read on their own */
-const EXCLUDED_FEEDS_SQL = "f.type != 'clip' AND f.url NOT LIKE 'https://github.com/stars/%'"
+/**
+ * Feeds the journal never covers: clips, and starred GitHub releases read on
+ * their own. A stars feed keeps its canonical URL in rss_url; url holds
+ * whatever was pasted, `github.com/<user>?tab=stars` included.
+ */
+const EXCLUDED_FEEDS_SQL = `f.type != 'clip'
+  AND COALESCE(f.rss_url, '') NOT LIKE 'https://github.com/stars/%'
+  AND f.url NOT LIKE 'https://github.com/stars/%'`
 
 export interface JournalArticle {
   id: number
@@ -47,14 +53,31 @@ export function getLastPeriodEnd(): string | null {
   return row?.period_end ?? null
 }
 
-function periodWhere(start: string | null): string {
+/**
+ * Articles published this long before the period starts are left out even
+ * when they arrive in it: a newly added feed brings its whole backlog, years
+ * old, in one fetch. The slack still covers feeds that publish late.
+ */
+export const MAX_PUBLISHED_BEFORE_PERIOD = '-7 days'
+
+/** SQL for the period start, and its parameters. A null start looks back FIRST_EDITION_LOOKBACK from the end. */
+function periodStart(start: string | null, end: string): { sql: string; params: string[] } {
   return start === null
-    ? 'a.created_at > datetime(?, ?) AND a.created_at <= ?'
-    : 'a.created_at > ? AND a.created_at <= ?'
+    ? { sql: 'datetime(?, ?)', params: [end, FIRST_EDITION_LOOKBACK] }
+    : { sql: '?', params: [start] }
+}
+
+function periodWhere(start: string | null): string {
+  const from = periodStart(start, '').sql
+  // Undated articles (or dates SQLite cannot parse) stay in: arrival is all we know
+  return `a.created_at > ${from} AND a.created_at <= ?
+    AND (a.published_at IS NULL OR datetime(a.published_at) IS NULL
+         OR datetime(a.published_at) >= datetime(${from}, ?))`
 }
 
 function periodParams(start: string | null, end: string): string[] {
-  return start === null ? [end, FIRST_EDITION_LOOKBACK, end] : [start, end]
+  const from = periodStart(start, end).params
+  return [...from, end, ...from, MAX_PUBLISHED_BEFORE_PERIOD]
 }
 
 /** Articles arrived in (start, end], best first. A null start looks back FIRST_EDITION_LOOKBACK. */

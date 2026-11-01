@@ -28,7 +28,7 @@ import { CommandPalette } from '@/components/command-palette'
 import { useGlobalShortcuts } from '@/hooks/use-global-shortcuts'
 import { useAppLayout } from '@/app'
 import type { ClassificationOverview } from '../../../../shared/classification'
-import { extractDomain, isGithubStarsFeedUrl } from '@/lib/url'
+import { extractDomain, isGithubStarsFeed } from '@/lib/url'
 import type { FeedWithCounts, Category } from '../../../../shared/types'
 
 function isFeedInactive(feed: FeedWithCounts): boolean {
@@ -232,7 +232,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
   // Simple mode hides the feed list, so starred-repo releases get their own entry
   // Without themes there would be nothing left to read from, so the feed list stays
   const hideFeedList = simple && !!classification?.enabled
-  const githubFeeds = useMemo(() => feeds.filter(f => !f.disabled && isGithubStarsFeedUrl(f.url)), [feeds])
+  const githubFeeds = useMemo(() => feeds.filter(f => !f.disabled && isGithubStarsFeed(f)), [feeds])
 
   const totalUnread = feeds.reduce((sum, f) => sum + (f.disabled || f.type === 'clip' ? 0 : f.unread_count), 0)
 

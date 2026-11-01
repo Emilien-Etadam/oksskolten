@@ -8,10 +8,13 @@ export function extractDomain(url: string): string | null {
   }
 }
 
+const GITHUB_STARS_URL = /^https:\/\/github\.com\/stars\/[A-Za-z0-9-]+\/?$/
+
 /**
- * True for a GitHub starred-releases feed. The server stores these under the
- * canonical `https://github.com/stars/<user>` URL whichever form was pasted.
+ * True for a GitHub starred-releases feed. The canonical
+ * `https://github.com/stars/<user>` URL is its `rss_url`; `url` keeps whatever
+ * was pasted (`github.com/<user>?tab=stars` too), so both are checked.
  */
-export function isGithubStarsFeedUrl(url: string): boolean {
-  return /^https:\/\/github\.com\/stars\/[A-Za-z0-9-]+\/?$/.test(url)
+export function isGithubStarsFeed(feed: { url: string; rss_url: string | null }): boolean {
+  return GITHUB_STARS_URL.test(feed.rss_url ?? '') || GITHUB_STARS_URL.test(feed.url)
 }

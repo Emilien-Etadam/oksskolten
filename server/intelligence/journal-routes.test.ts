@@ -77,8 +77,24 @@ describe('POST /api/journal/generate', () => {
     expect(result.pending_count).toBe(0)
   })
 
+  it('leaves out old articles a newly added feed brings in', async () => {
+    const feed = createFeed({ name: 'Blog', url: 'https://blog.example.com' })
+    insertArticle({ feed_id: feed.id, title: 'Backlog from 2023', url: 'https://blog.example.com/old', published_at: '2023-11-06T10:00:00Z' })
+    const recent = insertArticle({ feed_id: feed.id, title: 'Recent', url: 'https://blog.example.com/new', published_at: new Date().toISOString() })
+    const undated = insertArticle({ feed_id: feed.id, title: 'Undated', url: 'https://blog.example.com/undated', published_at: null })
+    mockCreateMessage.mockResolvedValue(reply('Something [1].'))
+
+    const result = await generateAndWait()
+    expect(result.latest?.article_count).toBe(2)
+    expect(result.latest?.content?.sections[0].article_ids.sort()).toEqual([recent, undated].sort())
+    // Left out, not consumed: the old article stays unread
+    const old = getDb().prepare("SELECT seen_at FROM articles WHERE url = 'https://blog.example.com/old'").get() as { seen_at: string | null }
+    expect(old.seen_at).toBeNull()
+  })
+
   it('leaves starred GitHub releases and clips out', async () => {
-    const stars = createFeed({ name: 'GitHub Releases (me)', url: 'https://github.com/stars/me' })
+    // As the add-feed dialog stores it: the pasted URL, the canonical one in rss_url
+    const stars = createFeed({ name: 'GitHub Releases (me)', url: 'https://github.com/me?tab=stars', rss_url: 'https://github.com/stars/me' })
     insertArticle({ feed_id: stars.id, title: 'v1.0', url: 'https://github.com/x/y/releases/v1', published_at: new Date().toISOString() })
     const res = await app.inject({ method: 'POST', url: '/api/journal/generate' })
     expect(res.statusCode).toBe(422)
