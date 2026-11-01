@@ -12,8 +12,14 @@ export const FIRST_EDITION_LOOKBACK = '-1 day'
 /** A running edition older than this was cut short (restart, crash) */
 const STALE_RUNNING_MINUTES = 30
 
-/** Feeds the journal never covers: clips, and starred GitHub releases read on their own */
-const EXCLUDED_FEEDS_SQL = "f.type != 'clip' AND f.url NOT LIKE 'https://github.com/stars/%'"
+/**
+ * Feeds the journal never covers: clips, and starred GitHub releases read on
+ * their own. A stars feed keeps its canonical URL in rss_url; url holds
+ * whatever was pasted, `github.com/<user>?tab=stars` included.
+ */
+const EXCLUDED_FEEDS_SQL = `f.type != 'clip'
+  AND COALESCE(f.rss_url, '') NOT LIKE 'https://github.com/stars/%'
+  AND f.url NOT LIKE 'https://github.com/stars/%'`
 
 export interface JournalArticle {
   id: number

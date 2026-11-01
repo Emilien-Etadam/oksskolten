@@ -6,7 +6,7 @@ import { History, Paperclip, PenLine, Sparkles, ThumbsDown, ThumbsUp } from 'luc
 import { ApiError, apiPost, apiPut, fetcher } from '@/lib/fetcher'
 import { useI18n, type TranslateFn } from '@/i18n'
 import { Skeleton } from '@/components/ui/skeleton'
-import { articleUrlToPath, isGithubStarsFeedUrl } from '@/lib/url'
+import { articleUrlToPath, isGithubStarsFeed } from '@/lib/url'
 import { formatRelativeDate } from '@/lib/dateFormat'
 import { NO_THEME_KEY } from '../../../../shared/journal'
 import type {
@@ -66,7 +66,7 @@ export function JournalPage() {
   const edition = viewingId !== null ? past?.edition ?? null : latest
   const feedback = viewingId !== null ? past?.feedback ?? {} : overview?.feedback ?? {}
   const githubUnread = (feedsData?.feeds ?? [])
-    .filter(f => isGithubStarsFeedUrl(f.url))
+    .filter(f => isGithubStarsFeed(f))
     .reduce((sum, f) => sum + f.unread_count, 0)
 
   async function generate() {

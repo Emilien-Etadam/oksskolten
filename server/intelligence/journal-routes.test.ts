@@ -93,7 +93,8 @@ describe('POST /api/journal/generate', () => {
   })
 
   it('leaves starred GitHub releases and clips out', async () => {
-    const stars = createFeed({ name: 'GitHub Releases (me)', url: 'https://github.com/stars/me' })
+    // As the add-feed dialog stores it: the pasted URL, the canonical one in rss_url
+    const stars = createFeed({ name: 'GitHub Releases (me)', url: 'https://github.com/me?tab=stars', rss_url: 'https://github.com/stars/me' })
     insertArticle({ feed_id: stars.id, title: 'v1.0', url: 'https://github.com/x/y/releases/v1', published_at: new Date().toISOString() })
     const res = await app.inject({ method: 'POST', url: '/api/journal/generate' })
     expect(res.statusCode).toBe(422)

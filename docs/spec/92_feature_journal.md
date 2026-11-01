@@ -15,7 +15,8 @@ An on-demand digest of everything that arrived since the previous edition: one s
 
 ## Scope
 
-- Covered: articles created after the previous finished edition, excluding AI-filtered and rule-hidden articles (`filtered_at`), clips, and starred GitHub releases feeds (`https://github.com/stars/<user>`, see [86](./86_feature_github_releases.md)), which the reader follows on their own.
+- Covered: articles created after the previous finished edition, excluding AI-filtered and rule-hidden articles (`filtered_at`), clips, and starred GitHub releases feeds (canonical `https://github.com/stars/<user>` in `rss_url` or `url`, see [86](./86_feature_github_releases.md)), which the reader follows on their own. Releases from other feeds, a single repository's `releases.atom` for instance, are covered like any article.
+- Old backlog left out: articles published more than 7 days before the period starts are skipped and left unread, since a newly added feed brings its whole history in its first fetch. Undated articles stay in.
 - Not covered: scheduled generation, per-feed digests, delivery by e-mail or chat.
 
 ## Design
