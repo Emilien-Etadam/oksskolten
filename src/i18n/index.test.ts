@@ -56,7 +56,7 @@ describe('message dictionary', () => {
     expect(sum).toBe(Object.keys(dict).length)
   })
 
-  it('contains 905 keys', () => {
-    expect(Object.keys(dict).length).toBe(905)
+  it('contains 925 keys', () => {
+    expect(Object.keys(dict).length).toBe(925)
   })
 })

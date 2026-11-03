@@ -60,12 +60,23 @@ The `classify` ingest step (new and clipped articles) enqueues task `classify` o
 
 `GET /api/articles` accepts `format` and `theme` (case-insensitive ids).
 
+### Accuracy bench
+
+Settings → Classification → Accuracy bench (or `npm run bench:notjev`) measures how right the three decisions are on the reader's own articles. It never writes to the production database: a child process copies it with `VACUUM INTO` into `data/notjev-bench-<ISO>/snapshot.db`, points its own `DATABASE_URL` at the copy, and only then imports the production modules, so the prompts are byte for byte those of `classifyArticle()`.
+
+- Sample: articles carrying a label first (journal vote, liked, bookmarked), then a seeded random draw among classified articles. Articles whose title is injected as an example in the importance question are left out.
+- Three readings per article: production; the same questions with options permuted (position bias); and a reference from the same model with thinking on, whose final `Answer: X` letter is parsed (unreadable answers are counted as such).
+- Results are appended to `results.jsonl` as they come, so a stopped run resumes without repeating calls; `replay.json` is a `notjev replay` recording.
+- `report.html` is self-contained: agreement against a null arm, importance accuracy against labels (strict and soft), confusion matrices, theta curve recomputed offline, accuracy by band, position bias, coverage, time, reproducibility against stored values, and the list of disagreements with buttons. Arbitrations are exported as JSON and imported back, which recomputes the figures without any call.
+
+Configuration: `scripts/notjev-bench.config.json`; usage: `scripts/README-notjev-bench.md`.
+
 ### Frontend
 
 - Sidebar: "Themes" and "Formats" sections under smart folders, collapsible, hidden while classification is off.
 - `/themes/:id` and `/formats/:id` list unread articles only; once all are read, the empty state offers "Show read articles", as categories do with the unread-only option.
 - Hidden categories: the sidebar lists feeds flat, sorted by name, with drag-and-drop to folders disabled (there is no folder to drop into), and the tab bar above article lists (`category-tabs.tsx`) links to `/themes/:id` instead of `/categories/:id`.
-- Settings → Integration → Article classification: switch, model, thresholds, theme editor, live test, backfill and reclassify.
+- Settings → Integration → Article classification: switch, model, thresholds, theme editor, live test, backfill and reclassify, accuracy bench.
 
 ### Key Files
 
@@ -79,3 +90,6 @@ The `classify` ingest step (new and clipped articles) enqueues task `classify` o
 | `src/features/feeds/components/classification-list.tsx` | Sidebar sections |
 | `src/features/settings/sections/classification-section.tsx` | Settings section |
 | `scripts/format-eval.ts` | Offline evaluation against a real database |
+| `server/bench/notjev/` | Accuracy bench: snapshot, calls, analysis, report, routes |
+| `src/features/settings/sections/classification-bench.tsx` | Accuracy bench panel |
+| `scripts/notjev-bench.config.json` | Accuracy bench configuration |

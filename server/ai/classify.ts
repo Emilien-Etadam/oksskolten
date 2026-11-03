@@ -96,7 +96,7 @@ export function saveClassificationSettings(patch: Partial<ClassificationSettings
   if (patch.hideCategories !== undefined) upsertSetting(KEYS.hideCategories, patch.hideCategories ? 'on' : 'off')
 }
 
-function resolveModel(settings: ClassificationSettings): string {
+export function resolveModel(settings: ClassificationSettings): string {
   return settings.model || getSetting('summary.model') || ''
 }
 
@@ -144,8 +144,21 @@ export function buildClassifyState(input: ClassifyInput): string {
   return `Title: ${input.title}\nSource: ${input.feedName ?? 'unknown'}\n\n${body}\n`
 }
 
-function toOptions(list: ClassOption[]) {
+export function toOptions(list: ClassOption[]) {
   return list.map(o => ({ id: o.id, description: o.description || o.label }))
+}
+
+/** The question lines, shared with the accuracy bench so it measures the exact production prompt */
+export const FORMAT_QUESTION = 'What is the format of this article?'
+export const THEME_QUESTION = 'What is the main theme of this article?'
+
+/** The notjev client used for classification */
+export function createClassifyClient(model: string) {
+  return notjev.createClient({
+    baseUrl: getVllmBaseUrl(),
+    apiKey: getVllmApiKey() || undefined,
+    model,
+  })
 }
 
 /**
@@ -157,24 +170,20 @@ export async function classifyArticle(input: ClassifyInput): Promise<ClassifyRes
   const settings = getClassificationSettings()
   const model = resolveModel(settings)
   if (!model) throw new Error('No model configured for classification')
-  const client = notjev.createClient({
-    baseUrl: getVllmBaseUrl(),
-    apiKey: getVllmApiKey() || undefined,
-    model,
-  })
+  const client = createClassifyClient(model)
   // Lone surrogates make the inference server's tokenizer reject the request
   const state = toWellFormedText(buildClassifyState(input))
   // Sequential on purpose: the second request reuses the server's prefix
   // cache for the shared article text
   const format = await client.decide({
     state,
-    question: 'What is the format of this article?',
+    question: FORMAT_QUESTION,
     options: toOptions(FORMATS),
     theta: settings.formatTheta,
   })
   const theme = await client.decide({
     state,
-    question: 'What is the main theme of this article?',
+    question: THEME_QUESTION,
     options: toOptions(settings.themes),
     theta: settings.themeTheta,
   })

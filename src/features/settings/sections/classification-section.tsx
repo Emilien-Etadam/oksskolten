@@ -8,6 +8,7 @@ import { RadioGroup } from '@/components/ui/radio-group'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import type { ClassOption, ClassificationOverview, ClassificationSettings } from '../../../../shared/classification'
 import { MAX_THEMES } from '../../../../shared/classification'
+import { ClassificationBench } from './classification-bench'
 
 interface TestResult {
   ok: boolean
@@ -287,6 +288,8 @@ export function ClassificationSection() {
               </button>
             </div>
           </div>
+
+          <ClassificationBench />
         </>
       )}
 
