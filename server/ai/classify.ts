@@ -1,15 +1,19 @@
 import notjev from 'notjev'
 import { getSetting, upsertSetting } from '../db.js'
 import { getVllmBaseUrl, getVllmApiKey } from './providers/llm/vllm.js'
+import { toWellFormedText, truncateChars } from '../lib/text.js'
 import {
   FORMATS,
   DEFAULT_THEMES,
   DEFAULT_FORMAT_THETA,
   DEFAULT_THEME_THETA,
+  DEFAULT_IMPORTANCE_THETA,
+  IMPORTANCE,
   MAX_THEMES,
   normalizeClassId,
   type ClassOption,
   type ClassificationSettings,
+  type Importance,
 } from '../../shared/classification.js'
 
 /**
@@ -96,10 +100,19 @@ function resolveModel(settings: ClassificationSettings): string {
   return settings.model || getSetting('summary.model') || ''
 }
 
+/** What the reader told the journal about a theme, used to judge importance */
+export interface ReaderContext {
+  instruction?: string
+  liked: string[]
+  disliked: string[]
+}
+
 export interface ClassifyInput {
   title: string
   feedName?: string | null
   body?: string | null
+  /** The reader's instruction and votes for the theme just decided (null: undecided) */
+  readerContext?: (theme: string | null) => ReaderContext
 }
 
 export interface ClassifyResult {
@@ -110,12 +123,24 @@ export interface ClassifyResult {
   /** The model's top guess, even when undecided */
   formatTop: string
   themeTop: string
+  /** null when the model was undecided */
+  importance: Importance | null
+  importanceTop: string
   model: string
   ms: number
 }
 
+export function buildImportanceQuestion(context: ReaderContext | undefined): string {
+  const lines = ['How important is this article for this reader?']
+  if (context?.instruction) lines.push(`The reader's instruction for this theme: ${context.instruction}`)
+  if (context?.liked.length) lines.push(`The reader wants more articles like: ${context.liked.map(t => `"${t}"`).join('; ')}`)
+  if (context?.disliked.length) lines.push(`The reader wants fewer articles like: ${context.disliked.map(t => `"${t}"`).join('; ')}`)
+  return lines.join('\n')
+}
+
 export function buildClassifyState(input: ClassifyInput): string {
-  const body = (input.body ?? '').replace(/\s+/g, ' ').trim().slice(0, BODY_CHARS)
+  const cleaned = (input.body ?? '').replace(/\s+/g, ' ').trim()
+  const body = truncateChars(cleaned, BODY_CHARS)
   return `Title: ${input.title}\nSource: ${input.feedName ?? 'unknown'}\n\n${body}\n`
 }
 
@@ -124,7 +149,7 @@ function toOptions(list: ClassOption[]) {
 }
 
 /**
- * Ask the two questions (format, theme) about one article. Throws on a
+ * Ask the three questions (format, theme, importance) about one article. Throws on a
  * network or server error so the queue can retry later; an undecided answer
  * is a normal result with a null field.
  */
@@ -137,7 +162,8 @@ export async function classifyArticle(input: ClassifyInput): Promise<ClassifyRes
     apiKey: getVllmApiKey() || undefined,
     model,
   })
-  const state = buildClassifyState(input)
+  // Lone surrogates make the inference server's tokenizer reject the request
+  const state = toWellFormedText(buildClassifyState(input))
   // Sequential on purpose: the second request reuses the server's prefix
   // cache for the shared article text
   const format = await client.decide({
@@ -152,6 +178,14 @@ export async function classifyArticle(input: ClassifyInput): Promise<ClassifyRes
     options: toOptions(settings.themes),
     theta: settings.themeTheta,
   })
+  // Last, so the reader's instruction for the theme just found can be included;
+  // the article text is still in the server's prefix cache
+  const importance = await client.decide({
+    state,
+    question: buildImportanceQuestion(input.readerContext?.(theme.choice)),
+    options: toOptions(IMPORTANCE),
+    theta: DEFAULT_IMPORTANCE_THETA,
+  })
   if (format.degraded && theme.degraded) {
     // No option letter at all: the server returned no logprobs, or the model
     // answered something else entirely. Treat as a failure, not "undecided".
@@ -164,7 +198,9 @@ export async function classifyArticle(input: ClassifyInput): Promise<ClassifyRes
     themeP1: theme.p1,
     formatTop: format.top,
     themeTop: theme.top,
+    importance: importance.choice as Importance | null,
+    importanceTop: importance.top,
     model,
-    ms: (format.ms ?? 0) + (theme.ms ?? 0),
+    ms: (format.ms ?? 0) + (theme.ms ?? 0) + (importance.ms ?? 0),
   }
 }

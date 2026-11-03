@@ -4,11 +4,13 @@ import { getArticleById, updateArticleContent, updateScore } from '../db/article
 import { getFeedById } from '../db/feeds.js'
 import { translateArticle, translateTitle, summarizeArticle, evaluateArticleRelevance } from './tasks.js'
 import { classifyArticle, isClassificationEnabled } from './classify.js'
+import { getReaderContext } from '../intelligence/journal-db.js'
 import { rescoreArticleInterest } from '../intelligence/interests.js'
 import { Semaphore } from '../fetcher/util.js'
 import { logger } from '../logger.js'
 import { DEFAULT_LANGUAGE } from '../../shared/lang.js'
 import type { ArticleDetail } from '../../shared/types.js'
+import { truncateChars } from '../lib/text.js'
 
 const log = logger.child('ai-queue')
 
@@ -96,7 +98,7 @@ async function processFilter(item: QueueItem): Promise<void> {
   }
 
   const body = article.summary || article.full_text || article.excerpt || ''
-  const text = `${article.title}\n\n${body}`.slice(0, FILTER_TEXT_MAX_CHARS)
+  const text = truncateChars(`${article.title}\n\n${body}`, FILTER_TEXT_MAX_CHARS)
 
   const { keep } = await evaluateArticleRelevance(text, criterion, { provider: 'vllm' })
   updateArticleContent(item.articleId, {
@@ -120,16 +122,18 @@ async function processClassify(item: QueueItem): Promise<void> {
     title: article.title,
     feedName: article.feed_name,
     body: article.full_text || article.excerpt || article.summary,
+    readerContext: getReaderContext,
   })
   updateArticleContent(item.articleId, {
     format: r.format,
     theme: r.theme,
+    importance: r.importance,
     classified_at: nowIso(),
     classify_pending_at: null,
   })
   // The interest score counts the reader's affinity for the new theme/format
   rescoreArticleInterest(item.articleId)
-  log.debug(`classified article ${item.articleId}: ${r.format ?? `?${r.formatTop}`} / ${r.theme ?? `?${r.themeTop}`} (${r.ms} ms)`)
+  log.debug(`classified article ${item.articleId}: ${r.format ?? `?${r.formatTop}`} / ${r.theme ?? `?${r.themeTop}`} / ${r.importance ?? `?${r.importanceTop}`} (${r.ms} ms)`)
 }
 
 /**

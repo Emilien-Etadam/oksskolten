@@ -23,6 +23,7 @@ Typical RSS readers only display the title and summary provided by the feed, req
 > - [87_feature_classification.md](./87_feature_classification.md) — Article Classification (formats and themes from a local model)
 > - [88_feature_github_trending.md](./88_feature_github_trending.md) — GitHub Trending
 > - [89_feature_discord_channel.md](./89_feature_discord_channel.md) — Discord Channels
+> - [92_feature_journal.md](./92_feature_journal.md) — Journal (on-demand sourced digest by theme)
 > - [90_perf_retry_backoff.md](./90_perf_retry_backoff.md) — Exponential Backoff for Article Retry
 > - [91_perf_score_recalculation.md](./91_perf_score_recalculation.md) — Score Recalculation Optimization
 

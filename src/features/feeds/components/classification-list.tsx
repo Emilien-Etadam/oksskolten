@@ -9,6 +9,8 @@ import type { ClassificationCount, ClassificationOverview } from '../../../../sh
 
 interface Props {
   onNavigate?: () => void
+  /** Simple mode lists themes only */
+  hideFormats?: boolean
 }
 
 const COLLAPSED_KEY = 'sidebar-classification-collapsed'
@@ -31,7 +33,7 @@ function writeCollapsed(value: Record<string, boolean>): void {
  * Sidebar sections listing the article themes and formats assigned by the
  * local model, with their unread counts. Hidden while classification is off.
  */
-export function ClassificationList({ onNavigate }: Props) {
+export function ClassificationList({ onNavigate, hideFormats = false }: Props) {
   const { t } = useI18n()
   const { data } = useSWR<ClassificationOverview>('/api/classification', fetcher, { refreshInterval: 60_000 })
   const [collapsed, setCollapsed] = useState(readCollapsed)
@@ -58,16 +60,18 @@ export function ClassificationList({ onNavigate }: Props) {
         onToggle={() => toggle('themes')}
         onNavigate={onNavigate}
       />
-      <Section
-        id="formats"
-        title={t('classification.formats')}
-        icon={Shapes}
-        basePath="/formats"
-        items={data.formats}
-        collapsed={!!collapsed.formats}
-        onToggle={() => toggle('formats')}
-        onNavigate={onNavigate}
-      />
+      {!hideFormats && (
+        <Section
+          id="formats"
+          title={t('classification.formats')}
+          icon={Shapes}
+          basePath="/formats"
+          items={data.formats}
+          collapsed={!!collapsed.formats}
+          onToggle={() => toggle('formats')}
+          onNavigate={onNavigate}
+        />
+      )}
     </>
   )
 }

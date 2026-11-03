@@ -1,6 +1,7 @@
 import type { Message, ToolUseBlock, ToolResultBlock, ContentBlock } from './types.js'
 import type { ChatTurnParams, RunChatTurnResult, ChatSSEEvent } from './adapter.js'
 import { executeTool } from './tools.js'
+import { toWellFormedText } from '../../lib/text.js'
 
 export const MAX_TOOL_ROUNDS = 10
 export const CHAT_MAX_TOKENS = 4096
@@ -44,7 +45,7 @@ export async function runToolLoop(
       toolUseBlocks.map(async (toolUse) => {
         try {
           const r = await executeTool(toolUse.name, toolUse.input, { timeZone })
-          return { type: 'tool_result' as const, tool_use_id: toolUse.id, content: r }
+          return { type: 'tool_result' as const, tool_use_id: toolUse.id, content: toWellFormedText(r) }
         } catch (err) {
           return {
             type: 'tool_result' as const,

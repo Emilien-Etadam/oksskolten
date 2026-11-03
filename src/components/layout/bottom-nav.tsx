@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Inbox, Search, Bookmark, MessagesSquare, Menu } from 'lucide-react'
+import { Inbox, Search, Bookmark, MessagesSquare, Menu, Newspaper } from 'lucide-react'
 import { useAppLayout } from '../../app'
 import { useI18n } from '@/i18n'
 import { SearchDialog } from '../ui/search-dialog'
@@ -13,7 +13,8 @@ import { SearchDialog } from '../ui/search-dialog'
  * covers the message input.
  */
 export function BottomNav() {
-  const { sidebarOpen, setSidebarOpen } = useAppLayout()
+  const { sidebarOpen, setSidebarOpen, settings } = useAppLayout()
+  const simple = settings?.simpleMode === 'on'
   const location = useLocation()
   const navigate = useNavigate()
   const { t } = useI18n()
@@ -21,11 +22,13 @@ export function BottomNav() {
 
   if (sidebarOpen || location.pathname.startsWith('/chat')) return null
 
+  // Simple mode drops the destinations its sidebar hides (inbox, chat)
   const items = [
-    { icon: Inbox, label: t('feeds.inbox'), selected: location.pathname === '/inbox', onClick: () => { void navigate('/inbox') } },
+    ...(simple ? [{ icon: Newspaper, label: t('journal.title'), selected: location.pathname === '/journal', onClick: () => { void navigate('/journal') } }] : []),
+    ...(simple ? [] : [{ icon: Inbox, label: t('feeds.inbox'), selected: location.pathname === '/inbox', onClick: () => { void navigate('/inbox') } }]),
     { icon: Search, label: t('search.title'), selected: false, onClick: () => setSearchOpen(true) },
     { icon: Bookmark, label: t('feeds.bookmarks'), selected: location.pathname === '/bookmarks', onClick: () => { void navigate('/bookmarks') } },
-    { icon: MessagesSquare, label: t('chat.title'), selected: false, onClick: () => { void navigate('/chat') } },
+    ...(simple ? [] : [{ icon: MessagesSquare, label: t('chat.title'), selected: false, onClick: () => { void navigate('/chat') } }]),
     { icon: Menu, label: t('header.menu'), selected: false, onClick: () => setSidebarOpen(true) },
   ]
 

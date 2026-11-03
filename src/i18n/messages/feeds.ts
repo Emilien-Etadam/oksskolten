@@ -35,6 +35,7 @@ export const feeds = {
   'feeds.aiFilterPlaceholder': { ja: '例: セルフホスティングとホームオートメーションに関する記事のみ。雑談は除く。', en: 'e.g. Only posts about self-hosting and home automation. Skip chit-chat.', zh: '例如：仅保留自托管和智能家居相关内容，排除闲聊。'},
   'feeds.aiFilterHint': { ja: 'ローカルモデルが各記事を判定します。空欄でフィルタを無効化。', en: 'Your local model judges each article. Leave empty to disable the filter.', zh: '由本地模型判断每篇文章。留空则禁用过滤。'},
   'feeds.clips': { ja: 'クリップ', en: 'Clips', zh: '剪藏'},
+  'feeds.githubReleases': { ja: 'GitHub リリース', en: 'GitHub Releases', zh: 'GitHub 发布'},
   'feeds.clipArticle': { ja: '記事をクリップ', en: 'Clip Article', zh: '剪藏文章'},
   'feeds.articleUrlPlaceholder': { ja: '記事のURLを入力', en: 'Enter article URL', zh: '输入文章 URL'},
   'modal.clipExistsInFeed': {

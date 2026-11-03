@@ -4,6 +4,7 @@ import { smartFolderRoutes } from './smart-folders-routes.js'
 import { ruleRoutes } from './rules-routes.js'
 import { storyRoutes } from './stories-routes.js'
 import { interestRoutes } from './interests-routes.js'
+import { journalRoutes } from './journal-routes.js'
 
 export async function registerIntelligenceRoutes(api: FastifyInstance): Promise<void> {
   await api.register(frontPageRoutes)
@@ -11,4 +12,5 @@ export async function registerIntelligenceRoutes(api: FastifyInstance): Promise<
   await api.register(ruleRoutes)
   await api.register(storyRoutes)
   await api.register(interestRoutes)
+  await api.register(journalRoutes)
 }

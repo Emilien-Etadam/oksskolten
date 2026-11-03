@@ -202,6 +202,7 @@ export function updateArticleContent(
     theme?: string | null
     classified_at?: string | null
     classify_pending_at?: string | null
+    importance?: string | null
     summary?: string | null
     excerpt?: string | null
     og_image?: string | null

@@ -4,7 +4,7 @@ import useSWR from 'swr'
 import { fetcher, apiPatch } from '@/lib/fetcher'
 import { useI18n } from '@/i18n'
 import { MD_BREAKPOINT } from '@/lib/breakpoints'
-import { Inbox, Plus, ChevronRight, Bookmark, ThumbsUp, Clock, Paperclip, Search, Command, ArrowBigUp, AlertTriangle, MessagesSquare, Flame, Sparkles } from 'lucide-react'
+import { Inbox, Plus, ChevronRight, Bookmark, ThumbsUp, Clock, Paperclip, Search, Command, ArrowBigUp, AlertTriangle, MessagesSquare, Flame, Sparkles, Github, Newspaper } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { useFetchProgressContext } from '@/contexts/fetch-progress-context'
@@ -28,7 +28,7 @@ import { CommandPalette } from '@/components/command-palette'
 import { useGlobalShortcuts } from '@/hooks/use-global-shortcuts'
 import { useAppLayout } from '@/app'
 import type { ClassificationOverview } from '../../../../shared/classification'
-import { extractDomain } from '@/lib/url'
+import { extractDomain, isGithubStarsFeed } from '@/lib/url'
 import type { FeedWithCounts, Category } from '../../../../shared/types'
 
 function isFeedInactive(feed: FeedWithCounts): boolean {
@@ -77,6 +77,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
   const isChat = location.pathname.startsWith('/chat')
   const isStories = location.pathname === '/stories'
   const isRecommended = location.pathname === '/recommended'
+  const isJournal = location.pathname === '/journal'
   const selectedFeedId = feedId ? Number(feedId) : null
   const selectedCategoryId = categoryId ? Number(categoryId) : null
   const [aiFilterFeed, setAiFilterFeed] = useState<FeedWithCounts | null>(null)
@@ -227,6 +228,11 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
 
   const { settings } = useAppLayout()
   const showFeedActivity = settings.showFeedActivity
+  const simple = settings.simpleMode === 'on'
+  // Simple mode hides the feed list, so starred-repo releases get their own entry
+  // Without themes there would be nothing left to read from, so the feed list stays
+  const hideFeedList = simple && !!classification?.enabled
+  const githubFeeds = useMemo(() => feeds.filter(f => !f.disabled && isGithubStarsFeed(f)), [feeds])
 
   const totalUnread = feeds.reduce((sum, f) => sum + (f.disabled || f.type === 'clip' ? 0 : f.unread_count), 0)
 
@@ -494,34 +500,41 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
         <FeedListHeader onClose={onClose} onCollapse={onCollapse} />
 
         <nav className="flex-1 overflow-y-auto overscroll-contain py-2 px-2">
-          <SidebarNavItem icon={Inbox} label={t('feeds.inbox')} selected={isInbox && selectedFeedId === null} onClick={() => { void navigate('/inbox'); onClose() }} badge={totalUnread > 0 ? <UnreadBadge count={totalUnread} /> : undefined} />
+          <SidebarNavItem icon={Newspaper} label={t('journal.title')} selected={isJournal} onClick={() => { void navigate('/journal'); onClose() }} />
+
+          {!simple && <SidebarNavItem icon={Inbox} label={t('feeds.inbox')} selected={isInbox && selectedFeedId === null} onClick={() => { void navigate('/inbox'); onClose() }} badge={totalUnread > 0 ? <UnreadBadge count={totalUnread} /> : undefined} />}
 
           <SidebarNavItem icon={Search} label={t('search.title')} onClick={() => setSearchOpen(true)} className="group/search">
             <kbd className="hidden md:inline-flex text-[11px] text-muted bg-hover px-1.5 py-1 rounded opacity-0 group-hover/search:opacity-100 transition-opacity items-center gap-0"><span className="w-2.5 h-3 inline-flex items-center justify-center"><Command className="w-2.5 h-2.5" /></span><span className="w-3 h-3 inline-flex items-center justify-center"><ArrowBigUp className="w-2.5 h-2.5" /></span><span className="w-3 h-3 inline-flex items-center justify-center leading-none">K</span></kbd>
           </SidebarNavItem>
 
-          <SidebarNavItem icon={Flame} label={t('stories.title')} selected={isStories} onClick={() => { void navigate('/stories'); onClose() }} />
+          {!simple && <SidebarNavItem icon={Flame} label={t('stories.title')} selected={isStories} onClick={() => { void navigate('/stories'); onClose() }} />}
 
-          <SidebarNavItem icon={Sparkles} label={t('recommended.title')} selected={isRecommended} onClick={() => { void navigate('/recommended'); onClose() }} />
+          {!simple && <SidebarNavItem icon={Sparkles} label={t('recommended.title')} selected={isRecommended} onClick={() => { void navigate('/recommended'); onClose() }} />}
 
           <SidebarNavItem icon={Bookmark} label={t('feeds.bookmarks')} selected={isBookmarks} onClick={() => { void navigate('/bookmarks'); onClose() }} badge={(feedsData?.bookmark_count ?? 0) > 0 ? <UnreadBadge count={feedsData!.bookmark_count} /> : undefined} />
 
-          <SidebarNavItem icon={ThumbsUp} label={t('feeds.likes')} selected={isLikes} onClick={() => { void navigate('/likes'); onClose() }} badge={(feedsData?.like_count ?? 0) > 0 ? <UnreadBadge count={feedsData!.like_count} /> : undefined} />
+          {!simple && <SidebarNavItem icon={ThumbsUp} label={t('feeds.likes')} selected={isLikes} onClick={() => { void navigate('/likes'); onClose() }} badge={(feedsData?.like_count ?? 0) > 0 ? <UnreadBadge count={feedsData!.like_count} /> : undefined} />}
 
           {clipFeedId && (
             <SidebarNavItem icon={Paperclip} label={t('feeds.clips')} selected={isClips} onClick={() => { void navigate('/clips'); onClose() }} badge={clipFeedData && clipFeedData.unread_count > 0 ? <UnreadBadge count={clipFeedData.unread_count} /> : undefined} />
           )}
 
-          <SidebarNavItem icon={Clock} label={t('feeds.history')} selected={isHistory} onClick={() => { void navigate('/history'); onClose() }} />
+          {simple && githubFeeds.map(feed => (
+            <SidebarNavItem key={feed.id} icon={Github} label={githubFeeds.length > 1 ? feed.name : t('feeds.githubReleases')} selected={selectedFeedId === feed.id} onClick={() => { void navigate(`/feeds/${feed.id}`); onClose() }} badge={feed.unread_count > 0 ? <UnreadBadge count={feed.unread_count} /> : undefined} />
+          ))}
 
-          <SidebarNavItem icon={MessagesSquare} label={t('chat.title')} selected={isChat} onClick={() => { void navigate('/chat'); onClose() }} />
+          {!simple && <SidebarNavItem icon={Clock} label={t('feeds.history')} selected={isHistory} onClick={() => { void navigate('/history'); onClose() }} />}
+
+          {!simple && <SidebarNavItem icon={MessagesSquare} label={t('chat.title')} selected={isChat} onClick={() => { void navigate('/chat'); onClose() }} />}
 
           <SidebarNavItem icon={Plus} label={t('modal.addNew')} onClick={() => setFeedModalOpen(true)} className="text-muted hover:text-text" />
 
-          <SmartFolderList onNavigate={onClose} />
+          {!simple && <SmartFolderList onNavigate={onClose} />}
 
-          <ClassificationList onNavigate={onClose} />
+          <ClassificationList onNavigate={onClose} hideFormats={simple} />
 
+          {!hideFeedList && <>
           <div className="px-2 pt-4 pb-1">
             <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted">{t('feeds.title')}</h2>
           </div>
@@ -556,6 +569,7 @@ export function FeedList({ isOpen, onClose, onBackdropClose, onCollapse, onMarkA
               )
             }
           </div>}
+          </>}
         </nav>
 
         <div style={{ paddingBottom: 'var(--safe-area-inset-bottom)' }}>

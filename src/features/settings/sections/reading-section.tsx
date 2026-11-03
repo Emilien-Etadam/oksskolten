@@ -23,12 +23,27 @@ export function ReadingSection() {
     chatPosition, setChatPosition,
     articleOpenMode, setArticleOpenMode,
     dateMode, setDateMode,
+    simpleMode, setSimpleMode,
   } = settings
   const { t, locale } = useI18n()
 
   return (
     <section>
       <h2 className="text-base font-semibold text-text mb-4">{t('settings.reading')}</h2>
+
+      <div className="mb-6">
+        <p className="text-sm text-text mb-1">{t('settings.simpleMode')}</p>
+        <p className="text-xs text-muted mb-3">{t('settings.simpleModeDesc')}</p>
+        <RadioGroup
+          name="simpleMode"
+          options={[
+            { value: 'on' as const, label: t('settings.simpleModeOn') },
+            { value: 'off' as const, label: t('settings.simpleModeOff') },
+          ]}
+          value={simpleMode}
+          onChange={setSimpleMode}
+        />
+      </div>
 
       <div>
         <p className="text-sm text-text mb-1">{t('settings.unreadIndicator')}</p>

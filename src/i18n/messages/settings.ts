@@ -118,6 +118,14 @@ export const settings = {
   'settings.showFeedActivityDesc': { ja: 'サイドバーにフィードの更新頻度やステータスを表示します', en: 'Show feed update frequency and status in the sidebar', zh: '在侧边栏显示订阅源更新频率和状态'},
   'settings.showFeedActivityOn': { ja: '表示する', en: 'Show', zh: '显示'},
   'settings.showFeedActivityOff': { ja: '表示しない', en: 'Hide', zh: '隐藏'},
+  'settings.simpleMode': { ja: 'シンプルモード', en: 'Simple Mode', zh: '简洁模式'},
+  'settings.simpleModeDesc': {
+    ja: 'サイドバーをテーマ、ブックマーク、クリップ、GitHub リリース、設定だけに絞ります。隠したページは URL から引き続き開けます',
+    en: 'Trim the sidebar to themes, bookmarks, clips, GitHub releases and settings. Hidden pages still open from their URL',
+    zh: '侧边栏仅保留主题、书签、剪藏、GitHub 发布和设置。隐藏的页面仍可通过 URL 打开'
+  },
+  'settings.simpleModeOn': { ja: 'オン', en: 'On', zh: '开'},
+  'settings.simpleModeOff': { ja: 'オフ', en: 'Off', zh: '关'},
   'settings.chatPosition': { ja: 'チャットボタンの位置', en: 'Chat Button Position', zh: '聊天按钮位置'},
   'settings.chatPositionDesc': { ja: '記事ページでのチャットボタンの表示位置を選択します', en: 'Choose where the chat button appears on article pages', zh: '选择聊天按钮在文章页面的显示位置'},
   'settings.chatPositionFab': { ja: 'フローティング', en: 'Floating', zh: '浮动'},

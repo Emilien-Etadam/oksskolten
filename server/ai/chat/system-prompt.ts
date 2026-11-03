@@ -1,5 +1,6 @@
 import { getArticleById, getSetting } from '../../db.js'
 import { DEFAULT_LANGUAGE, languageName } from '../../../shared/lang.js'
+import { truncateChars } from '../../lib/text.js'
 
 const ARTICLE_CONTEXT_MAX_CHARS = 10000
 
@@ -50,7 +51,7 @@ export function appendArticleContext(systemPrompt: string, articleId: number): s
 
   const articleText = article.full_text_translated || article.full_text || ''
   const truncated = articleText.length > ARTICLE_CONTEXT_MAX_CHARS
-    ? articleText.slice(0, ARTICLE_CONTEXT_MAX_CHARS) + '\n… (truncated)'
+    ? truncateChars(articleText, ARTICLE_CONTEXT_MAX_CHARS) + '\n… (truncated)'
     : articleText
   const safeTitle = (article.title || '').replace(/[<>`]/g, '')
 

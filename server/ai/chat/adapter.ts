@@ -1,5 +1,6 @@
 import type { Message } from './types.js'
 import { runAnthropicTurn } from './adapter-anthropic.js'
+import { toWellFormedDeep, toWellFormedText } from '../../lib/text.js'
 
 export type ChatSSEEvent =
   | { type: 'text_delta'; text: string }
@@ -23,7 +24,13 @@ export interface ChatTurnParams {
   onEvent: (event: ChatSSEEvent) => void
 }
 
-export async function runChatTurn(provider: string, params: ChatTurnParams): Promise<RunChatTurnResult> {
+export async function runChatTurn(provider: string, rawParams: ChatTurnParams): Promise<RunChatTurnResult> {
+  // Lone surrogates (e.g. a half emoji) are invalid Unicode and get rejected by some LLM APIs
+  const params: ChatTurnParams = {
+    ...rawParams,
+    system: toWellFormedText(rawParams.system),
+    messages: toWellFormedDeep(rawParams.messages),
+  }
   if (provider === 'claude-code') {
     const { runClaudeCodeTurn } = await import('./adapter-claude-code.js')
     return runClaudeCodeTurn(params)
