@@ -18,7 +18,8 @@
     "typecheck": "tsc --noEmit",
     "test": "mise exec node@22 -- vitest run",
     "test:watch": "mise exec node@22 -- vitest",
-    "test:e2e": "npm run build && playwright test"
+    "test:e2e": "npm run build && playwright test",
+    "bench:notjev": "tsx --env-file-if-exists=.env server/bench/notjev/run.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
