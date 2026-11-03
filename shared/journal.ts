@@ -38,8 +38,12 @@ export interface JournalSection {
   refs: number[]
   /** Every article the section covered, cited or not */
   article_ids: number[]
-  /** Covered but not cited, best first */
+  /** Read by the model but not cited, best first */
   uncited: JournalArticleRef[]
+  /** Past the per-section cap: covered and counted, never read by the model. Absent in older editions. */
+  overflow?: JournalArticleRef[]
+  /** Judged negligible at classification time, never sent to the model. Absent in editions written before importance existed. */
+  skipped?: JournalArticleRef[]
 }
 
 export interface JournalEssential {

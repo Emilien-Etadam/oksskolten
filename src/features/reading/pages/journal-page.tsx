@@ -10,6 +10,7 @@ import { articleUrlToPath, isGithubStarsFeed } from '@/lib/url'
 import { formatRelativeDate } from '@/lib/dateFormat'
 import { NO_THEME_KEY } from '../../../../shared/journal'
 import type {
+  JournalArticleRef,
   JournalEdition,
   JournalEditionSummary,
   JournalOverview,
@@ -317,6 +318,7 @@ function Section({ index, section, label, sources, voteOf, onVote, instruction, 
       </div>
 
       <div className="flex flex-col gap-3.5 text-lg leading-relaxed text-text" style={{ fontFamily: 'var(--font-article)' }}>
+        {paragraphs.length === 0 && <p className="m-0 text-muted">{t('journal.nothingImportant')}</p>}
         {paragraphs.map((p, i) => <p key={i} className="m-0"><CitedText text={p} sources={sources} /></p>)}
       </div>
 
@@ -328,7 +330,17 @@ function Section({ index, section, label, sources, voteOf, onVote, instruction, 
         </div>
       )}
 
-      {section.uncited.length > 0 && <Uncited section={section} t={t} />}
+      {section.uncited.length > 0 && (
+        <ArticleRefList label={t('journal.showUncited', { count: String(section.uncited.length) })} articles={section.uncited} />
+      )}
+
+      {(section.overflow?.length ?? 0) > 0 && (
+        <ArticleRefList label={t('journal.showOverflow', { count: String(section.overflow!.length) })} articles={section.overflow!} muted />
+      )}
+
+      {(section.skipped?.length ?? 0) > 0 && (
+        <ArticleRefList label={t('journal.showSkipped', { count: String(section.skipped!.length) })} articles={section.skipped!} muted />
+      )}
 
       <InstructionBox theme={section.theme} value={instruction} onSaved={onInstructionsChange} t={t} />
     </section>
@@ -447,15 +459,15 @@ function SourceCard({ source, vote, onVote, locale, t }: {
   )
 }
 
-function Uncited({ section, t }: { section: JournalSection; t: TranslateFn }) {
+function ArticleRefList({ label, articles, muted = false }: { label: string; articles: JournalArticleRef[]; muted?: boolean }) {
   const navigate = useNavigate()
   return (
     <details>
-      <summary className="cursor-pointer select-none text-sm font-semibold text-accent">
-        {t('journal.showUncited', { count: String(section.uncited.length) })}
+      <summary className={`cursor-pointer select-none text-sm font-semibold ${muted ? 'text-muted hover:text-text' : 'text-accent'}`}>
+        {label}
       </summary>
       <ul className="mt-2 flex flex-col gap-1.5 pl-1">
-        {section.uncited.map(a => {
+        {articles.map(a => {
           const path = articleUrlToPath(a.url)
           return (
             <li key={a.article_id} className="text-sm">

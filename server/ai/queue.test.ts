@@ -393,7 +393,7 @@ describe('ai-queue classification', () => {
       summary: null,
       filtered_at: null,
     })
-    mockClassifyArticle.mockResolvedValue({ format: 'QUESTION', theme: 'AI', formatTop: 'QUESTION', themeTop: 'AI', ms: 10 })
+    mockClassifyArticle.mockResolvedValue({ format: 'QUESTION', theme: 'AI', formatTop: 'QUESTION', themeTop: 'AI', importance: 'ESSENTIAL', importanceTop: 'ESSENTIAL', ms: 10 })
     mockDbAll.mockReturnValue([])
   })
 
@@ -405,7 +405,7 @@ describe('ai-queue classification', () => {
     expect(mockUpdateArticleContent).not.toHaveBeenCalled()
   })
 
-  it('stores format and theme and clears the pending marker', async () => {
+  it('stores format, theme and importance and clears the pending marker', async () => {
     enqueueClassify(5)
     await flushQueue()
 
@@ -413,10 +413,12 @@ describe('ai-queue classification', () => {
       title: 'Which GPU for a local LLM?',
       feedName: 'r/LocalLLM',
       body: 'I have a budget of 500 euros',
+      readerContext: expect.any(Function),
     })
     const merged = updatesFor(5)
     expect(merged.format).toBe('QUESTION')
     expect(merged.theme).toBe('AI')
+    expect(merged.importance).toBe('ESSENTIAL')
     expect(merged.classified_at).toBeTruthy()
     expect(merged.classify_pending_at).toBeNull()
   })

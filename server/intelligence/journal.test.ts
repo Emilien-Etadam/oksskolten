@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { buildSectionPrompt, groupByTheme, remapCitations } from './journal.js'
+import { buildImportanceQuestion } from '../ai/classify.js'
 import type { JournalArticle } from './journal-db.js'
 
 function article(id: number, theme: string | null): JournalArticle {
-  return { id, title: `Title ${id}`, url: `https://x.example/${id}`, theme, feed_name: 'Feed', published_at: null, body: 'Body' }
+  return { id, title: `Title ${id}`, url: `https://x.example/${id}`, theme, feed_name: 'Feed', published_at: null, importance: null, body: 'Body' }
 }
 
 describe('groupByTheme', () => {
@@ -43,5 +44,18 @@ describe('buildSectionPrompt', () => {
     expect(prompt).toContain('- Benchmarks')
     expect(prompt).toContain('- Funding round')
     expect(prompt).toContain('Write it in French.')
+  })
+})
+
+describe('buildImportanceQuestion', () => {
+  it('includes the instruction and votes when there are some', () => {
+    const q = buildImportanceQuestion({ instruction: 'Skip memes', liked: ['Benchmarks'], disliked: ['Funding'] })
+    expect(q).toContain('Skip memes')
+    expect(q).toContain('"Benchmarks"')
+    expect(q).toContain('"Funding"')
+  })
+
+  it('is a plain question without context', () => {
+    expect(buildImportanceQuestion(undefined)).toBe('How important is this article for this reader?')
   })
 })

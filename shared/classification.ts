@@ -45,6 +45,23 @@ export const MAX_THEMES = 26
 export const DEFAULT_FORMAT_THETA = 0.5
 export const DEFAULT_THEME_THETA = 0.3
 
+/**
+ * How much an article matters to this reader, asked after the theme with the
+ * reader's instruction and votes for that theme. The journal leaves SKIP
+ * articles out of its synthesis; undecided (null) counts as USEFUL, so a
+ * hesitating model never hides anything.
+ */
+export const IMPORTANCE: ClassOption[] = [
+  { id: 'ESSENTIAL', label: 'Essential', description: 'essential: significant news, concrete results or first-hand experience the reader would regret missing' },
+  { id: 'USEFUL', label: 'Useful', description: 'useful: relevant and informative, but not a must-read' },
+  { id: 'SKIP', label: 'Negligible', description: 'negligible for this reader: memes, jokes, promotion, rumors, trivial or repeated posts, or what the reader asked to skip' },
+]
+
+export type Importance = 'ESSENTIAL' | 'USEFUL' | 'SKIP'
+
+/** Abstain unless the model leans clearly: a wrong SKIP hides an article from the journal */
+export const DEFAULT_IMPORTANCE_THETA = 0.3
+
 /** Normalize a user-typed id: uppercase, letters/digits/underscore only. */
 export function normalizeClassId(raw: string): string {
   return raw.trim().toUpperCase().replace(/[^A-Z0-9_]+/g, '_').replace(/^_+|_+$/g, '')

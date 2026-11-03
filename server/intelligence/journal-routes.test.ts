@@ -92,6 +92,33 @@ describe('POST /api/journal/generate', () => {
     expect(old.seen_at).toBeNull()
   })
 
+  it('keeps negligible articles out of the synthesis but lists them', async () => {
+    const feed = createFeed({ name: 'Blog', url: 'https://blog.example.com' })
+    const keep = insertArticle({ feed_id: feed.id, title: 'Benchmark results', url: 'https://blog.example.com/1', published_at: new Date().toISOString() })
+    const meme = insertArticle({ feed_id: feed.id, title: 'Meme of the day', url: 'https://blog.example.com/2', published_at: new Date().toISOString() })
+    getDb().prepare("UPDATE articles SET importance = 'SKIP' WHERE id = ?").run(meme)
+    mockCreateMessage.mockResolvedValue(reply('Results are in [1].'))
+
+    const result = await generateAndWait()
+    const prompt = mockCreateMessage.mock.calls[0][0].messages[0].content as string
+    expect(prompt).toContain('Benchmark results')
+    expect(prompt).not.toContain('Meme of the day')
+    const section = result.latest!.content!.sections[0]
+    expect(section.skipped?.map(a => a.article_id)).toEqual([meme])
+    expect(section.article_ids.sort()).toEqual([keep, meme].sort())
+  })
+
+  it('does not call the model for a theme with only negligible articles', async () => {
+    const feed = createFeed({ name: 'Blog', url: 'https://blog.example.com' })
+    const meme = insertArticle({ feed_id: feed.id, title: 'Meme', url: 'https://blog.example.com/1', published_at: new Date().toISOString() })
+    getDb().prepare("UPDATE articles SET importance = 'SKIP' WHERE id = ?").run(meme)
+
+    const result = await generateAndWait()
+    expect(result.latest?.status).toBe('done')
+    expect(mockCreateMessage).not.toHaveBeenCalled()
+    expect(result.latest?.content?.sections[0].summary).toBe('')
+  })
+
   it('leaves starred GitHub releases and clips out', async () => {
     // As the add-feed dialog stores it: the pasted URL, the canonical one in rss_url
     const stars = createFeed({ name: 'GitHub Releases (me)', url: 'https://github.com/me?tab=stars', rss_url: 'https://github.com/stars/me' })

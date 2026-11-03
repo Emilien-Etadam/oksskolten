@@ -154,13 +154,16 @@ async function writeEdition(editionId: number, buckets: ThemeBucket[], llm: Llm)
   const sections: JournalSection[] = []
 
   for (const [index, bucket] of buckets.entries()) {
-    const shown = bucket.articles.slice(0, MAX_ARTICLES_PER_SECTION)
+    // Judged negligible at classification time: listed, never sent to the model
+    const kept = bucket.articles.filter(a => a.importance !== 'SKIP')
+    const skipped = bucket.articles.filter(a => a.importance === 'SKIP')
+    const shown = kept.slice(0, MAX_ARTICLES_PER_SECTION)
     const examples = getFeedbackExamples(bucket.theme === NO_THEME_KEY ? null : bucket.theme)
-    const raw = await llm.ask(buildSectionPrompt({
+    const raw = shown.length === 0 ? '' : await llm.ask(buildSectionPrompt({
       label: bucket.label,
       language,
       articles: shown,
-      totalCount: bucket.articles.length,
+      totalCount: kept.length,
       instruction: instructions[bucket.theme],
       liked: examples.liked,
       disliked: examples.disliked,
@@ -192,9 +195,12 @@ async function writeEdition(editionId: number, buckets: ThemeBucket[], llm: Llm)
       article_count: bucket.articles.length,
       refs,
       article_ids: bucket.articles.map(a => a.id),
-      uncited: bucket.articles
+      uncited: shown
         .filter(a => !sourceByArticle.has(a.id))
         .map(a => ({ article_id: a.id, title: a.title, url: a.url, feed_name: a.feed_name })),
+      overflow: kept.slice(MAX_ARTICLES_PER_SECTION)
+        .map(a => ({ article_id: a.id, title: a.title, url: a.url, feed_name: a.feed_name })),
+      skipped: skipped.map(a => ({ article_id: a.id, title: a.title, url: a.url, feed_name: a.feed_name })),
     })
     setSectionsDone(editionId, index + 1)
   }
