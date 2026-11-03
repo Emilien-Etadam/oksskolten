@@ -122,4 +122,4 @@ An article whose URL is inside a GitHub repository, such as a starred release or
 | `shared/github-repo.ts` | GitHub URL → `<owner>/<repo>` |
 | `src/features/settings/sections/git-backup-section.tsx` | Settings section |
 | `src/features/reading/components/git-backup-chip.tsx` | Article toolbar chip |
-| `migrations/0021_git_backups.sql` | Table definition |
+| `migrations/0023_git_backups.sql` | Table definition |
