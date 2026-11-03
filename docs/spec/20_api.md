@@ -1097,6 +1097,8 @@ Article list and detail responses include `similar_count` (integer) — the numb
 
 Smart folders (`/api/smart-folders`), automated rules (`/api/rules`), top stories (`/api/stories`), the interest profile (`/api/interests`) and `GET /api/articles?sort=recommended` are documented in [87_feature_intelligence.md](./87_feature_intelligence.md#api).
 
+Git backup endpoints (`/api/settings/git-backup`, `/api/git-backups`) are documented in [86_feature_git_backup.md](./86_feature_git_backup.md#api).
+
 Article classification (`/api/classification`) and the `format` / `theme` filters of `GET /api/articles` are documented in [87_feature_classification.md](./87_feature_classification.md#api).
 
 

@@ -181,6 +181,24 @@ CREATE TABLE interest_classes (
   PRIMARY KEY (kind, class_id)
 );
 
+-- Git backup (86_feature_git_backup.md): GitHub repositories archived as
+-- Forgejo pull mirrors. Forgejo holds the code; this only tracks the archives.
+CREATE TABLE git_backups (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  github_owner     TEXT NOT NULL COLLATE NOCASE,
+  github_repo      TEXT NOT NULL COLLATE NOCASE,
+  forgejo_owner    TEXT NOT NULL,
+  forgejo_repo     TEXT NOT NULL,
+  default_branch   TEXT NOT NULL,                  -- branch watched by the pre-sync check
+  status           TEXT NOT NULL DEFAULT 'importing', -- importing | ok | blocked | frozen | error
+  blocked_refs     TEXT,                           -- JSON: refs a sync would lose
+  last_error       TEXT,
+  last_checked_at  TEXT,
+  last_synced_at   TEXT,
+  created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (github_owner, github_repo)
+);
+
 -- Article classification (87_feature_classification.md); articles also carry
 -- format TEXT, theme TEXT, classified_at TEXT, classify_pending_at TEXT,
 -- indexed by idx_articles_format / idx_articles_theme
