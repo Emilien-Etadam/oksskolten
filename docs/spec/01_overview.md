@@ -18,6 +18,7 @@ Typical RSS readers only display the title and summary provided by the feed, req
 > - [84_feature_keyboard_navigation.md](./84_feature_keyboard_navigation.md) — Keyboard Navigation
 > - [85_feature_ollama.md](./85_feature_ollama.md) — Ollama LLM Provider
 > - [86_feature_github_releases.md](./86_feature_github_releases.md) — GitHub Starred Releases
+> - [86_feature_git_backup.md](./86_feature_git_backup.md) — Git Backup (GitHub repositories archived on Forgejo)
 > - [87_feature_intelligence.md](./87_feature_intelligence.md) — Reading Intelligence (smart folders, rules, top stories, trust, interests)
 > - [87_feature_classification.md](./87_feature_classification.md) — Article Classification (formats and themes from a local model)
 > - [88_feature_github_trending.md](./88_feature_github_trending.md) — GitHub Trending
