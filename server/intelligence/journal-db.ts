@@ -1,4 +1,5 @@
 import { getDb } from '../db/connection.js'
+import { NO_THEME_KEY } from '../../shared/journal.js'
 import type {
   JournalContent,
   JournalEdition,
@@ -28,6 +29,8 @@ export interface JournalArticle {
   theme: string | null
   feed_name: string
   published_at: string | null
+  /** ESSENTIAL / USEFUL / SKIP; null when not judged or undecided */
+  importance: string | null
   /** Summary, excerpt or start of the full text, whichever exists first */
   body: string
 }
@@ -83,12 +86,13 @@ function periodParams(start: string | null, end: string): string[] {
 /** Articles arrived in (start, end], best first. A null start looks back FIRST_EDITION_LOOKBACK. */
 export function getArticlesForPeriod(start: string | null, end: string): JournalArticle[] {
   return getDb().prepare(`
-    SELECT a.id, a.title, a.url, a.theme, a.published_at, f.name AS feed_name,
+    SELECT a.id, a.title, a.url, a.theme, a.importance, a.published_at, f.name AS feed_name,
            COALESCE(NULLIF(a.summary, ''), NULLIF(a.excerpt, ''), substr(COALESCE(a.full_text, ''), 1, 600)) AS body
     FROM active_articles a
     JOIN feeds f ON f.id = a.feed_id
     WHERE ${periodWhere(start)} AND a.filtered_at IS NULL AND ${EXCLUDED_FEEDS_SQL}
-    ORDER BY a.interest_score DESC, a.score DESC, a.id DESC
+    ORDER BY CASE a.importance WHEN 'ESSENTIAL' THEN 0 WHEN 'SKIP' THEN 2 ELSE 1 END,
+             a.interest_score DESC, a.score DESC, a.id DESC
   `).all(...periodParams(start, end)) as JournalArticle[]
 }
 
@@ -235,4 +239,16 @@ export function getFeedbackExamples(theme: string | null, limit = 10): { liked: 
     liked: rows.filter(r => r.vote > 0).slice(0, limit).map(r => r.title),
     disliked: rows.filter(r => r.vote < 0).slice(0, limit).map(r => r.title),
   }
+}
+
+/** Votes shown per side when judging one article's importance at classification time */
+const READER_CONTEXT_EXAMPLES = 5
+
+/** The reader's instruction and recent votes for a theme, for the importance question */
+export function getReaderContext(theme: string | null): { instruction?: string; liked: string[]; disliked: string[] } {
+  // The journal files undecided and OTHER articles under one bucket, and keys its instruction so
+  const key = theme && theme !== 'OTHER' ? theme : NO_THEME_KEY
+  const instruction = getDb().prepare('SELECT instruction FROM journal_instructions WHERE theme = ?')
+    .get(key) as { instruction: string } | undefined
+  return { instruction: instruction?.instruction, ...getFeedbackExamples(theme, READER_CONTEXT_EXAMPLES) }
 }

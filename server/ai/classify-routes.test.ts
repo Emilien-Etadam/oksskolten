@@ -103,12 +103,22 @@ describe('classification API', () => {
       method: 'POST', url: '/api/classification/test', headers: json,
       payload: { title: 'Which GPU should I buy for local models?' },
     })
-    expect(res.json()).toMatchObject({ ok: true, result: { format: 'QUESTION', theme: 'COMICS', model: 'test-model' } })
-    // One request per question, sent to the vLLM endpoint with the configured model
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(res.json()).toMatchObject({ ok: true, result: { format: 'QUESTION', theme: 'COMICS', importance: 'USEFUL', model: 'test-model' } })
+    // One request per question (format, theme, importance), sent to the vLLM endpoint with the configured model
+    expect(fetchMock).toHaveBeenCalledTimes(3)
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, { body: string }]
     expect(url).toMatch(/\/v1\/chat\/completions$/)
     expect(JSON.parse(init.body)).toMatchObject({ model: 'test-model', max_tokens: 1, logprobs: true })
+  })
+
+  it('asks the importance question with the reader instruction for the theme found', async () => {
+    await enable()
+    await app.inject({ method: 'PUT', url: '/api/journal/instructions/COMICS', headers: json, payload: { instruction: 'Skip reprint announcements' } })
+    // 'B' everywhere: theme B is COMICS, importance B is USEFUL
+    const fetchMock = stubLogprobServer('B')
+    await app.inject({ method: 'POST', url: '/api/classification/test', headers: json, payload: { title: 'A new album' } })
+    const [, init] = fetchMock.mock.calls[2] as unknown as [string, { body: string }]
+    expect(init.body).toContain('Skip reprint announcements')
   })
 
   it('reports a server failure from the test endpoint instead of throwing', async () => {

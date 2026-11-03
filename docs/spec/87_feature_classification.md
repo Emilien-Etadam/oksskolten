@@ -28,7 +28,7 @@ Formats and themes show up in the sidebar with their unread counts (`/formats/:i
 
 ### Decision
 
-`server/ai/classify.ts` builds the article state (title, feed name, first 1,500 characters of the body) and asks two questions in sequence, so the second reuses the server's prefix cache. Each answer is `choice` or `null` when the margin between the two best options is below theta:
+`server/ai/classify.ts` builds the article state (title, feed name, first 1,500 characters of the body) and asks three questions in sequence (format, theme, importance), so each reuses the server's prefix cache for the article text. Each answer is `choice` or `null` when the margin between the two best options is below theta:
 
 | Setting | Default | Meaning |
 |---|---|---|
@@ -38,11 +38,13 @@ Formats and themes show up in the sidebar with their unread counts (`/formats/:i
 | `classify.theme_theta` | `0.3` | Minimum margin for a theme (themes like AI / Computing overlap, and the top guess is usually right) |
 | `classify.hide_categories` | `on` | Show themes instead of categories in the sidebar and the tab bar |
 
+**Importance** is asked last, because its question carries the reader's journal instruction for the theme just decided and the titles of their 5 latest "more like this" / "less like this" votes on it ([92_feature_journal.md](./92_feature_journal.md)). Options are `ESSENTIAL`, `USEFUL` and `SKIP` (`IMPORTANCE` in `shared/classification.ts`), with a fixed theta of 0.3. Undecided stays `null`, which the journal reads as useful: a hesitating model never hides an article. Articles classified before importance existed keep `null` until a backfill with `all`.
+
 Server errors throw, so the queue retries. If neither question saw an option letter (`degraded`: no logprobs, or the model answered outside the menu) the call counts as a failure, not as "undecided".
 
 ### Pipeline
 
-The `classify` ingest step (new and clipped articles) enqueues task `classify` on the AI queue, after the AI filter. The worker skips articles the filter hid, then writes `format`, `theme` and `classified_at`. `classify_pending_at` is the persistent marker the resume pass uses, like the other AI tasks.
+The `classify` ingest step (new and clipped articles) enqueues task `classify` on the AI queue, after the AI filter. The worker skips articles the filter hid, then writes `format`, `theme`, `importance` (migration `0022_article_importance.sql`) and `classified_at`. `classify_pending_at` is the persistent marker the resume pass uses, like the other AI tasks.
 
 `POST /api/classification/backfill` queues every active article with `classified_at IS NULL`, up to 5,000 per call, on a low-priority backlog drained only when the regular queue is empty, so new articles are translated and summarized first. Backfill items write no pending marker; after a restart the reader clicks again. `{ "all": true }` clears every verdict first (after editing the theme list).
 

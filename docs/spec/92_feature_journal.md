@@ -36,13 +36,14 @@ The client polls `GET /api/journal` every 2 seconds while the latest edition is 
 
 ### Grouping
 
-Articles are grouped by `articles.theme` in the reader's theme order ([87_feature_classification.md](./87_feature_classification.md)). Articles without a theme, with `OTHER`, or with a theme since removed from the list share the `_` bucket, placed last. With classification off every article is in `_`, and the single section is labelled "All news". Within a group, articles are ordered by `interest_score`, then `score`, then newest.
+Articles are grouped by `articles.theme` in the reader's theme order ([87_feature_classification.md](./87_feature_classification.md)). Articles without a theme, with `OTHER`, or with a theme since removed from the list share the `_` bucket, placed last. With classification off every article is in `_`, and the single section is labelled "All news". Within a group, articles are ordered by importance (`ESSENTIAL`, then useful or undecided, then `SKIP`), then `interest_score`, `score` and newest.
 
 ### Writing a section
 
 One model call per group (`buildSectionPrompt()`):
 
-- The 40 best articles of the group are listed as `[k] title (feed)` with up to 280 characters of summary, excerpt or full text. Larger groups are counted in the prompt ("the 40 most relevant of 120") and their remaining articles are covered but not read by the model.
+- Articles judged `SKIP` at classification time ([87_feature_classification.md](./87_feature_classification.md)) are never sent to the model; the section lists them as `skipped`. A group with only `SKIP` articles makes no call and gets an empty summary ("Nothing important in this theme").
+- The 40 best remaining articles are listed as `[k] title (feed)` with up to 280 characters of summary, excerpt or full text. Larger groups are counted in the prompt ("the 40 most relevant of 120"); the rest is covered but not read by the model and listed as `overflow`. `uncited` holds only articles the model read and did not cite.
 - The model writes 1 to 3 paragraphs in the reader's language (`general.language`), citing each statement as `[k]`, merging articles about the same subject, and saying so in one sentence when nothing stands out.
 - The reader's instruction for the theme and the titles of recent "more like this" / "less like this" votes on that theme are appended.
 
@@ -54,13 +55,13 @@ After the sections, one more call (`buildEssentialsPrompt()`) picks at most 3 po
 
 ### Feedback and instructions
 
-- **Instruction per theme**: free text, at most 1000 characters, stored in `journal_instructions` keyed by theme id (`_` for the no-theme bucket). An empty text deletes it. It applies from the next edition.
+- **Instruction per theme**: free text, at most 1000 characters, stored in `journal_instructions` keyed by theme id (`_` for the no-theme bucket). An empty text deletes it. It applies from the next edition, and to the importance of articles classified from then on.
 - **More / less like this**: a vote on a cited source, stored in `journal_feedback` with the article's title and theme. "More like this" also likes the article, which feeds the interest profile ([87_feature_intelligence.md](./87_feature_intelligence.md)) and therefore the ordering of the next groups. Voting the same way again clears the vote.
 - **Archive in Clips**: moves the article to the clip feed through `POST /api/articles/from-url` with `force: true` ([80_feature_clip.md](./80_feature_clip.md)).
 
 ### DB Schema
 
-Migration `0021_journal.sql`:
+Migration `0021_journal.sql` (and `articles.importance` from `0022_article_importance.sql`):
 
 | Table | Columns |
 |-------|---------|
@@ -88,5 +89,5 @@ Migration `0021_journal.sql`:
 - Masthead with the edition's date and number, the covered period, an editions picker for past editions, and the generate button.
 - A line with the number of articles waiting for the next edition, a progress bar while writing, or the error with a retry.
 - Four figures: articles covered, sources cited, themes, minutes of reading (words of the written text at 200 per minute).
-- The essentials box, then one numbered section per theme: the synthesis with superscript citations that open the article, a card per cited source (feed, date, more / less like this, archive in Clips), the uncited articles behind a disclosure, and the theme instruction.
+- The essentials box, then one numbered section per theme: the synthesis with superscript citations that open the article, a card per cited source (feed, date, more / less like this, archive in Clips), then behind disclosures the articles read but not cited, those past the limit and not read, and those judged negligible, and the theme instruction.
 - A footer recalling that the covered articles are marked read, and the unread count of the starred GitHub releases feeds left out.

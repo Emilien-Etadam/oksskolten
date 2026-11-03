@@ -10,6 +10,7 @@ import {
   sanitizeThemes,
 } from './classify.js'
 import { enqueueClassifyBackfill, countPendingClassify } from './queue.js'
+import { getReaderContext } from '../intelligence/journal-db.js'
 import { FORMATS, MAX_THEMES, type ClassificationCount, type ClassificationOverview } from '../../shared/classification.js'
 
 const Theta = z.number().min(0).max(1)
@@ -94,7 +95,7 @@ export async function classificationRoutes(api: FastifyInstance): Promise<void> 
     const body = parseOrBadRequest(TestBody, request.body, reply)
     if (!body) return
     try {
-      reply.send({ ok: true, result: await classifyArticle({ title: body.title, body: body.body }) })
+      reply.send({ ok: true, result: await classifyArticle({ title: body.title, body: body.body, readerContext: getReaderContext }) })
     } catch (err) {
       reply.send({ ok: false, error: err instanceof Error ? err.message : String(err) })
     }
