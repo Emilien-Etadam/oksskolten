@@ -11,7 +11,8 @@ import {
 } from './classify.js'
 import { enqueueClassifyBackfill, countPendingClassify } from './queue.js'
 import { getReaderContext } from '../intelligence/journal-db.js'
-import { FORMATS, MAX_THEMES, type ClassificationCount, type ClassificationOverview } from '../../shared/classification.js'
+import { suggestThemes } from './tasks.js'
+import { FORMATS, MAX_THEMES, normalizeClassId, type ClassOption, type ClassificationCount, type ClassificationOverview } from '../../shared/classification.js'
 
 const Theta = z.number().min(0).max(1)
 
@@ -37,6 +38,46 @@ const BackfillBody = z.object({
   /** Forget every previous verdict first (after editing the theme list) */
   all: z.boolean().optional(),
 })
+
+const SuggestBody = z.object({
+  /** How many themes to ask for, "Other" excluded */
+  count: z.number().int().min(3).max(MAX_THEMES - 1).optional(),
+})
+
+const SUGGEST_DEFAULT_COUNT = 18
+/** Titles sent to the model: the latest per feed, so one busy feed cannot drown the rest */
+const SUGGEST_TITLES = 300
+const SUGGEST_PER_FEED = 20
+
+function sampleTitles(): string[] {
+  const rows = getDb().prepare(`
+    SELECT title FROM (
+      SELECT title, published_at,
+        ROW_NUMBER() OVER (PARTITION BY feed_id ORDER BY published_at DESC) AS rank
+      FROM active_articles
+      WHERE filtered_at IS NULL AND title IS NOT NULL AND TRIM(title) != ''
+    )
+    WHERE rank <= ?
+    ORDER BY published_at DESC
+    LIMIT ?
+  `).all(SUGGEST_PER_FEED, SUGGEST_TITLES) as Array<{ title: string }>
+  return rows.map(r => r.title.replace(/\s+/g, ' ').trim().slice(0, 200))
+}
+
+/** Unique ids, at most MAX_THEMES - 1, then the current "Other" theme last. */
+function finalizeSuggestion(suggested: Array<{ label: string; description: string }>, current: ClassOption[]): ClassOption[] {
+  const other = current.find(th => th.id === 'OTHER') ?? { id: 'OTHER', label: 'Other', description: 'none of the above' }
+  const seen = new Set<string>(['OTHER'])
+  const out: ClassOption[] = []
+  for (const th of suggested) {
+    const id = normalizeClassId(th.label)
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    out.push({ id, label: th.label, description: th.description })
+    if (out.length >= MAX_THEMES - 1) break
+  }
+  return out.length ? [...out, other] : []
+}
 
 function unreadCounts(column: 'format' | 'theme'): Map<string, number> {
   const rows = getDb().prepare(`
@@ -98,6 +139,34 @@ export async function classificationRoutes(api: FastifyInstance): Promise<void> 
       reply.send({ ok: true, result: await classifyArticle({ title: body.title, body: body.body, readerContext: getReaderContext }) })
     } catch (err) {
       reply.send({ ok: false, error: err instanceof Error ? err.message : String(err) })
+    }
+  })
+
+  // A finer theme list proposed from recent titles, nothing stored: the
+  // reader edits it in the theme editor and saves it like a manual list
+  api.post('/api/classification/suggest-themes', async (request, reply) => {
+    const body = parseOrBadRequest(SuggestBody, request.body ?? {}, reply)
+    if (!body) return
+    const titles = sampleTitles()
+    if (titles.length === 0) {
+      reply.status(409).send({ error: 'No articles to learn themes from' })
+      return
+    }
+    const current = getClassificationSettings().themes
+    try {
+      const result = await suggestThemes(
+        titles,
+        current.filter(th => th.id !== 'OTHER'),
+        body.count ?? SUGGEST_DEFAULT_COUNT,
+      )
+      const themes = finalizeSuggestion(result.themes, current)
+      if (themes.length === 0) {
+        reply.status(502).send({ error: 'The model did not return a usable theme list' })
+        return
+      }
+      reply.send({ themes, sampled: titles.length })
+    } catch (err) {
+      reply.status(502).send({ error: err instanceof Error ? err.message : String(err) })
     }
   })
 

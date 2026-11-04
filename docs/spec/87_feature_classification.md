@@ -48,6 +48,10 @@ The `classify` ingest step (new and clipped articles) enqueues task `classify` o
 
 `POST /api/classification/backfill` queues every active article with `classified_at IS NULL`, up to 5,000 per call, on a low-priority backlog drained only when the regular queue is empty, so new articles are translated and summarized first. Backfill items write no pending marker; after a restart the reader clicks again. `{ "all": true }` clears every verdict first (after editing the theme list).
 
+### Theme suggestions
+
+When themes get too broad, Settings → Classification → "Suggest themes" asks the summary model (`summary.provider` / `summary.model`, not vLLM: it needs free text) for a new list. The prompt carries the current themes and up to 300 recent titles of visible articles, at most 20 per feed so one busy feed does not drown the rest, and asks for distinct, balanced themes as a JSON array, labels and descriptions in the interface language. The server keeps the first array in the answer, drops duplicate ids and any "Other" the model added, caps the list at 25 and appends the current `OTHER` theme. The proposal replaces the editor contents unsaved; the reader edits it, saves (or discards), then reclassifies. `classify.suggest_max_tokens` overrides the 4,096-token answer cap.
+
 ### API
 
 | Method | Path | Description |
@@ -55,6 +59,7 @@ The `classify` ingest step (new and clipped articles) enqueues task `classify` o
 | GET | `/api/classification` | `enabled`, `hideCategories` (only true while enabled), formats and themes with unread counts, `unclassified`, `pending` |
 | GET | `/api/classification/settings` | Current settings |
 | PATCH | `/api/classification/settings` | Update `enabled`, `model`, `formatTheta`, `themeTheta`, `themes`, `hideCategories` |
+| POST | `/api/classification/suggest-themes` | Propose a finer theme list from recent titles (`{ count? }`, 3-25, default 18); returns `{ themes, sampled }`, stores nothing |
 | POST | `/api/classification/test` | Classify `{ title, body? }` live, nothing stored |
 | POST | `/api/classification/backfill` | Queue unclassified articles (`{ all: true }` to start over) |
 
@@ -76,7 +81,7 @@ Configuration: `scripts/notjev-bench.config.json`; usage: `scripts/README-notjev
 - Sidebar: "Themes" and "Formats" sections under smart folders, collapsible, hidden while classification is off.
 - `/themes/:id` and `/formats/:id` list unread articles only; once all are read, the empty state offers "Show read articles", as categories do with the unread-only option.
 - Hidden categories: the sidebar lists feeds flat, sorted by name, with drag-and-drop to folders disabled (there is no folder to drop into), and the tab bar above article lists (`category-tabs.tsx`) links to `/themes/:id` instead of `/categories/:id`.
-- Settings → Integration → Article classification: switch, model, thresholds, theme editor, live test, backfill and reclassify, accuracy bench.
+- Settings → Integration → Article classification: switch, model, thresholds, theme editor with theme suggestions, live test, backfill and reclassify, accuracy bench.
 
 ### Key Files
 
