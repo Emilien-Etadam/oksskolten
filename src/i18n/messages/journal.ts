@@ -27,6 +27,8 @@ export const journal = {
   'journal.less': { ja: '減らしたい', en: 'Less like this', zh: '少来点'},
   'journal.archive': { ja: 'クリップに保存', en: 'Archive in Clips', zh: '存入剪藏'},
   'journal.archived': { ja: 'クリップに保存しました', en: 'Archived in Clips', zh: '已存入剪藏'},
+  'journal.otherArticles': { ja: 'その他の記事 ${count} 件', en: '${count} other articles', zh: '其他 ${count} 篇文章'},
+  'journal.sources': { ja: '出典', en: 'Sources', zh: '来源'},
   'journal.showOverflow': { ja: '件数上限を超えて読まれなかった ${count} 件', en: '${count} articles past the limit, not read', zh: '${count} 篇超出上限，未阅读'},
   'journal.showSkipped': { ja: '重要でないと判定された ${count} 件', en: '${count} articles judged negligible', zh: '${count} 篇被判定为无关紧要'},
   'journal.nothingImportant': { ja: 'このテーマに重要な記事はありませんでした。', en: 'Nothing important in this theme.', zh: '该主题没有重要内容。'},
