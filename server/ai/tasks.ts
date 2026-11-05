@@ -383,3 +383,89 @@ async function runDeepl(fullText: string): Promise<{ fullTextTranslated: string 
     monthlyChars: result.monthlyChars,
   }
 }
+
+const SUGGEST_THEMES_MAX_TOKENS = 4096
+
+export interface SuggestedTheme {
+  label: string
+  description: string
+}
+
+function buildSuggestThemesPrompt(currentThemes: SuggestedTheme[], count: number): (titles: string) => string {
+  const lang = getSetting('general.language') || DEFAULT_LANGUAGE
+  const current = currentThemes
+    .map(th => `- ${th.label}${th.description ? `: ${th.description}` : ''}`)
+    .join('\n')
+  return (titles: string) => `You design the theme list a reader uses to sort their RSS articles.
+Each article will later get exactly one theme, picked by a small model reading
+the theme labels and descriptions, so themes must be precise and not overlap.
+
+The reader finds some of their current themes too broad:
+${current}
+
+Below are titles of articles the reader recently received. Propose about ${count}
+themes that split these articles into balanced, distinct groups:
+- Split broad themes that gather many articles into narrower ones
+- Merge or drop themes that would stay almost empty
+- Each description lists the concrete topics it covers (under 150 characters)
+- Write labels and descriptions in ${languageName(lang)}
+- Do not include a catch-all theme: "Other" is added automatically
+
+Answer with a JSON array only, no other text:
+[{"label": "...", "description": "..."}]
+
+--- Article titles ---
+${titles}`
+}
+
+/** Pull the first JSON array out of a model answer (code fences, preambles…). */
+export function parseSuggestedThemes(text: string): SuggestedTheme[] {
+  const start = text.indexOf('[')
+  const end = text.lastIndexOf(']')
+  if (start < 0 || end <= start) return []
+  let raw: unknown
+  try {
+    raw = JSON.parse(text.slice(start, end + 1))
+  } catch {
+    return []
+  }
+  if (!Array.isArray(raw)) return []
+  const out: SuggestedTheme[] = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue
+    const { label, description } = item as Record<string, unknown>
+    if (typeof label !== 'string' || !label.trim()) continue
+    out.push({
+      label: label.trim().slice(0, 60),
+      description: typeof description === 'string' ? description.trim().slice(0, 300) : '',
+    })
+  }
+  return out
+}
+
+/**
+ * Ask the summary model for a finer theme list built from recent article
+ * titles. Nothing is stored: the reader reviews the proposal first.
+ */
+export async function suggestThemes(
+  titles: string[],
+  currentThemes: SuggestedTheme[],
+  count: number,
+): Promise<{ themes: SuggestedTheme[] } & AiTextResult> {
+  const config: AiTaskConfig = {
+    providerKey: 'summary.provider',
+    modelKey: 'summary.model',
+    defaultModel: TASK_DEFAULTS.summarize.model,
+    maxTokensKey: 'classify.suggest_max_tokens',
+    defaultMaxTokens: SUGGEST_THEMES_MAX_TOKENS,
+    buildPrompt: buildSuggestThemesPrompt(currentThemes, count),
+  }
+  const r = await runAiTask(config, titles.map(title => `- ${title}`).join('\n'))
+  return {
+    themes: parseSuggestedThemes(r.text),
+    inputTokens: r.inputTokens,
+    outputTokens: r.outputTokens,
+    billingMode: r.billingMode,
+    model: r.model,
+  }
+}

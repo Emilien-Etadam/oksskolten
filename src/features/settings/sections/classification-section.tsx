@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
-import { Loader2, Plus, Play, RefreshCw, Trash2 } from 'lucide-react'
+import { Loader2, Plus, Play, RefreshCw, Sparkles, Trash2 } from 'lucide-react'
 import { fetcher, apiPatch, apiPost } from '../../../lib/fetcher'
 import { useI18n } from '@/i18n'
 import { RadioGroup } from '@/components/ui/radio-group'
@@ -37,6 +37,7 @@ export function ClassificationSection() {
   const [themeTheta, setThemeTheta] = useState('')
   const [themes, setThemes] = useState<ClassOption[]>([])
   const [themesDirty, setThemesDirty] = useState(false)
+  const [suggesting, setSuggesting] = useState(false)
   const [testTitle, setTestTitle] = useState('')
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
@@ -90,6 +91,26 @@ export function ClassificationSection() {
       setThemesDirty(false)
       toast.success(t('classification.themesSaved'))
     }
+  }
+
+  // Loads a proposal into the editor; nothing is saved until "Save themes"
+  async function suggest() {
+    setSuggesting(true)
+    try {
+      const res = await apiPost('/api/classification/suggest-themes', {}) as { themes: ClassOption[]; sampled: number }
+      setThemes(res.themes)
+      setThemesDirty(true)
+      toast.success(t('classification.themesSuggested', { themes: String(res.themes.length), count: String(res.sampled) }))
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err))
+    } finally {
+      setSuggesting(false)
+    }
+  }
+
+  function discardThemes() {
+    if (settings) setThemes(settings.themes)
+    setThemesDirty(false)
   }
 
   async function runTest() {
@@ -241,7 +262,23 @@ export function ClassificationSection() {
               <button type="button" disabled={!themesDirty} onClick={() => { void saveThemes() }} className={buttonClass}>
                 {t('classification.saveThemes')}
               </button>
+              {themesDirty && (
+                <button type="button" onClick={discardThemes} className={buttonClass}>
+                  {t('classification.discardThemes')}
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={suggesting}
+                onClick={() => { void suggest() }}
+                className={buttonClass}
+                title={t('classification.suggestThemesDesc')}
+              >
+                {suggesting ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                {t('classification.suggestThemes')}
+              </button>
             </div>
+            <p className="text-xs text-muted mt-2">{t('classification.suggestThemesDesc')}</p>
           </div>
 
           <div className="mt-5">
