@@ -186,8 +186,11 @@ describe('classification API', () => {
       { id: 'SPORT', label: 'Sport', description: 'football' },
       { id: 'OTHER', label: 'Other', description: 'none of the above' },
     ]
-    const filtered = (id: number) =>
-      ({ ...getDb().prepare('SELECT filtered_at, hidden_by_theme FROM articles WHERE id = ?').get(id) as object, _metadata: undefined }) as { filtered_at: string | null; hidden_by_theme: string | null }
+    const filtered = (id: number) => {
+      // Pick the columns: libsql rows also carry a _metadata field
+      const row = getDb().prepare('SELECT filtered_at, hidden_by_theme FROM articles WHERE id = ?').get(id) as { filtered_at: string | null; hidden_by_theme: string | null }
+      return { filtered_at: row.filtered_at, hidden_by_theme: row.hidden_by_theme }
+    }
 
     function seed() {
       const feed = createFeed({ name: 'Mix', url: 'https://mix.example.com' })
