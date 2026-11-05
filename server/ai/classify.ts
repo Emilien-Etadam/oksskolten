@@ -1,5 +1,6 @@
 import notjev from 'notjev'
 import { getSetting, upsertSetting } from '../db.js'
+import { getDb } from '../db/connection.js'
 import { getVllmBaseUrl, getVllmApiKey } from './providers/llm/vllm.js'
 import { toWellFormedText, truncateChars } from '../lib/text.js'
 import {
@@ -55,7 +56,7 @@ export function sanitizeThemes(input: unknown): ClassOption[] | null {
     if (!id || seen.has(id)) return null
     seen.add(id)
     const description = typeof r.description === 'string' ? r.description.trim() : ''
-    themes.push({ id, label: label || id, description })
+    themes.push({ id, label: label || id, description, ...(r.hidden === true ? { hidden: true } : {}) })
   }
   if (themes.length === 0 || themes.length > MAX_THEMES) return null
   return themes
@@ -94,6 +95,32 @@ export function saveClassificationSettings(patch: Partial<ClassificationSettings
   if (patch.themeTheta !== undefined) upsertSetting(KEYS.themeTheta, String(patch.themeTheta))
   if (patch.themes !== undefined) upsertSetting(KEYS.themes, JSON.stringify(patch.themes))
   if (patch.hideCategories !== undefined) upsertSetting(KEYS.hideCategories, patch.hideCategories ? 'on' : 'off')
+}
+
+/**
+ * Make articles follow the hidden flag of their theme: hide (filtered_at +
+ * hidden_by_theme) those whose theme is hidden, and bring back those hidden
+ * by a theme that no longer is (un-hidden, renamed or removed). Articles the
+ * AI filter or a rule hid are never touched. `articleId` limits it to one
+ * article, after it was classified.
+ */
+export function syncHiddenThemes(articleId?: number): void {
+  const hidden = JSON.stringify(getThemes().filter(th => th.hidden).map(th => th.id))
+  const scope = articleId === undefined ? '' : 'AND id = @articleId'
+  const params = { hidden, articleId: articleId ?? null }
+  const db = getDb()
+  db.prepare(`
+    UPDATE articles SET filtered_at = NULL, hidden_by_theme = NULL
+    WHERE hidden_by_theme IS NOT NULL
+      AND (theme IS NULL OR theme != hidden_by_theme OR theme NOT IN (SELECT value FROM json_each(@hidden)))
+      ${scope}
+  `).run(params)
+  db.prepare(`
+    UPDATE articles SET filtered_at = datetime('now'), hidden_by_theme = theme
+    WHERE filtered_at IS NULL AND purged_at IS NULL
+      AND theme IN (SELECT value FROM json_each(@hidden))
+      ${scope}
+  `).run(params)
 }
 
 export function resolveModel(settings: ClassificationSettings): string {

@@ -8,6 +8,7 @@ import {
   getClassificationSettings,
   saveClassificationSettings,
   sanitizeThemes,
+  syncHiddenThemes,
 } from './classify.js'
 import { enqueueClassifyBackfill, countPendingClassify } from './queue.js'
 import { getReaderContext } from '../intelligence/journal-db.js'
@@ -26,6 +27,7 @@ const SettingsBody = z.object({
     id: z.string().max(40).optional(),
     label: z.string().max(60),
     description: z.string().max(300).optional(),
+    hidden: z.boolean().optional(),
   })).min(1).max(MAX_THEMES).optional(),
 })
 
@@ -104,7 +106,7 @@ export async function classificationRoutes(api: FastifyInstance): Promise<void> 
       enabled: settings.enabled,
       hideCategories: settings.enabled && settings.hideCategories,
       formats: withCounts(FORMATS, unreadCounts('format')),
-      themes: withCounts(settings.themes, unreadCounts('theme')),
+      themes: withCounts(settings.themes.filter(th => !th.hidden), unreadCounts('theme')),
       unclassified,
       pending: countPendingClassify(),
     }
@@ -127,6 +129,7 @@ export async function classificationRoutes(api: FastifyInstance): Promise<void> 
       }
     }
     saveClassificationSettings({ ...body, themes })
+    if (themes) syncHiddenThemes()
     reply.send(getClassificationSettings())
   })
 
@@ -178,6 +181,9 @@ export async function classificationRoutes(api: FastifyInstance): Promise<void> 
       return
     }
     if (body.all) {
+      // Bring back what hidden themes hid, so it gets classified again; the
+      // worker hides it anew if it lands in a hidden theme
+      getDb().prepare('UPDATE articles SET filtered_at = NULL, hidden_by_theme = NULL WHERE hidden_by_theme IS NOT NULL').run()
       getDb().prepare('UPDATE articles SET format = NULL, theme = NULL, classified_at = NULL WHERE id IN (SELECT id FROM active_articles)').run()
     }
     reply.send({ queued: enqueueClassifyBackfill() })

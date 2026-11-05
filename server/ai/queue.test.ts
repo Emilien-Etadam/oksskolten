@@ -11,6 +11,7 @@ const mockEvaluateRelevance = vi.fn()
 const mockGetFeedById = vi.fn()
 const mockDbAll = vi.fn()
 const mockClassifyArticle = vi.fn()
+const mockSyncHiddenThemes = vi.fn()
 
 vi.mock('../db.js', () => ({
   getSetting: (key: string) => mockGetSetting(key),
@@ -47,6 +48,7 @@ vi.mock('../intelligence/interests.js', () => ({
 vi.mock('./classify.js', () => ({
   classifyArticle: (input: unknown) => mockClassifyArticle(input),
   isClassificationEnabled: () => mockGetSetting('classify.enabled') === 'on',
+  syncHiddenThemes: (id?: number) => mockSyncHiddenThemes(id),
 }))
 
 import {
@@ -421,6 +423,8 @@ describe('ai-queue classification', () => {
     expect(merged.importance).toBe('ESSENTIAL')
     expect(merged.classified_at).toBeTruthy()
     expect(merged.classify_pending_at).toBeNull()
+    // A theme the reader hid hides the article right away
+    expect(mockSyncHiddenThemes).toHaveBeenCalledWith(5)
   })
 
   it('stores an undecided verdict as null but still marks the article classified', async () => {

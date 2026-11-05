@@ -3,7 +3,7 @@ import { getDb } from '../db/connection.js'
 import { getArticleById, updateArticleContent, updateScore } from '../db/articles.js'
 import { getFeedById } from '../db/feeds.js'
 import { translateArticle, translateTitle, summarizeArticle, evaluateArticleRelevance } from './tasks.js'
-import { classifyArticle, isClassificationEnabled } from './classify.js'
+import { classifyArticle, isClassificationEnabled, syncHiddenThemes } from './classify.js'
 import { getReaderContext } from '../intelligence/journal-db.js'
 import { rescoreArticleInterest } from '../intelligence/interests.js'
 import { Semaphore } from '../fetcher/util.js'
@@ -131,6 +131,7 @@ async function processClassify(item: QueueItem): Promise<void> {
     classified_at: nowIso(),
     classify_pending_at: null,
   })
+  syncHiddenThemes(item.articleId)
   // The interest score counts the reader's affinity for the new theme/format
   rescoreArticleInterest(item.articleId)
   log.debug(`classified article ${item.articleId}: ${r.format ?? `?${r.formatTop}`} / ${r.theme ?? `?${r.themeTop}`} / ${r.importance ?? `?${r.importanceTop}`} (${r.ms} ms)`)
