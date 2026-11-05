@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -94,7 +94,7 @@ export function JournalPage() {
     : null
 
   return (
-    <div className="max-w-3xl mx-auto px-4 md:px-6 py-6 md:py-10 flex flex-col gap-9">
+    <div className="max-w-3xl lg:max-w-5xl mx-auto px-4 md:px-6 py-6 md:py-10 flex flex-col gap-9">
       <header className="flex flex-col gap-5">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-text pb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
           <span>{masthead}</span>
@@ -291,6 +291,63 @@ function EditionBody({ edition, feedback, instructions, onInstructionsChange, lo
   )
 }
 
+/** Right padding of the text column on wide screens: the 15rem margin column plus a 2rem gap */
+const TEXT_COLUMN = 'lg:pr-[17rem]'
+const WIDE_QUERY = '(min-width: 1024px)'
+const NOTE_GAP_PX = 12
+
+/**
+ * Margin-note layout: on wide screens each paragraph's sources sit in the
+ * right margin at the paragraph's height, pushed down only as far as needed
+ * not to overlap the previous group, so the text never moves. Returns the
+ * top of each group and the height the margin needs, or null on narrow
+ * screens, where the notes simply follow their paragraph.
+ */
+function useMarginNotes(count: number) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const paragraphRefs = useRef<(HTMLElement | null)[]>([])
+  const noteRefs = useRef<(HTMLElement | null)[]>([])
+  const [layout, setLayout] = useState<{ tops: number[]; height: number } | null>(null)
+
+  useLayoutEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+    const measure = () => {
+      if (!window.matchMedia(WIDE_QUERY).matches) {
+        setLayout(null)
+        return
+      }
+      const tops: number[] = []
+      let bottom = 0
+      for (let i = 0; i < count; i++) {
+        const paragraph = paragraphRefs.current[i]
+        const note = noteRefs.current[i]
+        const top = Math.max(paragraph?.offsetTop ?? 0, bottom > 0 ? bottom + NOTE_GAP_PX : 0)
+        tops.push(top)
+        if (note) bottom = top + note.offsetHeight
+      }
+      setLayout(prev => (prev && prev.height === bottom && prev.tops.every((t, i) => t === tops[i]) ? prev : { tops, height: bottom }))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(container)
+    for (const note of noteRefs.current) if (note) observer.observe(note)
+    return () => observer.disconnect()
+  }, [count])
+
+  return { containerRef, paragraphRefs, noteRefs, layout }
+}
+
+/** Citation numbers in order of first appearance */
+function citedNumbers(text: string): number[] {
+  const out: number[] = []
+  for (const m of text.matchAll(/\[(\d+)\]/g)) {
+    const n = Number(m[1])
+    if (!out.includes(n)) out.push(n)
+  }
+  return out
+}
+
 function Section({ index, section, label, sources, voteOf, onVote, instruction, onInstructionsChange, locale, t }: {
   index: number
   section: JournalSection
@@ -305,9 +362,18 @@ function Section({ index, section, label, sources, voteOf, onVote, instruction, 
 }) {
   const cited = section.refs.map(n => sources.get(n)).filter((s): s is JournalSource => !!s)
   const paragraphs = section.summary.split(/\n{2,}/).map(p => p.trim()).filter(Boolean)
+  // Each source sits next to the paragraph that cites it first
+  const seen = new Set<number>()
+  const notesByParagraph = paragraphs.map(p => citedNumbers(p)
+    .filter(n => !seen.has(n) && (seen.add(n), true))
+    .map(n => sources.get(n))
+    .filter((s): s is JournalSource => !!s))
+  const others = section.uncited.length + (section.overflow?.length ?? 0) + (section.skipped?.length ?? 0)
+  const { containerRef, paragraphRefs, noteRefs, layout } = useMarginNotes(paragraphs.length)
+
   return (
     <section className={`flex flex-col gap-5 ${index > 0 ? 'border-t border-border pt-8' : ''}`}>
-      <div className="flex items-center gap-3.5">
+      <div className={`flex items-center gap-3.5 ${TEXT_COLUMN}`}>
         <span className="text-4xl font-medium leading-none text-accent" style={{ fontFamily: 'var(--font-article)' }}>
           {String(index + 1).padStart(2, '0')}
         </span>
@@ -317,32 +383,59 @@ function Section({ index, section, label, sources, voteOf, onVote, instruction, 
         </div>
       </div>
 
-      <div className="flex flex-col gap-3.5 text-lg leading-relaxed text-text" style={{ fontFamily: 'var(--font-article)' }}>
-        {paragraphs.length === 0 && <p className="m-0 text-muted">{t('journal.nothingImportant')}</p>}
-        {paragraphs.map((p, i) => <p key={i} className="m-0"><CitedText text={p} sources={sources} /></p>)}
-      </div>
-
-      {cited.length > 0 && (
-        <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2">
-          {cited.map(source => (
-            <SourceCard key={source.n} source={source} vote={voteOf(source.article_id)} onVote={onVote} locale={locale} t={t} />
+      {paragraphs.length === 0 && (
+        <p className={`m-0 text-lg text-muted ${TEXT_COLUMN}`} style={{ fontFamily: 'var(--font-article)' }}>{t('journal.nothingImportant')}</p>
+      )}
+      {paragraphs.length > 0 && (
+        <div ref={containerRef} className={`relative flex flex-col gap-3.5 ${TEXT_COLUMN}`} style={layout ? { minHeight: layout.height } : undefined}>
+          {paragraphs.map((p, i) => (
+            <Fragment key={i}>
+              <p
+                ref={el => { paragraphRefs.current[i] = el }}
+                className="m-0 text-lg leading-relaxed text-text"
+                style={{ fontFamily: 'var(--font-article)' }}
+              >
+                <CitedText text={p} sources={sources} />
+              </p>
+              {notesByParagraph[i].length > 0 && (
+                <aside
+                  ref={el => { noteRefs.current[i] = el }}
+                  aria-label={t('journal.sources')}
+                  className="flex flex-col gap-3 lg:absolute lg:right-0 lg:w-60"
+                  style={layout ? { top: layout.tops[i] } : undefined}
+                >
+                  {notesByParagraph[i].map(source => (
+                    <SourceNote key={source.n} source={source} vote={voteOf(source.article_id)} onVote={onVote} locale={locale} t={t} />
+                  ))}
+                </aside>
+              )}
+            </Fragment>
           ))}
         </div>
       )}
 
-      {section.uncited.length > 0 && (
-        <ArticleRefList label={t('journal.showUncited', { count: String(section.uncited.length) })} articles={section.uncited} />
+      {others > 0 && (
+        <details className={TEXT_COLUMN}>
+          <summary className="cursor-pointer select-none text-sm font-semibold text-muted hover:text-text">
+            {t('journal.otherArticles', { count: String(others) })}
+          </summary>
+          <div className="mt-3 flex flex-col gap-4">
+            {section.uncited.length > 0 && (
+              <ArticleRefList label={t('journal.showUncited', { count: String(section.uncited.length) })} articles={section.uncited} />
+            )}
+            {(section.overflow?.length ?? 0) > 0 && (
+              <ArticleRefList label={t('journal.showOverflow', { count: String(section.overflow!.length) })} articles={section.overflow!} />
+            )}
+            {(section.skipped?.length ?? 0) > 0 && (
+              <ArticleRefList label={t('journal.showSkipped', { count: String(section.skipped!.length) })} articles={section.skipped!} />
+            )}
+          </div>
+        </details>
       )}
 
-      {(section.overflow?.length ?? 0) > 0 && (
-        <ArticleRefList label={t('journal.showOverflow', { count: String(section.overflow!.length) })} articles={section.overflow!} muted />
-      )}
-
-      {(section.skipped?.length ?? 0) > 0 && (
-        <ArticleRefList label={t('journal.showSkipped', { count: String(section.skipped!.length) })} articles={section.skipped!} muted />
-      )}
-
-      <InstructionBox theme={section.theme} value={instruction} onSaved={onInstructionsChange} t={t} />
+      <div className={TEXT_COLUMN}>
+        <InstructionBox theme={section.theme} value={instruction} onSaved={onInstructionsChange} t={t} />
+      </div>
     </section>
   )
 }
@@ -376,7 +469,8 @@ function CitedText({ text, sources, inverse = false }: { text: string; sources: 
   )
 }
 
-function SourceCard({ source, vote, onVote, locale, t }: {
+/** A cited source as a margin note next to the paragraph citing it */
+function SourceNote({ source, vote, onVote, locale, t }: {
   source: JournalSource
   vote: number
   onVote: (articleId: number, value: -1 | 1) => Promise<void>
@@ -402,33 +496,33 @@ function SourceCard({ source, vote, onVote, locale, t }: {
     }
   }
 
+  const iconButton = 'flex h-7 w-7 items-center justify-center rounded-md transition-colors'
   return (
-    <article className="flex flex-col gap-2.5 rounded-2xl border border-border bg-bg-card p-3.5">
-      <div className="flex items-center gap-2 text-xs text-muted">
-        <span className="flex-1 truncate">
+    <article className="flex flex-col gap-1">
+      <div className="flex items-baseline gap-1.5 text-[11px] text-muted">
+        <span className="font-bold text-accent">{source.n}</span>
+        <span className="truncate">
           {source.feed_name}
           {source.published_at && ` · ${formatRelativeDate(source.published_at, locale, { justNow: t('date.justNow') })}`}
         </span>
-        <span className="font-bold text-accent">{source.n}</span>
       </div>
       <a
         href={path}
         onClick={e => { e.preventDefault(); void navigate(path) }}
-        className="font-semibold leading-snug text-text hover:underline"
+        className="line-clamp-3 text-sm font-semibold leading-snug text-text hover:underline"
       >
         {source.title}
       </a>
-      <div className="flex items-center gap-1.5">
+      <div className="-ml-1.5 flex items-center gap-0.5">
         <button
           type="button"
           onClick={() => { void onVote(source.article_id, 1) }}
           aria-pressed={vote === 1}
-          className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-colors ${
-            vote === 1 ? 'border-success text-success' : 'border-border text-muted hover:text-text'
-          }`}
+          aria-label={t('journal.more')}
+          title={t('journal.more')}
+          className={`${iconButton} ${vote === 1 ? 'text-success' : 'text-muted hover:bg-hover hover:text-text'}`}
         >
           <ThumbsUp size={14} strokeWidth={1.8} aria-hidden="true" />
-          {t('journal.more')}
         </button>
         <button
           type="button"
@@ -436,9 +530,7 @@ function SourceCard({ source, vote, onVote, locale, t }: {
           aria-pressed={vote === -1}
           aria-label={t('journal.less')}
           title={t('journal.less')}
-          className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
-            vote === -1 ? 'border-error text-error' : 'border-border text-muted hover:text-text'
-          }`}
+          className={`${iconButton} ${vote === -1 ? 'text-error' : 'text-muted hover:bg-hover hover:text-text'}`}
         >
           <ThumbsDown size={14} strokeWidth={1.8} aria-hidden="true" />
         </button>
@@ -448,9 +540,7 @@ function SourceCard({ source, vote, onVote, locale, t }: {
           disabled={archived}
           aria-label={archived ? t('journal.archived') : t('journal.archive')}
           title={archived ? t('journal.archived') : t('journal.archive')}
-          className={`ml-auto flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
-            archived ? 'border-accent text-accent' : 'border-border text-muted hover:text-text'
-          }`}
+          className={`${iconButton} ${archived ? 'text-accent' : 'text-muted hover:bg-hover hover:text-text'}`}
         >
           <Paperclip size={14} strokeWidth={1.8} aria-hidden="true" />
         </button>
@@ -459,14 +549,12 @@ function SourceCard({ source, vote, onVote, locale, t }: {
   )
 }
 
-function ArticleRefList({ label, articles, muted = false }: { label: string; articles: JournalArticleRef[]; muted?: boolean }) {
+function ArticleRefList({ label, articles }: { label: string; articles: JournalArticleRef[] }) {
   const navigate = useNavigate()
   return (
-    <details>
-      <summary className={`cursor-pointer select-none text-sm font-semibold ${muted ? 'text-muted hover:text-text' : 'text-accent'}`}>
-        {label}
-      </summary>
-      <ul className="mt-2 flex flex-col gap-1.5 pl-1">
+    <div>
+      <h3 className="m-0 mb-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-muted">{label}</h3>
+      <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
         {articles.map(a => {
           const path = articleUrlToPath(a.url)
           return (
@@ -477,7 +565,7 @@ function ArticleRefList({ label, articles, muted = false }: { label: string; art
           )
         })}
       </ul>
-    </details>
+    </div>
   )
 }
 
