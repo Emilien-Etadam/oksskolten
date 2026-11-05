@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
-import { Loader2, Plus, Play, RefreshCw, Sparkles, Trash2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Plus, Play, RefreshCw, Sparkles, Trash2 } from 'lucide-react'
 import { fetcher, apiPatch, apiPost } from '../../../lib/fetcher'
 import { useI18n } from '@/i18n'
 import { RadioGroup } from '@/components/ui/radio-group'
@@ -84,7 +84,7 @@ export function ClassificationSection() {
     // A new row has no id yet: the server derives one from the label
     const cleaned = themes
       .filter(th => th.label.trim())
-      .map(th => ({ id: th.id || undefined, label: th.label, description: th.description }))
+      .map(th => ({ id: th.id || undefined, label: th.label, description: th.description, hidden: th.hidden || undefined }))
     const next = await save({ themes: cleaned as ClassOption[] })
     if (next) {
       setThemes(next.themes)
@@ -227,16 +227,26 @@ export function ClassificationSection() {
                     value={th.label}
                     placeholder={t('classification.themeLabel')}
                     onChange={e => updateTheme(i, { label: e.target.value })}
-                    className={`${inputClass} w-40`}
+                    className={`${inputClass} w-40${th.hidden ? ' opacity-50' : ''}`}
                     aria-label={t('classification.themeLabel')}
                   />
                   <input
                     value={th.description}
                     placeholder={t('classification.themeDescription')}
                     onChange={e => updateTheme(i, { description: e.target.value })}
-                    className={`${inputClass} flex-1 min-w-0`}
+                    className={`${inputClass} flex-1 min-w-0${th.hidden ? ' opacity-50' : ''}`}
                     aria-label={t('classification.themeDescription')}
                   />
+                  <button
+                    type="button"
+                    onClick={() => updateTheme(i, { hidden: !th.hidden })}
+                    className={th.hidden ? 'text-accent p-1' : 'text-muted hover:text-text p-1'}
+                    aria-label={t(th.hidden ? 'classification.showTheme' : 'classification.hideTheme')}
+                    aria-pressed={!!th.hidden}
+                    title={t(th.hidden ? 'classification.showTheme' : 'classification.hideTheme')}
+                  >
+                    {th.hidden ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
                   <button
                     type="button"
                     onClick={() => { setThemes(prev => prev.filter((_, j) => j !== i)); setThemesDirty(true) }}

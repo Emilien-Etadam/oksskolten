@@ -4,6 +4,7 @@ import { buildApp } from '../__tests__/helpers/buildApp.js'
 import { createFeed, insertArticle } from '../db.js'
 import { getDb } from '../db/connection.js'
 import { _resetAiQueueForTests } from './queue.js'
+import { syncHiddenThemes } from './classify.js'
 import type { FastifyInstance } from 'fastify'
 
 let app: FastifyInstance
@@ -177,5 +178,75 @@ describe('classification API', () => {
     expect(created.statusCode).toBeLessThan(300)
     const folders = (await app.inject({ method: 'GET', url: '/api/smart-folders' })).json().folders
     expect(folders[0].unread_count).toBe(1)
+  })
+
+  describe('hidden themes', () => {
+    const themes = [
+      { id: 'LINUX', label: 'Linux', description: 'kernel' },
+      { id: 'SPORT', label: 'Sport', description: 'football' },
+      { id: 'OTHER', label: 'Other', description: 'none of the above' },
+    ]
+    const filtered = (id: number) => {
+      // Pick the columns: libsql rows also carry a _metadata field
+      const row = getDb().prepare('SELECT filtered_at, hidden_by_theme FROM articles WHERE id = ?').get(id) as { filtered_at: string | null; hidden_by_theme: string | null }
+      return { filtered_at: row.filtered_at, hidden_by_theme: row.hidden_by_theme }
+    }
+
+    function seed() {
+      const feed = createFeed({ name: 'Mix', url: 'https://mix.example.com' })
+      const now = new Date().toISOString()
+      const linux = insertArticle({ feed_id: feed.id, title: 'Kernel', url: 'https://mix.example.com/1', published_at: now })
+      const sport = insertArticle({ feed_id: feed.id, title: 'Match', url: 'https://mix.example.com/2', published_at: now })
+      const ruled = insertArticle({ feed_id: feed.id, title: 'Promo', url: 'https://mix.example.com/3', published_at: now })
+      getDb().prepare("UPDATE articles SET theme = 'LINUX' WHERE id = ?").run(linux)
+      getDb().prepare("UPDATE articles SET theme = 'SPORT' WHERE id IN (?, ?)").run(sport, ruled)
+      // Hidden by a rule before the theme was: must stay hidden after un-hiding
+      getDb().prepare("UPDATE articles SET filtered_at = '2026-01-01T00:00:00Z' WHERE id = ?").run(ruled)
+      return { linux, sport, ruled }
+    }
+
+    it('hides the articles of a hidden theme and the theme itself, reversibly', async () => {
+      const { linux, sport, ruled } = seed()
+      const saved = await enable({ themes: themes.map(th => th.id === 'SPORT' ? { ...th, hidden: true } : th) })
+      expect(saved.themes.find((th: { id: string }) => th.id === 'SPORT').hidden).toBe(true)
+      expect(saved.themes.find((th: { id: string }) => th.id === 'LINUX').hidden).toBeUndefined()
+
+      expect(filtered(sport)).toMatchObject({ hidden_by_theme: 'SPORT' })
+      expect(filtered(sport).filtered_at).not.toBeNull()
+      expect(filtered(linux)).toEqual({ filtered_at: null, hidden_by_theme: null })
+      expect(filtered(ruled)).toEqual({ filtered_at: '2026-01-01T00:00:00Z', hidden_by_theme: null })
+
+      const overview = (await app.inject({ method: 'GET', url: '/api/classification' })).json()
+      expect(overview.themes.map((th: { id: string }) => th.id)).toEqual(['LINUX', 'OTHER'])
+
+      await enable({ themes })
+      expect(filtered(sport)).toEqual({ filtered_at: null, hidden_by_theme: null })
+      expect(filtered(ruled)).toEqual({ filtered_at: '2026-01-01T00:00:00Z', hidden_by_theme: null })
+    })
+
+    it('brings articles back when their hidden theme is removed', async () => {
+      const { sport } = seed()
+      await enable({ themes: themes.map(th => th.id === 'SPORT' ? { ...th, hidden: true } : th) })
+      await enable({ themes: themes.filter(th => th.id !== 'SPORT') })
+      expect(filtered(sport)).toEqual({ filtered_at: null, hidden_by_theme: null })
+    })
+
+    it('hides a newly classified article and un-hides it on reclassification', async () => {
+      const { linux } = seed()
+      await enable({ themes: themes.map(th => th.id === 'LINUX' ? { ...th, hidden: true } : th) })
+      expect(filtered(linux).hidden_by_theme).toBe('LINUX')
+
+      getDb().prepare("UPDATE articles SET theme = 'SPORT' WHERE id = ?").run(linux)
+      syncHiddenThemes(linux)
+      expect(filtered(linux)).toEqual({ filtered_at: null, hidden_by_theme: null })
+
+      getDb().prepare("UPDATE articles SET theme = 'LINUX' WHERE id = ?").run(linux)
+      syncHiddenThemes(linux)
+      expect(filtered(linux).hidden_by_theme).toBe('LINUX')
+
+      stubLogprobServer('B')
+      await app.inject({ method: 'POST', url: '/api/classification/backfill', headers: json, payload: { all: true } })
+      expect(filtered(linux).hidden_by_theme).toBeNull()
+    })
   })
 })

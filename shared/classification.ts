@@ -10,6 +10,8 @@ export interface ClassOption {
   id: string
   label: string
   description: string
+  /** Themes only: articles in a hidden theme are hidden everywhere, and the theme leaves the sidebar */
+  hidden?: boolean
 }
 
 export const FORMATS: ClassOption[] = [
