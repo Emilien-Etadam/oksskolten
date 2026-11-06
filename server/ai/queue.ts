@@ -11,8 +11,18 @@ import { logger } from '../logger.js'
 import { DEFAULT_LANGUAGE } from '../../shared/lang.js'
 import type { ArticleDetail } from '../../shared/types.js'
 import { truncateChars } from '../lib/text.js'
+import { isGithubReleaseUrl } from '../feeds/sources/github-releases.js'
 
 const log = logger.child('ai-queue')
+
+/**
+ * Titles that must stay in their original language. A GitHub release title is
+ * a version string or project name ("v2.3.0", "Release 1.4 – Foo") that a
+ * translation only garbles.
+ */
+function keepsOriginalTitle(article: Pick<ArticleDetail, 'url'>): boolean {
+  return isGithubReleaseUrl(article.url)
+}
 
 export type AiQueueTask = 'translate' | 'summarize' | 'filter' | 'classify'
 
@@ -178,6 +188,10 @@ async function processTranslate(item: QueueItem): Promise<void> {
   }
 
   if (scope === 'titles') {
+    if (keepsOriginalTitle(article)) {
+      markPending('translate', item.articleId, null)
+      return
+    }
     await translateTitleOnly(item, article)
     return
   }
@@ -191,7 +205,7 @@ async function processTranslate(item: QueueItem): Promise<void> {
 
   // Title translation is best-effort: a failure must not lose the body translation
   let titleTranslated = article.title_translated
-  try {
+  if (!keepsOriginalTitle(article)) try {
     const t = await translateTitle(article.title, { provider: 'vllm' })
     if (t.titleTranslated.trim()) titleTranslated = t.titleTranslated
   } catch (err) {
@@ -408,7 +422,7 @@ export function translateArticleTitle(articleId: number): void {
   void (async () => {
     try {
       const article = getArticleById(articleId)
-      if (!article?.title) return
+      if (!article?.title || keepsOriginalTitle(article)) return
       const result = await translateTitle(article.title)
       if (result.titleTranslated.trim()) {
         updateArticleContent(articleId, { title_translated: result.titleTranslated })
