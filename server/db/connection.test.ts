@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setupTestDb } from '../__tests__/helpers/testDb.js'
 import { bindNamedParams, runNamed, getNamed, allNamed, getDb, runMigrations } from './connection.js'
@@ -93,6 +95,29 @@ describe('runMigrations', () => {
   it('records applied migrations', () => {
     const applied = getDb().prepare('SELECT name FROM _migrations').all() as { name: string }[]
     expect(applied.length).toBeGreaterThan(0)
+  })
+})
+
+describe('0025_untranslate_github_release_titles', () => {
+  it('clears translated titles of GitHub releases only', () => {
+    const db = getDb()
+    db.prepare("INSERT INTO feeds (id, name, url) VALUES (1, 'Feed', 'https://example.com/feed')").run()
+    const insert = db.prepare('INSERT INTO articles (id, feed_id, title, title_translated, full_text_translated, url) VALUES (?, 1, ?, ?, ?, ?)')
+    insert.run(1, 'v2.3.0', 'v2.3.0 traduit', 'Corps traduit', 'https://github.com/owner/repo/releases/tag/v2.3.0')
+    insert.run(2, 'v1.0', 'v1.0 traduit', null, 'https://www.github.com/owner/repo/releases/tag/v1.0')
+    insert.run(3, 'Blog post', 'Billet', null, 'https://github.com/owner/repo/blob/main/README.md')
+    insert.run(4, 'News', 'Actualité', null, 'https://example.com/releases/tag/v1')
+
+    const sql = fs.readFileSync(path.join(process.cwd(), 'migrations/0025_untranslate_github_release_titles.sql'), 'utf-8')
+    db.exec(sql)
+
+    const rows = db.prepare('SELECT id, title_translated, full_text_translated FROM articles ORDER BY id').all()
+    expect(rows).toEqual([
+      { id: 1, title_translated: null, full_text_translated: 'Corps traduit' },
+      { id: 2, title_translated: null, full_text_translated: null },
+      { id: 3, title_translated: 'Billet', full_text_translated: null },
+      { id: 4, title_translated: 'Actualité', full_text_translated: null },
+    ])
   })
 })
 

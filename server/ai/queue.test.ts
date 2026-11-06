@@ -327,6 +327,49 @@ describe('ai-queue', () => {
     })
   })
 
+  describe('github release titles', () => {
+    const release = {
+      id: 1, title: 'v2.3.0', title_translated: null,
+      url: 'https://github.com/owner/repo/releases/tag/v2.3.0',
+      full_text: 'Changelog', full_text_translated: null,
+      translated_lang: null, summary: null, lang: 'en',
+    }
+
+    it('titles scope leaves a release title untranslated', async () => {
+      settings({
+        'reading.auto_translate': 'on',
+        'translate.target_lang': 'fr',
+        'reading.auto_translate_scope': 'titles',
+      })
+      mockGetArticleById.mockReturnValue(release)
+      enqueueAutoTranslate(1, 'Changelog')
+      await flushQueue()
+
+      expect(mockTranslateTitle).not.toHaveBeenCalled()
+      expect(updatesFor(1).title_translated).toBeUndefined()
+      expect(updatesFor(1).translate_pending_at).toBeNull()
+    })
+
+    it('full scope translates the body but not the release title', async () => {
+      mockGetArticleById.mockReturnValue(release)
+      enqueueAutoTranslate(1, 'Changelog')
+      await flushQueue()
+
+      expect(mockTranslateTitle).not.toHaveBeenCalled()
+      expect(updatesFor(1).full_text_translated).toBe('Texte traduit')
+      expect(updatesFor(1).title_translated).toBeNull()
+    })
+
+    it('translateArticleTitle skips a release title', async () => {
+      mockGetArticleById.mockReturnValue(release)
+      translateArticleTitle(1)
+      await flushQueue()
+
+      expect(mockTranslateTitle).not.toHaveBeenCalled()
+      expect(mockUpdateArticleContent).not.toHaveBeenCalled()
+    })
+  })
+
   describe('ai filter', () => {
     beforeEach(() => {
       mockGetArticleById.mockReturnValue({
